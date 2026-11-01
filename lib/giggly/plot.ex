@@ -279,6 +279,12 @@ defmodule Giggly.Plot do
   # The reference lines, which ggplot2's `annotate()` refuses to draw, since each annotates on its
   # own.
   @reference_line_geoms [:abline, :hline, :vline]
+
+  # The annotations that run along a range, checked as their layer functions check one.
+  @range_geoms [:linerange, :pointrange, :errorbar, :crossbar]
+
+  # The geoms `stat_summary/3` draws with.
+  @summary_geoms Options.summary_geoms()
   @theme_drawn_kinds Options.theme_drawn_kinds()
 
   # What every function choosing a complete theme does to the plot's theme and the settings laid
@@ -1251,6 +1257,331 @@ defmodule Giggly.Plot do
   end
 
   @doc """
+  Adds a layer of line ranges: a vertical line for each row from its `ymin` to its `ymax` at its
+  `x`, for an interval round a value, or a horizontal one from its `xmin` to its `xmax` at its
+  `y`.
+
+  Line ranges use `:x`, `:y`, `:xmin`, `:xmax`, `:ymin`, `:ymax`, `:group`, `:alpha`, `:color`,
+  `:linetype` and `:linewidth`. A layer given `:ymin` or `:ymax` runs up the panel and needs `:x`,
+  `:ymin` and `:ymax`; one given neither runs across it and needs `:y`, `:xmin` and `:xmax`; and
+  `orientation:` chooses either way. A row missing a position, its width or its line type draws no
+  line, and an infinite end reaches the panel's edge. Each line takes its own row's colour, alpha,
+  width and line type; a colour of `:none` draws none, and so does the line type `:blank`. Under
+  `coord_radial/1` a line follows the panel's curves.
+
+  Raises `ArgumentError` where the layer lacks one of the three positions its lines run along.
+
+  ## Options
+
+  #{NimbleOptions.docs(Options.linerange())}
+
+      iex> frame =
+      ...>   %{"trt" => [1, 2], "resp" => [1.0, 3.0], "lower" => [0.8, 2.4], "upper" => [1.1, 3.3]}
+      ...>   |> Giggly.Plot.new(%{x: :trt, y: :resp})
+      ...>   |> Giggly.Plot.geom_linerange(%{ymin: :lower, ymax: :upper})
+      ...>   |> Giggly.layer_data()
+      iex> {Giggly.DataFrame.pull(frame, :ymin), Giggly.DataFrame.pull(frame, :ymax)}
+      {[0.8, 2.4], [1.1, 3.3]}
+
+  Ranges given `:xmin` and `:xmax` run across the panel:
+
+      iex> frame =
+      ...>   %{"trt" => [1, 2], "lower" => [0.8, 2.4], "upper" => [1.1, 3.3]}
+      ...>   |> Giggly.Plot.new(%{y: :trt, xmin: :lower, xmax: :upper})
+      ...>   |> Giggly.Plot.geom_linerange()
+      ...>   |> Giggly.layer_data()
+      iex> Giggly.DataFrame.pull(frame, :flipped_aes)
+      [true, true]
+  """
+  @spec geom_linerange(t(), mapping_argument() | keyword(), keyword()) :: t()
+  def geom_linerange(plot, mapping_or_options \\ %{}, options \\ [])
+
+  def geom_linerange(%__MODULE__{} = plot, options, []) when is_list(options),
+    do: geom_linerange(plot, %{}, options)
+
+  def geom_linerange(%__MODULE__{} = plot, mapping, options)
+      when is_map(mapping) and is_list(options) do
+    validated = layer_options(options, Options.linerange())
+    data = own_data(validated)
+
+    layer = %Layer{
+      geom: linerange_geom(validated),
+      stat: %Stat.Identity{},
+      position: position(Keyword.fetch!(validated, :position)),
+      data: data,
+      mapping: resolve(mapping, plot, data, "Plot.geom_linerange/3"),
+      fixed: fixed(validated),
+      accepted: Geom.Linerange.accepted_aesthetics(),
+      annotation: false,
+      inherit: true
+    }
+
+    plot
+    |> add_layer(layer, "Plot.geom_linerange/3", required: Geom.Linerange.required_aesthetics())
+    |> check_range(layer, "Plot.geom_linerange/3")
+  end
+
+  @doc """
+  Adds a layer of point ranges: a line range for each row, as `geom_linerange/3` draws one, with
+  a point at its `x` and `y` on it, for a value and the interval round it, such as a mean and its
+  standard error.
+
+  Point ranges use a line range's aesthetics and a point's `:fill`, `:shape`, `:size` and
+  `:stroke`, and need `:x` and `:y` and the range a line range runs along: `:ymin` and `:ymax`
+  up the panel, or `:xmin` and `:xmax` across it, as `orientation:` or the range given says. Every
+  line is drawn before every point, each point four times its `size`, so a small size makes a
+  plain dot on the line. Each line and point takes its own row's look; a row missing a position
+  draws no line, and one missing `x` or `y` no point.
+
+  Raises `ArgumentError` where the layer lacks one of the three positions its lines run along.
+
+  ## Options
+
+  #{NimbleOptions.docs(Options.pointrange())}
+
+      iex> frame =
+      ...>   %{"trt" => [1, 2], "resp" => [1.0, 3.0], "lower" => [0.8, 2.4], "upper" => [1.1, 3.3]}
+      ...>   |> Giggly.Plot.new(%{x: :trt, y: :resp})
+      ...>   |> Giggly.Plot.geom_pointrange(%{ymin: :lower, ymax: :upper}, colour: "red")
+      ...>   |> Giggly.layer_data()
+      iex> {Giggly.DataFrame.pull(frame, :size), Giggly.DataFrame.pull(frame, :stroke)}
+      {[0.5, 0.5], [1.0, 1.0]}
+  """
+  @spec geom_pointrange(t(), mapping_argument() | keyword(), keyword()) :: t()
+  def geom_pointrange(plot, mapping_or_options \\ %{}, options \\ [])
+
+  def geom_pointrange(%__MODULE__{} = plot, options, []) when is_list(options),
+    do: geom_pointrange(plot, %{}, options)
+
+  def geom_pointrange(%__MODULE__{} = plot, mapping, options)
+      when is_map(mapping) and is_list(options) do
+    validated = layer_options(options, Options.pointrange())
+    data = own_data(validated)
+
+    layer = %Layer{
+      geom: pointrange_geom(validated),
+      stat: %Stat.Identity{},
+      position: position(Keyword.fetch!(validated, :position)),
+      data: data,
+      mapping: resolve(mapping, plot, data, "Plot.geom_pointrange/3"),
+      fixed: fixed(validated),
+      accepted: Geom.Pointrange.accepted_aesthetics(),
+      annotation: false,
+      inherit: true
+    }
+
+    plot
+    |> add_layer(layer, "Plot.geom_pointrange/3", required: Geom.Pointrange.required_aesthetics())
+    |> check_range(layer, "Plot.geom_pointrange/3")
+  end
+
+  @doc """
+  Adds a layer of error bars: a vertical line for each row from its `ymin` to its `ymax` at its
+  `x`, with a whisker across each end, for an interval round a value, or, turned, a horizontal
+  one from its `xmin` to its `xmax` at its `y`.
+
+  Error bars use a line range's aesthetics and `:width`, and run up or across the panel as
+  `geom_linerange/3`'s ranges do. Each whisker is as wide as the row's `width`, mapped or set, or
+  else 0.9 of the closest spacing of the positions along the axis the bars are placed on, so bars
+  at neighbouring positions never meet. A row missing a position draws none of its lines that
+  need it, and each bar takes its own row's colour, alpha, width and line type.
+
+  Raises `ArgumentError` where the layer lacks one of the three positions its bars run along, and
+  where a mapped `:width` is not a number.
+
+  ## Options
+
+  #{NimbleOptions.docs(Options.errorbar())}
+
+      iex> frame =
+      ...>   %{"trt" => [1, 2], "resp" => [1.0, 3.0], "lower" => [0.8, 2.4], "upper" => [1.1, 3.3]}
+      ...>   |> Giggly.Plot.new(%{x: :trt, y: :resp})
+      ...>   |> Giggly.Plot.geom_errorbar(%{ymin: :lower, ymax: :upper}, width: 0.2)
+      ...>   |> Giggly.layer_data()
+      iex> {Giggly.DataFrame.pull(frame, :xmin), Giggly.DataFrame.pull(frame, :xmax)}
+      {[0.9, 1.9], [1.1, 2.1]}
+  """
+  @spec geom_errorbar(t(), mapping_argument() | keyword(), keyword()) :: t()
+  def geom_errorbar(plot, mapping_or_options \\ %{}, options \\ [])
+
+  def geom_errorbar(%__MODULE__{} = plot, options, []) when is_list(options),
+    do: geom_errorbar(plot, %{}, options)
+
+  def geom_errorbar(%__MODULE__{} = plot, mapping, options)
+      when is_map(mapping) and is_list(options) do
+    validated = layer_options(options, Options.errorbar())
+    data = own_data(validated)
+
+    layer = %Layer{
+      geom: errorbar_geom(validated),
+      stat: %Stat.Identity{},
+      position: position(Keyword.fetch!(validated, :position)),
+      data: data,
+      mapping: resolve(mapping, plot, data, "Plot.geom_errorbar/3"),
+      fixed: fixed(validated),
+      accepted: Geom.Errorbar.accepted_aesthetics(),
+      annotation: false,
+      inherit: true
+    }
+
+    plot
+    |> add_layer(layer, "Plot.geom_errorbar/3", required: Geom.Errorbar.required_aesthetics())
+    |> check_range(layer, "Plot.geom_errorbar/3")
+    |> check_numbers(
+      layer,
+      "Plot.geom_errorbar/3",
+      :width,
+      "an error bar is drawn as wide as its width"
+    )
+  end
+
+  @doc """
+  Adds a layer of crossbars: a box for each row from its `ymin` to its `ymax`, with a line across
+  it at its `y`, for a value and the interval round it, or, turned, a box from its `xmin` to its
+  `xmax` with a line up it at its `x`.
+
+  Crossbars use a line range's aesthetics, `:fill` and `:width`, and need `:x` and `:y` and the
+  range a line range runs along, as `geom_linerange/3` takes it. Each box is as wide as the row's
+  `width`, as `geom_errorbar/3` sizes its whiskers. Every box is drawn before every line across,
+  which is 2.5 times as wide as the box's border unless `middle_linewidth:` says otherwise; the
+  box's fill takes the row's alpha, its border and line across their colour's own. The
+  `middle_` and `box_` options give the line across and the box's border a look of their own.
+
+  Raises `ArgumentError` where the layer lacks one of the three positions its boxes run along, and
+  where a mapped `:width` is not a number.
+
+  ## Options
+
+  #{NimbleOptions.docs(Options.crossbar())}
+
+      iex> frame =
+      ...>   %{"trt" => [1, 2], "resp" => [1.0, 3.0], "lower" => [0.8, 2.4], "upper" => [1.1, 3.3]}
+      ...>   |> Giggly.Plot.new(%{x: :trt, y: :resp})
+      ...>   |> Giggly.Plot.geom_crossbar(%{ymin: :lower, ymax: :upper}, middle_colour: "red")
+      ...>   |> Giggly.layer_data()
+      iex> {Giggly.DataFrame.pull(frame, :xmin), Giggly.DataFrame.pull(frame, :xmax)}
+      {[0.55, 1.55], [1.45, 2.45]}
+  """
+  @spec geom_crossbar(t(), mapping_argument() | keyword(), keyword()) :: t()
+  def geom_crossbar(plot, mapping_or_options \\ %{}, options \\ [])
+
+  def geom_crossbar(%__MODULE__{} = plot, options, []) when is_list(options),
+    do: geom_crossbar(plot, %{}, options)
+
+  def geom_crossbar(%__MODULE__{} = plot, mapping, options)
+      when is_map(mapping) and is_list(options) do
+    validated = layer_options(options, Options.crossbar())
+    data = own_data(validated)
+
+    layer = %Layer{
+      geom: crossbar_geom(validated),
+      stat: %Stat.Identity{},
+      position: position(Keyword.fetch!(validated, :position)),
+      data: data,
+      mapping: resolve(mapping, plot, data, "Plot.geom_crossbar/3"),
+      fixed: fixed(validated),
+      accepted: Geom.Crossbar.accepted_aesthetics(),
+      annotation: false,
+      inherit: true
+    }
+
+    plot
+    |> add_layer(layer, "Plot.geom_crossbar/3", required: Geom.Crossbar.required_aesthetics())
+    |> check_range(layer, "Plot.geom_crossbar/3")
+    |> check_numbers(
+      layer,
+      "Plot.geom_crossbar/3",
+      :width,
+      "a crossbar is drawn as wide as its width"
+    )
+  end
+
+  @doc """
+  Adds a layer summarising the `y` values at each `x`: for each group, a row at each of its `x`
+  positions, its `y` a summary of the values there and its `ymin` and `ymax` an interval round
+  it, drawn as point ranges unless `geom:` says otherwise. Given no summary, it is the mean less
+  and plus one standard error, which a position holding one value has no interval for. A row
+  missing its `x` or `y`, or at an infinite one, is left out.
+
+  `fun_data:` gives the whole summary by name; `fun:`, `fun_min:` and `fun_max:` give its `y`,
+  `ymin` and `ymax` one at a time, by name or as a function of the values, and one not given is
+  missing, so `fun: :mean` alone draws points with no ranges.
+
+  Where `y` alone is discrete, the `x` values are summarised at each `y` instead, into `x`,
+  `xmin` and `xmax`, and the marks run across the panel; `orientation:` says which way.
+
+  A summary uses `:x`, `:y` and `:group` and the aesthetics its geom draws with, and needs `:x` and
+  `:y`; it writes the range, so `:ymin`, `:ymax`, `:xmin` and `:xmax` are not mapped. Every other
+  aesthetic goes to the summary at each position where it holds one value among that position's
+  rows, and is missing where it holds more, so a discrete one groups the rows and gives each
+  group its own summaries.
+
+  ## Options
+
+  #{NimbleOptions.docs(Options.summary_stat())}
+
+  Each geom takes the options of its own function but `orientation:`: `:pointrange` those of
+  `geom_pointrange/3`, `:point` of `geom_point/3`, `:line` of `geom_line/3`, `:bar` of
+  `geom_col/3`, `:crossbar` of `geom_crossbar/3`, `:errorbar` of `geom_errorbar/3`, `:linerange`
+  of `geom_linerange/3` and `:ribbon` of `geom_ribbon/3`. Its `position:` is `:identity` unless
+  given, the bars' included.
+
+  Raises `ArgumentError` for a geom it does not draw with, and for `fun_data:` beside `fun:`,
+  `fun_min:` or `fun_max:`; `NimbleOptions.ValidationError` for an option the geom does not take,
+  or a value it cannot use.
+
+      iex> frame =
+      ...>   %{"cyl" => [4, 4, 6, 6], "mpg" => [22.0, 26.0, 18.0, 20.0]}
+      ...>   |> Giggly.Plot.new(%{x: :cyl, y: :mpg})
+      ...>   |> Giggly.Plot.stat_summary()
+      ...>   |> Giggly.layer_data()
+      iex> {Giggly.DataFrame.pull(frame, :y), Giggly.DataFrame.pull(frame, :ymin)}
+      {[24.0, 19.0], [22.0, 18.0]}
+  """
+  @spec stat_summary(t(), mapping_argument() | keyword(), keyword()) :: t()
+  def stat_summary(plot, mapping_or_options \\ %{}, options \\ [])
+
+  def stat_summary(%__MODULE__{} = plot, options, []) when is_list(options),
+    do: stat_summary(plot, %{}, options)
+
+  def stat_summary(%__MODULE__{} = plot, mapping, options)
+      when is_map(mapping) and is_list(options) do
+    geom =
+      options
+      |> Aesthetics.canonicalize()
+      |> Keyword.get(:geom, :pointrange)
+      |> summary_geom()
+
+    validated = layer_options(options, Options.summary(geom))
+    data = own_data(validated)
+    {kind, accepted} = summary_kind(geom, Keyword.delete(validated, :orientation))
+
+    layer = %Layer{
+      geom: kind,
+      stat: summary_stat(validated),
+      position: position(Keyword.get(validated, :position, :identity)),
+      data: data,
+      mapping: resolve(mapping, plot, data, "Plot.stat_summary/3"),
+      fixed: fixed(validated),
+      accepted:
+        (Stat.Summary.accepted_aesthetics() ++ accepted)
+        |> Enum.uniq()
+        |> Enum.reject(fn aesthetic -> aesthetic in [:xmin, :xmax, :ymin, :ymax] end)
+        |> Enum.sort(),
+      annotation: false,
+      inherit: true
+    }
+
+    plot
+    |> add_layer(layer, "Plot.stat_summary/3",
+      required: Stat.Summary.required_aesthetics(),
+      computed: Stat.Summary.computed_variables(),
+      dropped: Stat.Summary.dropped_aesthetics()
+    )
+    |> check_summary_width(layer)
+  end
+
+  @doc """
   Adds a layer of horizontal reference lines: a line across the whole panel at each `yintercept`,
   for a threshold, a target or a mean drawn over the data.
 
@@ -1506,13 +1837,7 @@ defmodule Giggly.Plot do
     data = own_data(validated)
 
     layer = %Layer{
-      geom: %Geom.Ribbon{
-        orientation: Keyword.get(validated, :orientation, :none),
-        outline_type: Keyword.fetch!(validated, :outline_type),
-        line_end: Keyword.fetch!(validated, :lineend),
-        line_join: Keyword.fetch!(validated, :linejoin),
-        mitre_limit: Keyword.fetch!(validated, :linemitre)
-      },
+      geom: ribbon_geom(validated),
       stat: %Stat.Identity{},
       position: %Position.Identity{},
       data: data,
@@ -2111,7 +2436,8 @@ defmodule Giggly.Plot do
   @doc """
   Adds an annotation: a layer drawn from values given here rather than from the data's columns,
   for a label, a shaded rectangle or a line placed by hand. `geom` names what draws it: `:point`,
-  `:col` or `:bar`, `:path`, `:line`, `:segment`, `:rug`, `:text`, `:label` or `:rect`.
+  `:col` or `:bar`, `:path`, `:line`, `:segment`, `:rug`, `:linerange`, `:pointrange`,
+  `:errorbar`, `:crossbar`, `:text`, `:label` or `:rect`.
 
   An annotation's positions widen the axes as the data's do. It takes nothing from the plot's
   mapping, titles no axis, is in no legend, and under a facet is drawn in every panel. It is drawn
@@ -2122,10 +2448,10 @@ defmodule Giggly.Plot do
   `x: [2, 3, 4, 5], y: 25` places four. A position is a number, `:infinity` or `:neg_infinity`,
   which reach the panel's edge, `nil` for none, a string on a discrete axis, `true` or `false`, or
   a date, a date-time or a time on such an axis. Of the other options, `label:`, `colour:`,
-  `alpha:` and `fill:` each take a list, its values of one type, and so do a point's `shape:`,
-  `size:` and `stroke:`, a bar's, a segment's, a rug's, a label's or a rectangle's `linewidth:`
-  and `linetype:`, whose list holds line types, a dash pattern among them a tuple, and a path's or
-  a line's `linewidth:`, a line whose width changes along it drawn a segment from each annotation
+  `alpha:` and `fill:` each take a list, its values of one type, and so do a point's or a point
+  range's `shape:`, `size:` and `stroke:`, a bar's, a segment's, a rug's, a range's, a label's or
+  a rectangle's `linewidth:` and `linetype:`, whose list holds line types, a dash pattern among
+  them a tuple, and a path's or a line's `linewidth:`, a line whose width changes along it drawn a segment from each annotation
   to the next; the rest take one value, a label's `label_padding:` one for every label however
   many sides it gives. Under a facet that makes more than one panel, an annotation given such a
   list raises when the plot is run.
@@ -2142,6 +2468,13 @@ defmodule Giggly.Plot do
       `lineend:` and `linejoin:`;
     * `:rug`: `x:`, `y:`, `alpha:`, `colour:`, `linewidth:`, `linetype:`, `sides:`, `length:`,
       `outside:` and `lineend:`;
+    * `:linerange`: `x:`, `y:`, `xmin:`, `xmax:`, `ymin:`, `ymax:`, `orientation:`, `alpha:`,
+      `colour:`, `linewidth:`, `linetype:` and `lineend:`, and `:pointrange` those and `fill:`,
+      `shape:`, `size:` and `stroke:`;
+    * `:errorbar`: a line range's options and `width:`, one value or a list;
+    * `:crossbar`: `x:`, `y:`, `xmin:`, `xmax:`, `ymin:`, `ymax:`, `orientation:`, `width:`,
+      `alpha:`, `colour:`, `fill:`, `linewidth:`, `linetype:`, `lineend:`, `linejoin:` and the
+      `middle_` and `box_` looks, its `width:` one value or a list;
     * `:text`: `x:`, `y:`, `label:`, `check_overlap:`, `alpha:`, `colour:`, `size:`, `angle:`,
       `hjust:`, `vjust:` and `family:`;
     * `:label`: `x:`, `y:`, `label:`, `alpha:`, `colour:`, `fill:`, `linewidth:`, `linetype:`,
@@ -2154,7 +2487,8 @@ defmodule Giggly.Plot do
   (`geom_hline/3`, `geom_vline/3`, `geom_abline/3`).
 
   Raises `ArgumentError` for a geom it does not draw with, for lists of different lengths, for a
-  list whose values are not of one type, and for an aesthetic the geom needs and is not given;
+  list whose values are not of one type, and for an aesthetic the geom needs and is not given, a
+  range's three positions among them, as `geom_linerange/3` refuses them;
   `NimbleOptions.ValidationError` for an option the geom does not take, or a value it cannot draw.
 
       iex> frame =
@@ -2173,11 +2507,16 @@ defmodule Giggly.Plot do
     {kind, accepted, required} = annotation_geom(geom, validated)
     {positions, others} = Enum.split_with(validated, &position?/1)
 
-    annotation_layer(plot, positions, others, kind, "Plot.annotate/3", "annotation",
-      accepted: accepted,
-      required: required,
-      unmet: "the #{inspect(geom)} annotation is given no value for it"
-    )
+    annotated =
+      annotation_layer(plot, positions, others, kind, "Plot.annotate/3", "annotation",
+        accepted: accepted,
+        required: required,
+        unmet: "the #{inspect(geom)} annotation is given no value for it"
+      )
+
+    if geom in @range_geoms,
+      do: check_range(annotated, hd(annotated.reversed_layers), "Plot.annotate/3"),
+      else: annotated
   end
 
   def annotate(%__MODULE__{}, geom, options)
@@ -2189,8 +2528,45 @@ defmodule Giggly.Plot do
 
   def annotate(%__MODULE__{}, geom, options) when is_list(options) do
     raise ArgumentError,
-          "Plot.annotate/3 draws with :point, :col, :bar, :path, :line, :segment, :rug, :text, " <>
-            ":label or :rect, got: #{inspect(geom)}"
+          "Plot.annotate/3 draws with :point, :col, :bar, :path, :line, :segment, :rug, " <>
+            ":linerange, :pointrange, :errorbar, :crossbar, :text, :label or :rect, got: " <>
+            inspect(geom)
+  end
+
+  @doc """
+  A position for the `position:` of the bar functions and the range functions
+  (`geom_linerange/3`, `geom_pointrange/3`, `geom_errorbar/3`, `geom_crossbar/3`), with options:
+  the marks of different groups at one position set side by side, as `position: :dodge` sets
+  them, within the width given.
+
+  The groups at a position share the width, each centred in its share, lowest group first, and
+  each mark keeps its own width over the number of groups. Given no `width:`, they share the width
+  of the panel's first mark, so a bar dodges bars, but marks of different widths drawn over them,
+  such as narrower error bars, are dodged within their own width and miss the bars; give each
+  layer the same `width:`, the bars' width, so they line up. A mark with no width of its own, a
+  line range or a point range, is dodged only within a `width:` given. A position with one group
+  keeps its mark where it is.
+
+  Raises `NimbleOptions.ValidationError` for an option it does not take or a value it cannot use.
+
+  ## Options
+
+  #{NimbleOptions.docs(Options.position_dodge())}
+
+      iex> frame =
+      ...>   %{"x" => ["a", "a"], "y" => [2.0, 3.0], "g" => ["p", "q"]}
+      ...>   |> Giggly.Plot.new(%{x: :x, y: :y, color: :g})
+      ...>   |> Giggly.Plot.geom_linerange(%{ymin: :y, ymax: :y},
+      ...>     position: Giggly.Plot.position_dodge(width: 0.9)
+      ...>   )
+      ...>   |> Giggly.layer_data()
+      iex> Giggly.DataFrame.pull(frame, :x)
+      [0.775, 1.225]
+  """
+  @spec position_dodge(keyword()) :: struct()
+  def position_dodge(options \\ []) when is_list(options) do
+    validated = NimbleOptions.validate!(options, Options.position_dodge())
+    %Position.Dodge{width: Keyword.get(validated, :width, :none)}
   end
 
   @doc """
@@ -5480,8 +5856,9 @@ defmodule Giggly.Plot do
 
   defp position(:identity), do: %Position.Identity{}
   defp position(:stack), do: %Position.Stack{}
-  defp position(:dodge), do: %Position.Dodge{}
+  defp position(:dodge), do: %Position.Dodge{width: :none}
   defp position(:dodge2), do: position_dodge2()
+  defp position(%Position.Dodge{} = position), do: position
   defp position(%Position.Dodge2{} = position), do: position
   defp position(:jitter), do: position_jitter()
   defp position(%Position.Jitter{} = position), do: position
@@ -5567,6 +5944,141 @@ defmodule Giggly.Plot do
     }
   end
 
+  defp ribbon_geom(validated) do
+    %Geom.Ribbon{
+      orientation: Keyword.get(validated, :orientation, :none),
+      outline_type: Keyword.fetch!(validated, :outline_type),
+      line_end: Keyword.fetch!(validated, :lineend),
+      line_join: Keyword.fetch!(validated, :linejoin),
+      mitre_limit: Keyword.fetch!(validated, :linemitre)
+    }
+  end
+
+  # The geom a summary draws with, from its options, its orientation left to the stat, which
+  # writes it in `flipped_aes`, and the aesthetics it draws with.
+  defp summary_kind(:pointrange, validated),
+    do: {pointrange_geom(validated), Geom.Pointrange.accepted_aesthetics()}
+
+  defp summary_kind(:point, _validated), do: {%Geom.Point{}, Geom.Point.accepted_aesthetics()}
+
+  defp summary_kind(:line, validated),
+    do: {line_geom([orientation: :none] ++ validated), Geom.Line.accepted_aesthetics()}
+
+  defp summary_kind(:bar, validated),
+    do: {%Geom.Bar{just: Keyword.fetch!(validated, :just)}, Geom.Bar.accepted_aesthetics()}
+
+  defp summary_kind(:crossbar, validated),
+    do: {crossbar_geom(validated), Geom.Crossbar.accepted_aesthetics()}
+
+  defp summary_kind(:errorbar, validated),
+    do: {errorbar_geom(validated), Geom.Errorbar.accepted_aesthetics()}
+
+  defp summary_kind(:linerange, validated),
+    do: {linerange_geom(validated), Geom.Linerange.accepted_aesthetics()}
+
+  defp summary_kind(:ribbon, validated),
+    do: {ribbon_geom(validated), Geom.Ribbon.accepted_aesthetics()}
+
+  # A summary's mapped width must hold numbers where its geom draws it, as its geom's function
+  # checks one; a geom drawing no width carries it unused.
+  defp check_summary_width(plot, layer) do
+    if :width in layer.accepted,
+      do:
+        check_numbers(
+          plot,
+          layer,
+          "Plot.stat_summary/3",
+          :width,
+          "its geom draws each mark as wide as its width"
+        ),
+      else: plot
+  end
+
+  # The geom `stat_summary/3` is given, refused unless it draws with it.
+  defp summary_geom(geom) when geom in @summary_geoms, do: geom
+
+  defp summary_geom(geom) do
+    raise ArgumentError,
+          "Plot.stat_summary/3 draws with :pointrange, :point, :line, :bar, :crossbar, " <>
+            ":errorbar, :linerange or :ribbon, got: " <> inspect(geom)
+  end
+
+  # A summary's struct from its validated options: `fun_data:`, or `fun:`, `fun_min:` and
+  # `fun_max:`, never both, and `{:mean_se, mult: 1.0}` given none, each not given `:none`.
+  defp summary_stat(validated) do
+    functions = Keyword.take(validated, [:fun, :fun_min, :fun_max])
+
+    fun_data =
+      case {Keyword.fetch(validated, :fun_data), functions} do
+        {:error, []} ->
+          {:mean_se, mult: 1.0}
+
+        {:error, _functions} ->
+          :none
+
+        {{:ok, fun_data}, []} ->
+          fun_data
+
+        {{:ok, _fun_data}, functions} ->
+          parts =
+            functions
+            |> Keyword.keys()
+            |> Enum.map_join(" and ", fn name -> "#{name}:" end)
+
+          raise ArgumentError,
+                "Plot.stat_summary/3 is given fun_data:, the whole summary, and " <>
+                  parts <> ", part of one; give fun_data: alone, or fun:, fun_min: and fun_max:"
+      end
+
+    %Stat.Summary{
+      fun_data: fun_data,
+      fun: Keyword.get(validated, :fun, :none),
+      fun_min: Keyword.get(validated, :fun_min, :none),
+      fun_max: Keyword.get(validated, :fun_max, :none),
+      orientation: Keyword.get(validated, :orientation, :none)
+    }
+  end
+
+  defp linerange_geom(validated) do
+    %Geom.Linerange{
+      orientation: Keyword.get(validated, :orientation, :none),
+      line_end: Keyword.fetch!(validated, :lineend)
+    }
+  end
+
+  defp pointrange_geom(validated) do
+    %Geom.Pointrange{
+      orientation: Keyword.get(validated, :orientation, :none),
+      line_end: Keyword.fetch!(validated, :lineend)
+    }
+  end
+
+  defp errorbar_geom(validated) do
+    %Geom.Errorbar{
+      orientation: Keyword.get(validated, :orientation, :none),
+      line_end: Keyword.fetch!(validated, :lineend)
+    }
+  end
+
+  defp crossbar_geom(validated) do
+    looks =
+      Enum.reduce(Options.crossbar_part_looks(), %{middle: %{}, box: %{}}, fn
+        {option, {part, look}}, given ->
+          case Keyword.fetch(validated, option) do
+            {:ok, value} -> put_in(given, [part, look], value)
+            :error -> given
+          end
+      end)
+
+    %Geom.Crossbar{
+      orientation: Keyword.get(validated, :orientation, :none),
+      middle: looks.middle,
+      box: looks.box,
+      line_end: Keyword.fetch!(validated, :lineend),
+      line_join: Keyword.fetch!(validated, :linejoin)
+    }
+  end
+
   defp rug_geom(validated) do
     %Geom.Rug{
       sides: Keyword.fetch!(validated, :sides),
@@ -5623,6 +6135,26 @@ defmodule Giggly.Plot do
 
   defp annotation_geom(:rug, validated) do
     {rug_geom(validated), Geom.Rug.accepted_aesthetics(), Geom.Rug.required_aesthetics()}
+  end
+
+  defp annotation_geom(:linerange, validated) do
+    geom = linerange_geom(validated)
+    {geom, Geom.Linerange.accepted_aesthetics(), Geom.Linerange.required_aesthetics()}
+  end
+
+  defp annotation_geom(:pointrange, validated) do
+    geom = pointrange_geom(validated)
+    {geom, Geom.Pointrange.accepted_aesthetics(), Geom.Pointrange.required_aesthetics()}
+  end
+
+  defp annotation_geom(:errorbar, validated) do
+    geom = errorbar_geom(validated)
+    {geom, Geom.Errorbar.accepted_aesthetics(), Geom.Errorbar.required_aesthetics()}
+  end
+
+  defp annotation_geom(:crossbar, validated) do
+    geom = crossbar_geom(validated)
+    {geom, Geom.Crossbar.accepted_aesthetics(), Geom.Crossbar.required_aesthetics()}
   end
 
   defp annotation_geom(:text, validated),
@@ -5935,6 +6467,48 @@ defmodule Giggly.Plot do
               "it, but neither its mapping nor the plot's maps either. Map them, or leave " <>
               "orientation: out to run along the axis the range is given for."
     end
+  end
+
+  # A line range or point range runs along the axis its orientation names, or, not given one,
+  # along y where the layer is given neither `:ymin` nor `:ymax`, as ggplot2's
+  # `has_flipped_aes(range_is_orthogonal = TRUE)` reads a range, and needs the three positions it
+  # runs along there: `:x`, `:ymin` and `:ymax`, or `:y`, `:xmin` and `:xmax`. ggplot2 aborts when
+  # it builds a vertical layer without them, and draws nothing for a horizontal one; Giggly refuses
+  # either at the call.
+  defp check_range(plot, %Layer{geom: %{orientation: orientation}} = layer, function) do
+    given =
+      plot
+      |> computed_mapping(layer)
+      |> Map.merge(layer.fixed)
+      |> Map.keys()
+
+    along = range_along(orientation, given)
+    needed = if along == :x, do: [:x, :ymin, :ymax], else: [:y, :xmin, :xmax]
+
+    case Enum.reject(needed, fn aesthetic -> aesthetic in given end) do
+      [] ->
+        plot
+
+      missing ->
+        raise ArgumentError,
+              "#{function} runs along #{along}, so it needs #{aesthetics_listed(needed)}, but " <>
+                "neither its mapping nor the plot's gives #{aesthetics_listed(missing)}. A " <>
+                "range runs up the panel from :ymin to :ymax at each :x, or across it from " <>
+                ":xmin to :xmax at each :y; orientation: chooses where both are given."
+    end
+  end
+
+  defp range_along(:none, given),
+    do: if(Enum.any?([:ymin, :ymax], fn end_given -> end_given in given end), do: :x, else: :y)
+
+  defp range_along(orientation, _given), do: orientation
+
+  # Aesthetics named as a sentence lists them: `:x, :ymin and :ymax`.
+  defp aesthetics_listed([only]), do: inspect(only)
+
+  defp aesthetics_listed(aesthetics) do
+    {last, others} = List.pop_at(aesthetics, -1)
+    Enum.map_join(others, ", ", &inspect/1) <> " and " <> inspect(last)
   end
 
   # A box plot is not weighted, so a weight the plot's mapping gives it, which would ride along

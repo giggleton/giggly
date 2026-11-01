@@ -79,6 +79,44 @@ stops the question being reopened from scratch. A new entry is about 150 words: 
 sentence or two of why, and one line per rejected alternative. What a later decision replaces is
 deleted from the entry it was in, never marked superseded; git history keeps every version.
 
+- **`stat_summary/3` draws with eight geoms, each checked by a schema of its own (2026-10-31,
+  Steve: "Yes"; checked against ggplot2 4.0.3's `stat-summary.R`).** `geom:` takes
+  `:pointrange`, the default, `:point`, `:line`, `:bar`, `:crossbar`, `:errorbar`, `:linerange`
+  and `:ribbon`; another raises naming them. Each geom's options are the summary's beside its
+  own function's but `orientation:`, which is the stat's, the geom recording `:none` and reading
+  `flipped_aes`, the line as `has_flipped_aes(ambiguous = TRUE)` reads it first
+  (`Options.summary/1`, as `annotate/3`'s per-geom schemas); an option the geom cannot use raises,
+  where R warns "Ignoring unknown parameters". `position:` is the geom function's set, `:identity`
+  for every geom, bars included, as R's default. `fun_data:` beside `fun:`, `fun_min:` or
+  `fun_max:` is refused, where R lets `fun.data` win, and a mapped range, which R fails to build.
+  *Rejected: `:col`* — `GeomCol` is an alias of `GeomBar`, and R's docs write `"bar"`. *Rejected:
+  any geom* — each needs its options checked, and paths, areas and text wait for a user.
+
+- **A summary's values are names the frame computes, or a function of the values (2026-10-31,
+  Steve: "go with this").** `fun:`, `fun_min:` and `fun_max:` take `:mean`, `:median` (the frame's
+  type 7 quantile at one half, which matched R's `median()` on 200,000 random vectors), `:min` and
+  `:max`, or a function of a position's values, pulled by the frame's `list` aggregate, as loess
+  pulls a group's, since no engine could run it; `fun_data:` takes a whole summary by name, its
+  arguments in a tuple, `{:mean_se, mult: 2}`, the default `{:mean_se, mult: 1.0}`; the Hmisc
+  summaries join it by name. *Rejected: functions alone* — every summary would pull its rows.
+  *Rejected: `fun_args:`* — R's list applies to every function at once; a tuple names whose.
+
+- **A summary carries a column cell by cell, ggplot2's `uniquecols()` (2026-10-31; checked
+  against ggplot2 4.0.3).** Each position of a group keeps a column where its rows hold one value
+  and has it missing where they hold more; a column holding more everywhere is dropped, as R's
+  `vec_rbind()` fills the cells a column is missing from. *Rejected: `Stat.Carry`'s rule* —
+  ggplot2's default `compute_panel()` applies it to whole groups, and `stat_summary()` does not.
+
+- **The summaries are not public functions on a list (2026-10-31, Steve: "go with this").** A
+  summary is named in `fun:` or `fun_data:` and computed by the stat; `mean_se()` and the Hmisc
+  wrappers called on a vector, as their reference pages' examples do, wait. *Rejected: exporting
+  them* — an API of list statistics beside the plot's, which nothing but those examples calls.
+
+- **`position_dodge/1` takes `width:` alone (2026-10-31, Steve: "go with this").** Any number,
+  kept as a float, `:none` when not given, the range layers dodging within it. *Rejected: R's
+  `preserve`, `orientation` and `reverse` now* — they arrive with the positions increment, which
+  needs them for every dodging layer; the range layers needed only the width.
+
 - **`dictionary/2` matches a value by `Scales.DataRange.key/1`, a map under `dictionary:` (2026-10-31,
   Steve: D1 to D4 "A"; checked against scales 1.4.0).** `dictionary(breaks, dictionary: %{value =>
   label}, nomatch:)`, the family's shape, each label a string or `nil`. A key names what a
@@ -3693,6 +3731,16 @@ tells the story (`git show <hash>`). Until 2026-10-15 each milestone also had a 
 `git log -S "<title>" -- notes/design-log.md` finds it in this file's history. The phases are
 §1's roadmap.
 
+- 2026-10-31 — Summarise y at each x with stat_summary(): mean_se, the frame's summaries or a
+  function, drawn by eight geoms (summaries, step 4); §4: "`stat_summary/3` draws with eight
+  geoms", "A summary's values are names", "A summary carries a column cell by cell", "The
+  summaries are not public functions"
+- 2026-10-31 — Add position_dodge(width:), and a position: on the range layers (summaries,
+  step 3); §4: "`position_dodge/1` takes `width:` alone"
+- 2026-10-31 — Add geom_errorbar() and geom_crossbar(), and draw a box plot's box and median
+  through the crossbar (summaries, step 2)
+- 2026-10-31 — Add geom_linerange() and geom_pointrange(): a segment across each row's range, a
+  point on it at four times its size, and their annotations (summaries, step 1)
 - 2026-10-31 — Wrap text and look labels up in a dictionary, and break a facet's wrapped strips by
   them (labels, step 5); §4: "`dictionary/2` matches", "`wrap/2` takes", "`wrap/2` counts a
   character", "Wrapping a strip's label"

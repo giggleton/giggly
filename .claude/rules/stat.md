@@ -133,6 +133,17 @@ the entry beginning "Each facet, coordinate system, geom, stat and position is a
   panel, with no `abs()`, divided as R divides, an infinity or NaN where the total is zero. A
   row missing its x or y, or at an infinite one, is not counted. size takes `n` by default; it
   computes `n` and `prop` and consumes `weight`.
+- **Summarising is ggplot2's `stat_summary()`** (design-log §4, the entries beginning "A
+  summary's values are names" and "A summary carries a column cell by cell"): per panel, group
+  and x, in that order, the rows at a finite x and y; `y`, `ymin` and `ymax` from `fun_data`,
+  `{:mean_se, mult: mult}`, the frame's `mean`, and its `variance` over its `count`,
+  square-rooted and times `mult` in R's order, missing for one value; or from `fun`, `fun_min`
+  and `fun_max`, each a frame aggregate by name (`:median` the type 7 quantile at one half), a
+  function of the values the frame's `list` pulls, which must return a number, or missing;
+  `flipped_aes`, along y by `orientation` or where y alone is discrete, flipped and flipped back.
+  It carries no group's constant columns: each other column goes to each cell holding one of its
+  values, missing in a cell holding more, dropped where every cell does, a range column never. It
+  computes nothing an after_stat can read and consumes nothing.
 - **Aligning is ggplot2's `stat_align()`, `geom_area()`'s stat, R's to the last digit**: rows
   missing or infinite in x or y left out first, as ggplot2's stats drop them; a panel of one group
   kept as it is; in a panel of several, the places are its rows' distinct x and the points where a

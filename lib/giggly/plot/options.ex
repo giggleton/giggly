@@ -17,6 +17,10 @@ defmodule Giggly.Plot.Options do
   alias Giggly.{Aesthetics, ElementTree, Geom, Guide, Position, Theme}
   alias Scales.{ColorOperations, DataRange, Palette}
 
+  # The positions `position_dodge/1` and `position_dodge2/1` make, which a `position:` that dodges
+  # takes.
+  @dodges [Position.Dodge, Position.Dodge2]
+
   # A facet's strip labels, ggplot2's labellers: each kind's options, and whether a labeller given
   # alone puts each column's label in a strip of its own. In a keyword list of labellers,
   # `multi_line:` is the list's, as ggplot2's `labeller()` hands its `.multi_line` to each.
@@ -433,18 +437,20 @@ defmodule Giggly.Plot.Options do
         "of the closest spacing of each panel's `y` positions when not given."
   ]
 
+  # Where a point layer's points are placed, ggplot2's `position`.
+  @point_position_option [
+    type: {:custom, __MODULE__, :validate_point_position, []},
+    default: :identity,
+    doc:
+      "Where the points are placed: at their positions (`:identity`), or each moved a small " <>
+        "random distance (`:jitter`, or as `position_jitter/1` says)."
+  ]
+
   # `geom_point/3`'s options, validated at the call.
   @point_options NimbleOptions.new!(
                    [
                      data: @data_option,
-                     position: [
-                       type: {:custom, __MODULE__, :validate_point_position, []},
-                       default: :identity,
-                       doc:
-                         "Where the points are placed: at their positions (`:identity`), or " <>
-                           "each moved a small random distance (`:jitter`, or as " <>
-                           "`position_jitter/1` says)."
-                     ]
+                     position: @point_position_option
                    ] ++ @point_look_options
                  )
 
@@ -716,6 +722,202 @@ defmodule Giggly.Plot.Options do
                      ] ++ @segment_line_style_options
                    )
 
+  # Where a range layer's marks are drawn, ggplot2's `position`.
+  @range_position_option [
+    type: {:custom, __MODULE__, :validate_range_position, []},
+    default: :identity,
+    doc:
+      "Where the marks are drawn: at their positions (`:identity`), or the marks of different " <>
+        "groups at one position set side by side within the width of the first (`:dodge`, or " <>
+        "within the width `position_dodge/1` gives), or each its share of their widths " <>
+        "(`:dodge2`, or as `position_dodge2/1` says)."
+  ]
+
+  # Which way a layer's ranges run, ggplot2's `orientation`, taken from the ranges given when not
+  # given.
+  @range_orientation_option [
+    type: {:in, [:x, :y]},
+    doc:
+      "Which way each range runs: `:x`, up the panel from `ymin` to `ymax` at each `x`, or `:y`, " <>
+        "across it from `xmin` to `xmax` at each `y`; when not given, `:y` where the layer is " <>
+        "given neither `:ymin` nor `:ymax`, and `:x` otherwise."
+  ]
+
+  # How every line of a line range or point range layer looks, set by its options.
+  @range_look_options [
+    alpha: @alpha_option,
+    color: @line_color_option,
+    linewidth: @linewidth_option,
+    linetype: @linetype_option,
+    lineend: Keyword.fetch!(@line_style_options, :lineend)
+  ]
+
+  # `geom_linerange/3`'s options, validated at the call.
+  @linerange_options NimbleOptions.new!(
+                       [
+                         data: @data_option,
+                         position: @range_position_option,
+                         orientation: @range_orientation_option
+                       ] ++ @range_look_options
+                     )
+
+  # How every point of a point range layer looks, set by its options: a point's, but its size and
+  # stroke, whose defaults are the point range's own.
+  @pointrange_point_options [
+    color: [
+      type: @color_type,
+      doc:
+        "The colour of every line and point, written `colour:` or `color:`, which outlines the " <>
+          "point's shape and fills the shapes filled in it: " <>
+          @color_forms <> "; black when not given."
+    ],
+    fill: @point_fill_option,
+    shape: @point_shape_option,
+    size: [
+      type: {:custom, __MODULE__, :validate_size, []},
+      doc:
+        "How big every point is, in millimetres, each drawn four times as big; a third of the " <>
+          "theme's points' size when not given, 0.5 at its default sizes."
+    ],
+    stroke: [
+      type: {:custom, __MODULE__, :validate_stroke, []},
+      doc:
+        "How heavy every point's outline is, in millimetres, or `:none` for no outline and no " <>
+          "lines; twice the theme's `base_line_size` when not given, 1 at its default sizes. " <>
+          "The outline is drawn half that wide, and a heavier stroke makes the shape bigger too."
+    ]
+  ]
+
+  # `geom_pointrange/3`'s options, validated at the call.
+  @pointrange_options NimbleOptions.new!(
+                        [
+                          data: @data_option,
+                          position: @range_position_option,
+                          orientation: @range_orientation_option
+                        ] ++ Keyword.merge(@range_look_options, @pointrange_point_options)
+                      )
+
+  # How wide every error bar's or crossbar's whiskers or box are, set by its options.
+  @range_width_option [
+    type: {:custom, __MODULE__, :validate_width, []},
+    doc:
+      "How wide every mark is, in the units of the axis it is placed along, x, or y for one " <>
+        "that runs across the panel, any number; 0.9 of the closest spacing of the positions " <>
+        "there when not given, 0.9 on a discrete axis. It replaces a mapped `:width`."
+  ]
+
+  # `geom_errorbar/3`'s options, validated at the call.
+  @errorbar_options NimbleOptions.new!(
+                      [
+                        data: @data_option,
+                        position: @range_position_option,
+                        orientation: @range_orientation_option,
+                        width: @range_width_option
+                      ] ++ @range_look_options
+                    )
+
+  # A crossbar's parts drawn as lines, each with a look of its own, and how its options' docs name
+  # each.
+  @crossbar_line_parts [middle: "line across each box", box: "box's border"]
+
+  # The look of each line part, ggplot2's `middle.colour` and the rest, R's dotted names
+  # underscored.
+  @crossbar_line_look_options Enum.flat_map(@crossbar_line_parts, fn {part, named} ->
+                                [
+                                  {:"#{part}_color",
+                                   [
+                                     type: @color_type,
+                                     doc:
+                                       "The colour of the #{named}, written " <>
+                                         "`#{part}_colour:` or `#{part}_color:`: " <>
+                                         @color_forms <> "; the crossbar's colour when not given."
+                                   ]},
+                                  {:"#{part}_linetype",
+                                   [
+                                     type: @linetype_type,
+                                     doc:
+                                       "The line type of the #{named}: " <>
+                                         @linetype_forms <> "; the crossbar's when not given."
+                                   ]},
+                                  {:"#{part}_linewidth",
+                                   [
+                                     type: {:custom, __MODULE__, :validate_linewidth, []},
+                                     doc:
+                                       "How wide the #{named} is drawn, in millimetres; the " <>
+                                         "crossbar's line width when not given" <>
+                                         if(part == :middle,
+                                           do: ", times 2.5.",
+                                           else: "."
+                                         )
+                                   ]}
+                                ]
+                              end)
+
+  # Each option giving a part of a crossbar its look, by the part and the look it gives, which the
+  # crossbar geom holds by part.
+  @crossbar_part_looks for(
+                         {part, _named} <- @crossbar_line_parts,
+                         look <- [:color, :linetype, :linewidth],
+                         do: {:"#{part}_#{look}", {part, look}}
+                       )
+
+  # How every crossbar looks, set by its options.
+  @crossbar_look_options [
+    alpha: [
+      type: {:custom, __MODULE__, :validate_alpha, []},
+      doc:
+        "How opaque every box's fill is, from 0, invisible, to 1, opaque; its lines keep their " <>
+          "colour's own alpha."
+    ],
+    color: [
+      type: @color_type,
+      doc:
+        "The colour of every box's border and line across, written `colour:` or `color:`: " <>
+          @color_forms <> "; black when not given."
+    ],
+    fill: [
+      type: @color_type,
+      doc: "The colour every box is filled with: " <> @color_forms <> "; none when not given."
+    ],
+    linewidth: [
+      type: {:custom, __MODULE__, :validate_linewidth, []},
+      doc:
+        "How wide every box's border is, in millimetres, its line across 2.5 times as wide; the " <>
+          "theme's `base_line_size` when not given, 0.5 at its default sizes."
+    ],
+    linetype: [
+      type: @linetype_type,
+      doc:
+        "The line type of every box's border and line across: " <>
+          @linetype_forms <> "; `:solid` when not given."
+    ]
+  ]
+
+  # How a crossbar's lines are drawn at their ends and corners, its corners mitred by default, as
+  # ggplot2's `GeomCrossbar` draws them.
+  @crossbar_line_style_options [
+    lineend: Keyword.fetch!(@line_style_options, :lineend),
+    linejoin: [
+      type: {:in, [:round, :mitre, :bevel]},
+      default: :mitre,
+      doc:
+        "How a box's border turns a corner: pointed (`:mitre`), rounded (`:round`) or cut off " <>
+          "(`:bevel`)."
+    ]
+  ]
+
+  # `geom_crossbar/3`'s options, validated at the call.
+  @crossbar_options NimbleOptions.new!(
+                      [
+                        data: @data_option,
+                        position: @range_position_option,
+                        orientation: @range_orientation_option,
+                        width: @range_width_option
+                      ] ++
+                        @crossbar_look_options ++
+                        @crossbar_line_look_options ++ @crossbar_line_style_options
+                    )
+
   # The sides a rug may be drawn along.
   @rug_sides [:top, :right, :bottom, :left]
 
@@ -855,6 +1057,126 @@ defmodule Giggly.Plot.Options do
                     outline_type: [default: :upper] ++ @outline_type_option
                   ] ++ @band_look_options ++ @line_style_options
                 )
+
+  # The geoms `stat_summary/3` draws with, as `geom:` names them, its default first.
+  @summary_geoms [:pointrange, :point, :line, :bar, :crossbar, :errorbar, :linerange, :ribbon]
+
+  # One of a summary's values, `fun:`, `fun_min:` or `fun_max:`.
+  @summary_function_type {:custom, __MODULE__, :validate_summary_function, []}
+
+  # The options of `stat_summary/3` whatever its geom: the table, the geom, the summary and which
+  # way it runs.
+  @summary_stat_options [
+    data: @data_option,
+    geom: [
+      type: {:in, @summary_geoms},
+      default: :pointrange,
+      doc:
+        "What each summary is drawn as: a point range (`:pointrange`), a point (`:point`), a " <>
+          "line through each group's (`:line`), a bar from 0 (`:bar`), a crossbar " <>
+          "(`:crossbar`), an error bar (`:errorbar`), a line range (`:linerange`), or a band " <>
+          "through each group's ranges (`:ribbon`). The other options are those the geom's " <>
+          "own function takes, but its `orientation:`, which is the summary's."
+    ],
+    fun_data: [
+      type: {:custom, __MODULE__, :validate_summary_data, []},
+      doc:
+        "The whole summary at each position, its `y`, `ymin` and `ymax`, by name: " <>
+          "`:mean_se`, the mean and the mean less and plus one standard error, or " <>
+          "`{:mean_se, mult: mult}`, `mult` standard errors, any number. Refused beside " <>
+          "`fun:`, `fun_min:` or `fun_max:`; `:mean_se` when none of them is given."
+    ],
+    fun: [
+      type: @summary_function_type,
+      doc:
+        "The summary's `y` at each position: `:mean`, `:median`, `:min` or `:max`, or a " <>
+          "function given the values there, a list of numbers in their rows' order, returning " <>
+          "a number. Missing when not given beside `fun_min:` or `fun_max:`."
+    ],
+    fun_min: [
+      type: @summary_function_type,
+      doc: "The summary's `ymin` at each position, as `fun:` gives its `y`."
+    ],
+    fun_max: [
+      type: @summary_function_type,
+      doc: "The summary's `ymax` at each position, as `fun:` gives its `y`."
+    ],
+    orientation: [
+      type: {:in, [:x, :y]},
+      doc:
+        "Which way the summary runs: `:x`, the `y` values summarised at each `x`, or `:y`, the " <>
+          "`x` values at each `y`; when not given, `:y` where `y` alone is discrete, and `:x` " <>
+          "otherwise."
+    ]
+  ]
+
+  # Where a summary's bars are drawn, a bar's positions with each at its own as the default, as
+  # ggplot2's `stat_summary()` defaults `position = "identity"`.
+  @summary_bar_position_option [
+    type: {:custom, __MODULE__, :validate_summary_bar_position, []},
+    default: :identity,
+    doc:
+      "Where the bars are drawn: at their positions (`:identity`), piled on one another " <>
+        "(`:stack`), set side by side within the width one bar takes (`:dodge`), or set side by " <>
+        "side, each its share of their widths, with a gap between them (`:dodge2`, or as " <>
+        "`position_dodge2/1` says)."
+  ]
+
+  # `stat_summary/3`'s options for each geom it draws with, validated at the call: the summary's,
+  # and the geom's function's but its orientation.
+  @summary_options %{
+    pointrange:
+      NimbleOptions.new!(
+        @summary_stat_options ++
+          [position: @range_position_option] ++
+          Keyword.merge(@range_look_options, @pointrange_point_options)
+      ),
+    point:
+      NimbleOptions.new!(
+        @summary_stat_options ++ [position: @point_position_option] ++ @point_look_options
+      ),
+    line:
+      NimbleOptions.new!(
+        @summary_stat_options ++
+          [
+            alpha: @alpha_option,
+            color: @line_color_option,
+            linewidth: @linewidth_option,
+            linetype: @linetype_option,
+            arrow: @arrow_option
+          ] ++ @line_style_options
+      ),
+    bar:
+      NimbleOptions.new!(
+        @summary_stat_options ++
+          [
+            position: @summary_bar_position_option,
+            width: @bar_width_option,
+            just: @bar_just_option
+          ] ++ @bar_look_options
+      ),
+    crossbar:
+      NimbleOptions.new!(
+        @summary_stat_options ++
+          [position: @range_position_option, width: @range_width_option] ++
+          @crossbar_look_options ++ @crossbar_line_look_options ++ @crossbar_line_style_options
+      ),
+    errorbar:
+      NimbleOptions.new!(
+        @summary_stat_options ++
+          [position: @range_position_option, width: @range_width_option] ++ @range_look_options
+      ),
+    linerange:
+      NimbleOptions.new!(
+        @summary_stat_options ++ [position: @range_position_option] ++ @range_look_options
+      ),
+    ribbon:
+      NimbleOptions.new!(
+        @summary_stat_options ++
+          [outline_type: [default: :both] ++ @outline_type_option] ++
+          @band_look_options ++ @line_style_options
+      )
+  }
 
   # How a layer of densities estimates each group's, options of `geom_density/3` and
   # `stat_density/3`.
@@ -1710,6 +2032,43 @@ defmodule Giggly.Plot.Options do
                     linewidth: @annotation_linewidth,
                     linetype: @annotation_linetype
                   ] ++ @rug_drawing_options
+  @linerange_annotation [
+    x: @annotation_position,
+    y: @annotation_position,
+    xmin: @annotation_position,
+    xmax: @annotation_position,
+    ymin: @annotation_position,
+    ymax: @annotation_position,
+    orientation: @range_orientation_option,
+    alpha: @annotation_alpha,
+    color: @annotation_color,
+    linewidth: @annotation_linewidth,
+    linetype: @annotation_linetype,
+    lineend: Keyword.fetch!(@line_style_options, :lineend)
+  ]
+  @pointrange_annotation @linerange_annotation ++
+                           [
+                             fill: @annotation_color,
+                             shape: @annotation_shape,
+                             size: @annotation_size,
+                             stroke: @annotation_stroke
+                           ]
+  @errorbar_annotation Keyword.put(@linerange_annotation, :width, @annotation_width)
+  @crossbar_annotation [
+                         x: @annotation_position,
+                         y: @annotation_position,
+                         xmin: @annotation_position,
+                         xmax: @annotation_position,
+                         ymin: @annotation_position,
+                         ymax: @annotation_position,
+                         orientation: @range_orientation_option,
+                         width: @annotation_width,
+                         alpha: @annotation_alpha,
+                         color: @annotation_color,
+                         fill: @annotation_color,
+                         linewidth: @annotation_linewidth,
+                         linetype: @annotation_linetype
+                       ] ++ @crossbar_line_look_options ++ @crossbar_line_style_options
   # A reference line layer's own table, which its mapping reads, as ggplot2's `data =` gives one;
   # it takes nothing from the plot's mapping, so it need hold only what its own mapping names.
   @reference_line_data_option [
@@ -1815,7 +2174,22 @@ defmodule Giggly.Plot.Options do
                     ] ++ @reference_line_look_options
                   )
 
-  @annotation_geoms [:point, :col, :bar, :path, :line, :segment, :rug, :text, :label, :rect]
+  @annotation_geoms [
+    :point,
+    :col,
+    :bar,
+    :path,
+    :line,
+    :segment,
+    :rug,
+    :linerange,
+    :pointrange,
+    :errorbar,
+    :crossbar,
+    :text,
+    :label,
+    :rect
+  ]
   @annotation_options %{
     point: NimbleOptions.new!(@point_annotation),
     col: NimbleOptions.new!(@bar_annotation),
@@ -1824,6 +2198,10 @@ defmodule Giggly.Plot.Options do
     line: NimbleOptions.new!([orientation: @orientation_option] ++ @path_annotation),
     segment: NimbleOptions.new!(@segment_annotation),
     rug: NimbleOptions.new!(@rug_annotation),
+    linerange: NimbleOptions.new!(@linerange_annotation),
+    pointrange: NimbleOptions.new!(@pointrange_annotation),
+    errorbar: NimbleOptions.new!(@errorbar_annotation),
+    crossbar: NimbleOptions.new!(@crossbar_annotation),
     text:
       NimbleOptions.new!(
         [
@@ -3102,6 +3480,19 @@ defmodule Giggly.Plot.Options do
                              ]
                            )
 
+  # `position_dodge/1`'s options.
+  @position_dodge_options NimbleOptions.new!(
+                            width: [
+                              type: {:custom, __MODULE__, :validate_width, []},
+                              doc:
+                                "How wide the space is that the marks at one position share, " <>
+                                  "in the units of the axis they are dodged along, any number; " <>
+                                  "the panel's first mark's width when not given, so marks " <>
+                                  "with no width of their own, such as line ranges, are not " <>
+                                  "moved."
+                            ]
+                          )
+
   # `position_dodge2/1`'s options.
   @position_dodge2_options NimbleOptions.new!(
                              preserve: [
@@ -3541,6 +3932,22 @@ defmodule Giggly.Plot.Options do
   def rug, do: @rug_options
 
   @doc false
+  @spec linerange() :: NimbleOptions.t()
+  def linerange, do: @linerange_options
+
+  @doc false
+  @spec pointrange() :: NimbleOptions.t()
+  def pointrange, do: @pointrange_options
+
+  @doc false
+  @spec errorbar() :: NimbleOptions.t()
+  def errorbar, do: @errorbar_options
+
+  @doc false
+  @spec crossbar() :: NimbleOptions.t()
+  def crossbar, do: @crossbar_options
+
+  @doc false
   @spec abline() :: NimbleOptions.t()
   def abline, do: @abline_options
 
@@ -3729,6 +4136,10 @@ defmodule Giggly.Plot.Options do
   def position_dodge2, do: @position_dodge2_options
 
   @doc false
+  @spec position_dodge() :: NimbleOptions.t()
+  def position_dodge, do: @position_dodge_options
+
+  @doc false
   @spec position_jitter() :: NimbleOptions.t()
   def position_jitter, do: @position_jitter_options
 
@@ -3771,6 +4182,11 @@ defmodule Giggly.Plot.Options do
   @spec boxplot_part_looks() :: keyword({atom(), atom()})
   def boxplot_part_looks, do: @boxplot_part_looks
 
+  # Each option giving a part of a crossbar its look, by the part and the look it gives.
+  @doc false
+  @spec crossbar_part_looks() :: keyword({atom(), atom()})
+  def crossbar_part_looks, do: @crossbar_part_looks
+
   # The aesthetics an annotation draws row by row, which take a list of values.
   @doc false
   @spec per_annotation_aesthetics() :: [atom()]
@@ -3780,6 +4196,21 @@ defmodule Giggly.Plot.Options do
   @doc false
   @spec annotation_geoms() :: [atom()]
   def annotation_geoms, do: @annotation_geoms
+
+  # `stat_summary/3`'s options drawing with `geom`, one of `summary_geoms/0`.
+  @doc false
+  @spec summary(atom()) :: NimbleOptions.t()
+  def summary(geom), do: Map.fetch!(@summary_options, geom)
+
+  # The options `stat_summary/3` takes whatever its geom, for its documentation.
+  @doc false
+  @spec summary_stat() :: NimbleOptions.t()
+  def summary_stat, do: NimbleOptions.new!(@summary_stat_options)
+
+  # The geoms `stat_summary/3` draws with.
+  @doc false
+  @spec summary_geoms() :: [atom()]
+  def summary_geoms, do: @summary_geoms
 
   # A date, date-time or time scale's options that choose what their plain twins choose.
   @doc false
@@ -4225,18 +4656,18 @@ defmodule Giggly.Plot.Options do
     do: {:error, "expected a number from 0 to 1, got: #{inspect(just)}"}
 
   # NimbleOptions' check of a bar's `position:`: one of the positions it takes by name, or a
-  # position `position_dodge2/1` makes.
+  # position `position_dodge/1` or `position_dodge2/1` makes.
   @doc false
   @spec validate_bar_position(term()) :: {:ok, atom() | struct()} | {:error, String.t()}
   def validate_bar_position(position) when position in [:stack, :dodge, :dodge2],
     do: {:ok, position}
 
-  def validate_bar_position(%Position.Dodge2{} = position), do: {:ok, position}
+  def validate_bar_position(%dodge{} = position) when dodge in @dodges, do: {:ok, position}
 
   def validate_bar_position(position) do
     {:error,
-     "expected :stack, :dodge, :dodge2 or a position Plot.position_dodge2/1 makes, got: " <>
-       inspect(position)}
+     "expected :stack, :dodge, :dodge2 or a position Plot.position_dodge/1 or " <>
+       "Plot.position_dodge2/1 makes, got: " <> inspect(position)}
   end
 
   # NimbleOptions' check of a box plot's `position:`: one of the positions it takes by name, or a
@@ -4252,6 +4683,69 @@ defmodule Giggly.Plot.Options do
     {:error,
      "expected :dodge2, :dodge or a position Plot.position_dodge2/1 makes, got: " <>
        inspect(position)}
+  end
+
+  # NimbleOptions' check of a range layer's `position:`, a line range's, point range's, error
+  # bar's or crossbar's: where it is drawn, by name, or a position `position_dodge/1` or
+  # `position_dodge2/1` makes.
+  @doc false
+  @spec validate_range_position(term()) :: {:ok, atom() | struct()} | {:error, String.t()}
+  def validate_range_position(position) when position in [:identity, :dodge, :dodge2],
+    do: {:ok, position}
+
+  def validate_range_position(%dodge{} = position) when dodge in @dodges, do: {:ok, position}
+
+  def validate_range_position(position) do
+    {:error,
+     "expected :identity, :dodge, :dodge2 or a position Plot.position_dodge/1 or " <>
+       "Plot.position_dodge2/1 makes, got: " <> inspect(position)}
+  end
+
+  # NimbleOptions' check of a summary's bars' `position:`: a bar's positions, or each bar at its
+  # own.
+  @doc false
+  @spec validate_summary_bar_position(term()) :: {:ok, atom() | struct()} | {:error, String.t()}
+  def validate_summary_bar_position(:identity), do: {:ok, :identity}
+
+  def validate_summary_bar_position(position) do
+    case validate_bar_position(position) do
+      {:ok, position} ->
+        {:ok, position}
+
+      {:error, _message} ->
+        {:error,
+         "expected :identity, :stack, :dodge, :dodge2 or a position Plot.position_dodge/1 or " <>
+           "Plot.position_dodge2/1 makes, got: " <> inspect(position)}
+    end
+  end
+
+  # NimbleOptions' check of one of a summary's values, `fun:`, `fun_min:` or `fun_max:`: a summary
+  # by name, or a function of the values at a position.
+  @doc false
+  @spec validate_summary_function(term()) :: {:ok, atom() | function()} | {:error, String.t()}
+  def validate_summary_function(summary) when summary in [:mean, :median, :min, :max],
+    do: {:ok, summary}
+
+  def validate_summary_function(summary) when is_function(summary, 1), do: {:ok, summary}
+
+  def validate_summary_function(summary) do
+    {:error,
+     "expected :mean, :median, :min, :max or a function of one argument, got: " <>
+       inspect(summary)}
+  end
+
+  # NimbleOptions' check of a summary's `fun_data:`: a whole summary by name, with its options,
+  # recorded with each, its `mult` a float.
+  @doc false
+  @spec validate_summary_data(term()) :: {:ok, {:mean_se, [mult: float()]}} | {:error, String.t()}
+  def validate_summary_data(:mean_se), do: {:ok, {:mean_se, mult: 1.0}}
+
+  def validate_summary_data({:mean_se, [mult: mult]}) when is_number(mult),
+    do: {:ok, {:mean_se, mult: mult / 1}}
+
+  def validate_summary_data(summary) do
+    {:error,
+     "expected :mean_se or {:mean_se, mult: mult}, mult a number, got: " <> inspect(summary)}
   end
 
   # NimbleOptions' check of a point layer's `position:`: one of the positions it takes by name, or

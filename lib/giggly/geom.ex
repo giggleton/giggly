@@ -26,7 +26,11 @@ defprotocol Giggly.Geom do
   # and areas (`Giggly.Geom.Area`), which draw as ribbons from 0 to their y, as ggplot2's
   # `GeomArea` is a `GeomRibbon`, densities (`Giggly.Geom.Density`), which draw as areas with a
   # look of their own, as ggplot2's `GeomDensity` is a `GeomArea`, segments
-  # (`Giggly.Geom.Segment`), a straight line for each row, rugs (`Giggly.Geom.Rug`), a short line
+  # (`Giggly.Geom.Segment`), a straight line for each row, line ranges (`Giggly.Geom.Linerange`),
+  # a segment across each row's range, and point ranges (`Giggly.Geom.Pointrange`), a line range
+  # with a point on it, error bars (`Giggly.Geom.Errorbar`), a line range with a whisker across each
+  # end, and crossbars (`Giggly.Geom.Crossbar`), a box with a line across it, which box plots draw
+  # their boxes with, rugs (`Giggly.Geom.Rug`), a short line
   # at the panel's edge for each row's place, hexagons (`Giggly.Geom.Hex`), one round each row's
   # centre, horizontal, vertical and diagonal reference lines (`Giggly.Geom.Hline`,
   # `Giggly.Geom.Vline`, `Giggly.Geom.Abline`), segments across the whole panel, and smooths
@@ -58,13 +62,17 @@ defprotocol Giggly.Geom do
       Area,
       Bar,
       Boxplot,
+      Crossbar,
       Density,
+      Errorbar,
       Hex,
       Hline,
       Label,
       Line,
+      Linerange,
       Path,
       Point,
+      Pointrange,
       Rect,
       Ribbon,
       Rug,

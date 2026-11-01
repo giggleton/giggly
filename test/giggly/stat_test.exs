@@ -371,6 +371,174 @@ defmodule Giggly.StatTest do
   # Every golden here is ggplot2 4.0.3's `layer_data()` in R 4.6.1 for
   # `geom_area(position = "identity")` of the table named, whose x, y and `align_padding` are the
   # stat's, printed to 17 significant digits; each table is built here as the stat is handed it.
+  # Every golden here is ggplot2 4.0.3's `layer_data()` in R 4.6.1 for the layer named, printed to
+  # 17 significant digits; they move only with ggplot2's `stat_summary()` or R's `mean()`, `var()`
+  # and `median()`.
+  describe "compute_layer/3 for summaries" do
+    # Golden: `ggplot(mtcars, aes(cyl, mpg)) + stat_summary()`, and with
+    # `fun.args = list(mult = 2)`.
+    test "given no summary, each x's mean less and plus mult standard errors, R's" do
+      frame = summary_frame(x: mtcars(:cyl), y: mtcars(:mpg))
+
+      summaries = Stat.compute_layer(summary(), frame, axes([1], false, false))
+
+      assert DataFrame.names(summaries) == [:x, :group, :y, :ymin, :ymax, :panel, :flipped_aes]
+
+      assert columns(summaries, [:x, :y, :ymin, :ymax, :flipped_aes]) === [
+               [4.0, 6.0, 8.0],
+               [26.663636363636364, 19.742857142857144, 15.1],
+               [25.303872164340785, 19.193460442199161, 14.415798371726675],
+               [28.023400562931943, 20.292253843515127, 15.784201628273324],
+               [false, false, false]
+             ]
+
+      doubled =
+        [fun_data: {:mean_se, mult: 2.0}]
+        |> summary()
+        |> Stat.compute_layer(frame, axes([1], false, false))
+
+      assert columns(doubled, [:ymin, :ymax]) === [
+               [23.944107965045205, 18.644063741541178, 13.731596743453352],
+               [29.383164762227523, 20.84165054417311, 16.468403256546647]
+             ]
+    end
+
+    # Golden: x `c(1, 1, 1, 2, 2, NA, 3, Inf)`, y `c(1, 3, Inf, NA, 4, 5, NaN, 2)`.
+    test "a row missing its x or y, or at an infinite one, is left out, and one value has no error" do
+      frame =
+        summary_frame(
+          x: [1, 1, 1, 2, 2, nil, 3, :infinity],
+          y: [1.0, 3.0, :infinity, nil, 4.0, 5.0, :nan, 2.0]
+        )
+
+      summaries = Stat.compute_layer(summary(), frame, axes([1], false, false))
+
+      assert columns(summaries, [:x, :y, :ymin, :ymax]) === [
+               [1.0, 2.0],
+               [2.0, 4.0],
+               [1.0, nil],
+               [3.0, nil]
+             ]
+    end
+
+    # Golden: x `c(1, 1, 1, 1, 2, 2, 2)`, y `c(7, 2, 10, 4, 3, 9, 5)`, `stat_summary(fun = median,
+    # fun.min = min, fun.max = max)`, and `fun = function(v) v[length(v)], fun.max = mean`.
+    test "fun, fun_min and fun_max give y, ymin and ymax, by name or as a function of the values" do
+      frame = summary_frame(x: [1, 1, 1, 1, 2, 2, 2], y: [7, 2, 10, 4, 3, 9, 5])
+      named = summary(fun_data: :none, fun: :median, fun_min: :min, fun_max: :max)
+
+      assert named
+             |> Stat.compute_layer(frame, axes([1], false, false))
+             |> columns([:y, :ymin, :ymax]) === [[5.5, 5.0], [2, 3], [10, 9]]
+
+      last = fn values -> List.last(values) end
+      given = summary(fun_data: :none, fun: last, fun_max: :mean)
+
+      assert given
+             |> Stat.compute_layer(frame, axes([1], false, false))
+             |> columns([:y, :ymin, :ymax]) === [[4, 5], [nil, nil], [5.75, 5.666666666666667]]
+    end
+
+    test "a function returning anything but a number is refused, naming what it returned" do
+      frame = summary_frame(x: [1, 1], y: [1.0, 2.0])
+      listed = summary(fun_data: :none, fun: fn values -> values end)
+
+      assert_raise ArgumentError,
+                   "a summary function must return a number for the values at each x, got: " <>
+                     "[1.0, 2.0]",
+                   fn -> Stat.compute_layer(listed, frame, axes([1], false, false)) end
+    end
+
+    test "each panel, then each group, then each x, comes in order, whatever the rows' order" do
+      frame =
+        DataFrame.new(
+          x: [2, 1, 1, 2, 1],
+          y: [1.0, 2.0, 3.0, 4.0, 5.0],
+          panel: [2, 2, 1, 1, 1],
+          group: [1, 1, 2, 2, 1]
+        )
+
+      summaries = Stat.compute_layer(summary(), frame, axes([1, 2], false, false))
+
+      assert columns(summaries, [:panel, :group, :x, :y]) === [
+               [1, 1, 1, 2, 2],
+               [1, 2, 2, 1, 1],
+               [1, 1, 2, 1, 2],
+               [5.0, 3.0, 4.0, 2.0, 1.0]
+             ]
+    end
+
+    # Golden: x `1:6`, y `c(1, 1, 2, 2, 2, 3)`, `stat_summary(orientation = "y")`; and x `c("a",
+    # "a", "b")`, y `c("p", "q", "q")`, `stat_summary(fun = length)`.
+    test "along y the x values at each y are summarised, as orientation or a discrete y alone says" do
+      frame = summary_frame(x: [1, 2, 3, 4, 5, 6], y: [1, 1, 2, 2, 2, 3])
+
+      along_y =
+        [orientation: :y]
+        |> summary()
+        |> Stat.compute_layer(frame, axes([1], false, false))
+
+      assert DataFrame.names(along_y) == [:y, :group, :x, :xmin, :xmax, :panel, :flipped_aes]
+
+      assert columns(along_y, [:y, :x, :xmin, :xmax, :flipped_aes]) === [
+               [1, 2, 3],
+               [1.5, 4.0, 6.0],
+               [1.0, 3.4226497308103743, nil],
+               [2.0, 4.5773502691896262, nil],
+               [true, true, true]
+             ]
+
+      # Six x values summarised along x, or three y values along y.
+      along_x = List.duplicate(false, 6)
+      assert flipped_aes(summary(), frame, axes([1], false, true)) == [true, true, true]
+      assert flipped_aes(summary(orientation: :x), frame, axes([1], false, true)) == along_x
+      assert flipped_aes(summary(), frame, axes([1], true, true)) == along_x
+      assert flipped_aes(summary(), frame, axes([1], true, false)) == along_x
+    end
+
+    # ggplot2 4.0.3's `uniquecols()` keeps a column cell by cell, as its `layer_data()` of x
+    # `c(1, 1, 2, 2, 3)`, y `1:5` and `aes(colour = c)` of c `c(10, 10, 20, 21, 30)` shows: the
+    # colours of 10, `NA` and 30. Each column here takes one of its cases: kept, missing in some
+    # cells, a category's levels kept, held more than once in every cell and dropped, and a range
+    # the summary writes.
+    test "a column goes to each x it holds one value at, missing where it holds more" do
+      frame =
+        summary_frame(
+          x: [1, 1, 2, 2, 3, 3],
+          y: [1.0, 2.0, 3.0, 4.0, 5.0, 6.0],
+          color: [10, 10, 20, 21, 30, 30],
+          size: [1, 2, 3, 4, 5, 5],
+          shape:
+            {["a", "b", "b", "b", "b", "b"], {:category, levels: ["b", "a"], ordered: false}},
+          stroke: [0.5, 0.6, 0.7, 0.8, 0.9, 1.0],
+          ymin: List.duplicate(9.0, 6)
+        )
+
+      summaries =
+        [fun_data: :none, fun: :mean]
+        |> summary()
+        |> Stat.compute_layer(frame, axes([1], false, false))
+
+      assert DataFrame.names(summaries) ==
+               [:x, :group, :y, :ymin, :ymax, :panel, :color, :size, :shape, :flipped_aes]
+
+      assert columns(summaries, [:y, :color, :size, :shape, :ymin]) === [
+               [1.5, 3.5, 5.5],
+               [10, nil, 30],
+               [nil, nil, 5],
+               [nil, "b", "b"],
+               [nil, nil, nil]
+             ]
+
+      assert DataFrame.category(summaries, :shape) ==
+               {:category, levels: ["b", "a"], ordered: false}
+    end
+
+    test "no aesthetic takes a computed column by default" do
+      assert Stat.default_mapping(summary()) == %{}
+    end
+  end
+
   describe "compute_layer/3 for aligning" do
     # Golden: `layer_data()` for x 3, 1 and 2 at y 3, 1 and 4 in group a, and x 1, 2 and 3 at y 2 in
     # group b, with `geom_area(position = "identity")`: a group's rows out of order along x are
@@ -2778,6 +2946,45 @@ defmodule Giggly.StatTest do
   end
 
   defp box, do: %Stat.Boxplot{coef: 1.5, width: :none, orientation: :none}
+
+  # A summary at its defaults, `mean_se`, but for the fields given.
+  defp summary(fields \\ []) do
+    struct!(
+      %Stat.Summary{
+        fun_data: {:mean_se, mult: 1.0},
+        fun: :none,
+        fun_min: :none,
+        fun_max: :none,
+        orientation: :none
+      },
+      fields
+    )
+  end
+
+  # A summary's table, the columns given in one panel and one group, a column given with a
+  # category declared so.
+  defp summary_frame(columns) do
+    rows =
+      columns
+      |> Keyword.fetch!(:x)
+      |> length()
+
+    columns
+    |> Enum.map(fn
+      {name, {values, category}} -> {name, values, category}
+      {name, values} -> {name, values}
+    end)
+    |> Enum.concat(panel: List.duplicate(1, rows), group: List.duplicate(-1, rows))
+    |> DataFrame.new()
+  end
+
+  defp flipped_aes(stat, frame, axes) do
+    stat
+    |> Stat.compute_layer(frame, axes)
+    |> DataFrame.pull(:flipped_aes)
+  end
+
+  defp mtcars(name), do: Keyword.fetch!(Datasets.mtcars(), name)
 
   defp width_frame(widths) do
     DataFrame.new(

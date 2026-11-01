@@ -33,10 +33,11 @@ stat and position" and "Each facet, coordinate system, geom, stat and position i
   never runs one.
 - **The API is `new/2`, the geom functions (`geom_histogram/3`, `geom_freqpoly/3`,
   `geom_boxplot/3`, `geom_smooth/3`, `geom_density/3`, `geom_segment/3`, `geom_rug/3`,
-  `geom_hex/3`, `geom_label/3`, `geom_tile/3`, `geom_raster/3`, `geom_hline/3`, `geom_vline/3` and
-  `geom_abline/3` among them),
+  `geom_hex/3`, `geom_label/3`, `geom_tile/3`, `geom_raster/3`, `geom_hline/3`, `geom_vline/3`,
+  `geom_abline/3`, `geom_linerange/3`, `geom_pointrange/3`, `geom_errorbar/3` and
+  `geom_crossbar/3` among them),
   `stat_sum/3`, `stat_bin/3`, `stat_bin_hex/3`,
-  `stat_smooth/3`, `stat_density/3`, `annotate/3`, the facet functions
+  `stat_smooth/3`, `stat_density/3`, `stat_summary/3`, `annotate/3`, the facet functions
   (`facet_wrap/3`, `facet_grid/2`), the coordinate functions (`coord_cartesian/2`,
   `coord_radial/1`), the scale functions (`scale_x_continuous/2`, `scale_y_continuous/2`, their `_log10`, `_sqrt` and `_reverse` shortcuts,
   `scale_x_discrete/2`, `scale_y_discrete/2`, `scale_x_date/2`, `scale_y_date/2`,
@@ -52,7 +53,8 @@ stat and position" and "Each facet, coordinate system, geom, stat and position i
   `scale_shape_manual/2`, the line type scales `scale_linetype_discrete/2` and
   `scale_linetype_manual/2`, the line width scales `scale_linewidth_continuous/2` and
   `scale_linewidth_discrete/2`, `xlim/3`, `xlim/2`, `ylim/3`, `ylim/2`, `lims/2`),
-  the guide functions (`guides/2`, `guide_legend/1`), `position_dodge2/1`, `position_jitter/1`,
+  the guide functions (`guides/2`, `guide_legend/1`), `position_dodge/1`, `position_dodge2/1`,
+  `position_jitter/1`,
   `labs/2`,
   `theme/2` and the complete theme functions (`theme_gray/2`, `theme_bw/2`, `theme_linedraw/2`,
   `theme_light/2`, `theme_dark/2`, `theme_minimal/2`, `theme_classic/2`, `theme_void/2`).**
@@ -81,7 +83,13 @@ stat and position" and "Each facet, coordinate system, geom, stat and position i
   and position, and `geom_rug/3` `%Geom.Rug{}` with the identity stat and its `position:`, and
   `geom_hline/3`, `geom_vline/3` and `geom_abline/3` `%Geom.Hline{}`, `%Geom.Vline{}` and
   `%Geom.Abline{}` with the identity stat and position, taking no `position:`, as only nudging
-  moves a reference line in R, and
+  moves a reference line in R, and `geom_linerange/3`, `geom_pointrange/3`, `geom_errorbar/3`
+  and `geom_crossbar/3` `%Geom.Linerange{}`, `%Geom.Pointrange{}`, `%Geom.Errorbar{}` and
+  `%Geom.Crossbar{}` with the identity stat and position, their `orientation:` (`:none` unless
+  given) and `lineend:` the geom's, a crossbar's `linejoin:` too, `:mitre` unless given, and its
+  `middle_` and `box_` looks (`middle_colour:`, `box_linewidth:` and the rest, R's dotted names
+  underscored) a map per part of only the looks given, as a box plot's parts are; `width:` sets an
+  error bar's or crossbar's width, a mapped one a number, checked at the call, and
   `geom_hex/3` and `stat_bin_hex/3` both `%Geom.Hex{}` with `%Stat.BinHex{}` and
   `%Position.Identity{}`, taking no `position:`, `bins:` (30) and `binwidth:` the stat's,
   each one value for both axes or an `{x, y}` pair, recorded as the pair, bins whole numbers
@@ -104,6 +112,19 @@ stat and position" and "Each facet, coordinate system, geom, stat and position i
   (`validate_adjust/1`), `kernel:`, one of R's seven by name, `n:`, `trim:`, and `bounds:`, `{low,
   high}`, the low a number or `:neg_infinity`, the high a number or `:infinity`, not below the low
   (`validate_bounds/1`), where R keeps no row for bounds high to low, each number kept as a float.
+  **`stat_summary/3` records `%Stat.Summary{}` with the geom `geom:` names and the position that
+  geom's function takes, `:identity` unless given** (design-log §4, the entry beginning
+  "`stat_summary/3` draws with eight geoms"): `fun_data:`, `fun:`, `fun_min:`, `fun_max:` and
+  `orientation:` the stat's, a summary by name or a function of one argument
+  (`validate_summary_function/1`, `validate_summary_data/1`), `fun_data:` recorded `{:mean_se,
+  mult: 1.0}` given no summary and refused beside the others; the geom's options its function's
+  (`Options.summary/1`), its orientation `:none`. It needs `:x` and `:y`, accepts no range, which
+  it writes, and checks a mapped width only where its geom draws one.
+  **A range layer's range is checked at the call, a line range's, point range's, error bar's
+  or crossbar's, an annotation's too**: along x,
+  its `orientation:` or else where `:ymin` or `:ymax` is given, it needs `:x`, `:ymin` and `:ymax`,
+  along y `:y`, `:xmin` and `:xmax`, given by a mapping or an option, the missing ones named,
+  where ggplot2 aborts building a vertical layer and draws nothing for a horizontal one.
   **A ribbon's `orientation:`, `:x` or `:y`, is checked at the
   call against its range**: along x it needs `:ymin` or `:ymax`, along y `:xmin` or `:xmax`, mapped,
   where ggplot2 aborts when it draws; not given, it is recorded `:none` and
@@ -310,12 +331,16 @@ stat and position" and "Each facet, coordinate system, geom, stat and position i
 - **A geom function takes a mapping, a map, and options, a keyword list, either alone or both**
   (design-log §4, the entry beginning "The public pipe API lives in"): `geom_bar(plot,
   position: :dodge)` and `geom_bar(plot, %{x: :class}, position: :dodge)`. A bar function's
-  position is chosen by an atom (`position: :stack | :dodge | :dodge2`, `:dodge2` recorded with
-  `position_dodge2/1`'s defaults) or by the struct `position_dodge2/1` builds from its options
-  (`preserve:`, `padding:` 0 to 1, `reverse:`, and no `width:`, which no geom taking a position
-  reads), and recorded as its kind's struct; its parameters never become the geom's options
-  (design-log §4, the entries beginning "A layer chooses its position by an atom" and
-  "`Plot.position_dodge2/1` arrives"). **`geom_point/3`'s `position:` is `:identity`, its
+  position is chosen by an atom (`position: :stack | :dodge | :dodge2`, `:dodge` recorded with no
+  width, `:dodge2` with `position_dodge2/1`'s defaults) or by the struct `position_dodge/1` builds
+  (`width:`, any number, kept as a float, `:none` when not given; R's `preserve`, `orientation`
+  and `reverse` wait) or `position_dodge2/1` builds (`preserve:`, `padding:` 0 to 1, `reverse:`,
+  and no `width:`, which waits), and recorded as its kind's struct; its parameters never become
+  the geom's options (design-log §4, the entries beginning "A layer chooses its position by an
+  atom" and "`Plot.position_dodge2/1` arrives"). **A range function's `position:`
+  (`geom_linerange/3`, `geom_pointrange/3`, `geom_errorbar/3`, `geom_crossbar/3`) is
+  `:identity`, its default, `:dodge`, `:dodge2` or either struct**; `geom_boxplot/3` takes no
+  `position_dodge/1`, which a varying width would need to preserve each box's. **`geom_point/3`'s `position:` is `:identity`, its
   default, `:jitter`, recorded with `position_jitter/1`'s defaults, or the struct
   `position_jitter/1` builds** (`width:` and `height:`, each 0 or more, a float, `:none` when not
   given, where R moves nothing for a negative one, and `seed:`, any integer, 0 when not given);
@@ -397,9 +422,11 @@ stat and position" and "Each facet, coordinate system, geom, stat and position i
   binning options and `orientation:`, and `geom_bar/3`'s; every option of `geom_boxplot/3`,
   `geom_text/3`, `geom_label/3`, `geom_segment/3`, `geom_rug/3`, `geom_hex/3`, `geom_hline/3`,
   `geom_vline/3`, `geom_abline/3`, `stat_bin_hex/3`,
-  `geom_rect/3`, `geom_tile/3`, `geom_raster/3`, `geom_ribbon/3`, `geom_area/3`, `geom_smooth/3`, `stat_smooth/3`,
-  `geom_density/3`, `stat_density/3`, `annotate/3`, `coord_cartesian/2`, the scale functions, the
-  guide functions, `position_dodge2/1`, `position_jitter/1`, `labs/2`, `theme/2` and the complete theme
+  `geom_rect/3`, `geom_tile/3`, `geom_raster/3`, `geom_ribbon/3`, `geom_area/3`, `geom_linerange/3`,
+  `geom_pointrange/3`, `geom_errorbar/3`, `geom_crossbar/3`, `geom_smooth/3`, `stat_smooth/3`,
+  `geom_density/3`, `stat_density/3`, `stat_summary/3`, `annotate/3`, `coord_cartesian/2`, the
+  scale functions, the
+  guide functions, `position_dodge/1`, `position_dodge2/1`, `position_jitter/1`, `labs/2`, `theme/2` and the complete theme
   functions), so
   a misspelt
   option raises naming it, and a repeated one is refused by `Aesthetics.canonicalize/1`, run first.
@@ -537,9 +564,10 @@ stat and position" and "Each facet, coordinate system, geom, stat and position i
   (`computed_mapping/2`), titles no guide, and so draws in no legend. Each option takes one value
   or a list, every list as long as the others, as ggplot2's "Unequal parameter lengths", a list of
   one value being one value; only the aesthetics a geom draws row by row (`label`, `colour`,
-  `alpha`, `fill`, a point's `shape`, `size` and `stroke`, a bar's, a segment's, a rug's, a
-  label's or a rectangle's `linewidth` and `linetype`, and a path's or a line's `linewidth`, drawn
-  a segment at a time) take
+  `alpha`, `fill`, a point's or a point range's `shape`, `size` and `stroke`, a bar's, a
+  segment's, a rug's, a range's, a label's or a rectangle's `linewidth` and `linetype`, a bar's,
+  an error bar's or a crossbar's `width`, and a path's or a line's `linewidth`, drawn a segment
+  at a time) take
   a list, which `fixed` holds as one value per annotation, and only they count annotations, so a
   label's `label_padding:` is one value however many sides it gives (design-log §4, the entry
   beginning "`annotate(:label)` counts a padding"), and its `border_colour:` and `text_colour:`

@@ -612,7 +612,7 @@ defmodule Giggly.PlotTest do
 
       assert [
                %Plot.Layer{
-                 position: %Position.Dodge{},
+                 position: %Position.Dodge{width: :none},
                  mapping: %{x: "cyl", y: "mpg"},
                  fixed: %{alpha: 0.5}
                }
@@ -754,7 +754,7 @@ defmodule Giggly.PlotTest do
         |> Plot.new(%{x: :cyl})
         |> Plot.geom_bar(position: :dodge)
 
-      assert [%Plot.Layer{position: %Position.Dodge{}, mapping: %{}, fixed: %{}}] =
+      assert [%Plot.Layer{position: %Position.Dodge{width: :none}, mapping: %{}, fixed: %{}}] =
                plot.reversed_layers
     end
 
@@ -818,12 +818,15 @@ defmodule Giggly.PlotTest do
       plot = Plot.new(@rows, %{x: :cyl})
 
       for add <- [&Plot.geom_bar/2, &Plot.geom_col/2, &Plot.geom_histogram/2, &Plot.stat_bin/2],
-          position <- [:jitter, %Position.Dodge{}] do
+          position <- [:jitter, Plot.position_jitter()] do
         error =
           assert_raise NimbleOptions.ValidationError, fn -> add.(plot, position: position) end
 
         assert error.key == :position
-        assert error.message =~ ":stack, :dodge, :dodge2 or a position Plot.position_dodge2/1"
+
+        assert error.message =~
+                 ":stack, :dodge, :dodge2 or a position Plot.position_dodge/1 or " <>
+                   "Plot.position_dodge2/1 makes"
       end
     end
 
@@ -1166,7 +1169,7 @@ defmodule Giggly.PlotTest do
                drop: :extremes
              }
 
-      assert {layer.position, layer.fixed} == {%Position.Dodge{}, %{fill: "#FFFFFF"}}
+      assert {layer.position, layer.fixed} == {%Position.Dodge{width: :none}, %{fill: "#FFFFFF"}}
     end
 
     test "a boundary is recorded as a float" do
@@ -1494,7 +1497,7 @@ defmodule Giggly.PlotTest do
 
       assert kept == %Position.Dodge2{preserve: :single, padding: 0.3, reverse: true}
 
-      assert [%Plot.Layer{position: %Position.Dodge{}}] =
+      assert [%Plot.Layer{position: %Position.Dodge{width: :none}}] =
                Plot.geom_boxplot(plot, position: :dodge).reversed_layers
     end
 
@@ -2331,6 +2334,509 @@ defmodule Giggly.PlotTest do
 
         assert error.key in [option, [option]]
       end
+    end
+  end
+
+  describe "geom_linerange/3 and geom_pointrange/3" do
+    @ranges %{
+      "trt" => [1, 2],
+      "resp" => [1.0, 3.0],
+      "lower" => [0.8, 2.4],
+      "upper" => [1.1, 3.3]
+    }
+
+    test "a range layer records its geom with no orientation and butt ends by default" do
+      plot = Plot.new(@ranges, %{x: :trt, y: :resp})
+
+      assert [
+               %Plot.Layer{
+                 geom: %Geom.Linerange{orientation: :none, line_end: :butt},
+                 stat: %Stat.Identity{},
+                 position: %Position.Identity{},
+                 data: :none,
+                 mapping: %{ymin: "lower", ymax: "upper"},
+                 fixed: %{},
+                 accepted: [
+                   :alpha,
+                   :color,
+                   :group,
+                   :linetype,
+                   :linewidth,
+                   :x,
+                   :xmax,
+                   :xmin,
+                   :y,
+                   :ymax,
+                   :ymin
+                 ],
+                 annotation: false,
+                 inherit: true
+               }
+             ] = Plot.geom_linerange(plot, %{ymin: :lower, ymax: :upper}).reversed_layers
+
+      assert [%Plot.Layer{geom: %Geom.Pointrange{orientation: :none, line_end: :butt}}] =
+               Plot.geom_pointrange(plot, %{ymin: :lower, ymax: :upper}).reversed_layers
+    end
+
+    test "the options choose the orientation and ends, and set every line's and point's look" do
+      plot =
+        Plot.new(@ranges, %{x: :trt, y: :resp, ymin: :lower, ymax: :upper, xmin: :lower})
+
+      assert [
+               %Plot.Layer{
+                 geom: %Geom.Pointrange{orientation: :x, line_end: :round},
+                 fixed: %{
+                   color: "#FF0000",
+                   linewidth: 2.0,
+                   linetype: {4, 4},
+                   fill: "#FFFFFF",
+                   shape: :circle_filled,
+                   size: 3.0,
+                   stroke: 1.5
+                 }
+               }
+             ] =
+               Plot.geom_pointrange(plot,
+                 orientation: :x,
+                 lineend: :round,
+                 colour: "red",
+                 linewidth: 2,
+                 linetype: :dashed,
+                 fill: "white",
+                 shape: 21,
+                 size: 3,
+                 stroke: 1.5
+               ).reversed_layers
+
+      assert_raise NimbleOptions.ValidationError, fn ->
+        Plot.geom_linerange(plot, fill: "white")
+      end
+    end
+
+    # ggplot2 4.0.3's `GeomLinerange$setup_params()` aborts building a vertical layer without x,
+    # ymin and ymax: "Either, x, ymin, and ymax or y, xmin, and xmax must be supplied."
+    test "a range layer is refused where it lacks a position its orientation runs along" do
+      plot = Plot.new(@ranges, %{x: :trt, y: :resp})
+
+      error =
+        assert_raise ArgumentError, fn ->
+          Plot.geom_linerange(plot, %{ymin: :lower, ymax: :upper}, orientation: :y)
+        end
+
+      assert String.starts_with?(
+               error.message,
+               "Plot.geom_linerange/3 runs along y, so it needs :y, :xmin and :xmax, but " <>
+                 "neither its mapping nor the plot's gives :xmin and :xmax."
+             )
+
+      error =
+        assert_raise ArgumentError, fn ->
+          Plot.geom_pointrange(plot, %{ymin: :lower, xmax: :upper})
+        end
+
+      assert error.message =~
+               "runs along x, so it needs :x, :ymin and :ymax, but neither its " <>
+                 "mapping nor the plot's gives :ymax."
+
+      across = Plot.new(@ranges, %{y: :trt, xmin: :lower, xmax: :upper})
+      assert %Plot{} = Plot.geom_linerange(across)
+    end
+
+    test "a point range needs its point's x and y" do
+      plot = Plot.new(@ranges, %{x: :trt})
+
+      error =
+        assert_raise ArgumentError, fn ->
+          Plot.geom_pointrange(plot, %{ymin: :lower, ymax: :upper})
+        end
+
+      assert error.message =~ "Plot.geom_pointrange/3 needs :y"
+    end
+
+    # ggplot2 4.0.3: `annotate("pointrange", x = 3.5, y = 20, ymin = 12, ymax = 28, colour = "red",
+    # size = 2.5, linewidth = 1.5)`, its looks one per annotation.
+    test "a line range or point range annotation takes its positions and a look for each" do
+      [layer] =
+        @rows
+        |> Plot.new()
+        |> Plot.annotate(:pointrange,
+          x: [3.5, 4.0],
+          y: 20,
+          ymin: 12,
+          ymax: 28,
+          colour: ["red", "blue"],
+          size: 2.5,
+          linewidth: [1.5, 1]
+        )
+        |> Map.fetch!(:reversed_layers)
+
+      assert %Plot.Layer{
+               geom: %Geom.Pointrange{orientation: :none, line_end: :butt},
+               mapping: %{x: "x", y: "y", ymin: "ymin", ymax: "ymax"},
+               fixed: %{color: ["#FF0000", "#0000FF"], size: 2.5, linewidth: [1.5, 1.0]},
+               annotation: true
+             } = layer
+
+      plot = Plot.new(@rows)
+
+      error =
+        assert_raise ArgumentError, fn ->
+          Plot.annotate(plot, :linerange, x: 1, ymin: 0, ymax: 2, orientation: :y)
+        end
+
+      assert error.message =~ "Plot.annotate/3 runs along y"
+    end
+  end
+
+  describe "geom_errorbar/3 and geom_crossbar/3" do
+    @bars %{
+      "trt" => [1, 2],
+      "resp" => [1.0, 3.0],
+      "lower" => [0.8, 2.4],
+      "upper" => [1.1, 3.3],
+      "label" => ["a", "b"]
+    }
+
+    test "an error bar or crossbar layer records its geom, its crossbar's corners mitred" do
+      plot = Plot.new(@bars, %{x: :trt, y: :resp, ymin: :lower, ymax: :upper})
+
+      assert [
+               %Plot.Layer{
+                 geom: %Geom.Errorbar{orientation: :none, line_end: :butt},
+                 stat: %Stat.Identity{},
+                 position: %Position.Identity{},
+                 fixed: %{width: 0.2},
+                 accepted: accepted
+               }
+             ] = Plot.geom_errorbar(plot, width: 0.2).reversed_layers
+
+      assert :width in accepted
+
+      assert [
+               %Plot.Layer{
+                 geom: %Geom.Crossbar{
+                   orientation: :none,
+                   middle: %{},
+                   box: %{},
+                   line_end: :butt,
+                   line_join: :mitre
+                 }
+               }
+             ] = Plot.geom_crossbar(plot).reversed_layers
+    end
+
+    # ggplot2 4.0.3's `geom_crossbar(middle.colour = , middle.linetype = , box.linewidth = )`, R's
+    # dotted names underscored, each part holding only the looks given.
+    test "a crossbar's middle_ and box_ options give each part a look of its own" do
+      plot = Plot.new(@bars, %{x: :trt, y: :resp, ymin: :lower, ymax: :upper})
+
+      assert [
+               %Plot.Layer{
+                 geom: %Geom.Crossbar{
+                   middle: %{color: "#FF0000", linetype: {4, 4}},
+                   box: %{linewidth: 0.3},
+                   line_end: :round,
+                   line_join: :round
+                 },
+                 fixed: %{fill: "#FFFFFF"}
+               }
+             ] =
+               Plot.geom_crossbar(plot,
+                 middle_colour: "red",
+                 middle_linetype: :dashed,
+                 box_linewidth: 0.3,
+                 lineend: :round,
+                 linejoin: :round,
+                 fill: "white"
+               ).reversed_layers
+
+      assert_raise NimbleOptions.ValidationError, fn ->
+        Plot.geom_errorbar(plot, middle_colour: "red")
+      end
+    end
+
+    test "a layer lacking its range's positions, or mapping a width that is not a number, is " <>
+           "refused" do
+      plot = Plot.new(@bars, %{x: :trt, y: :resp})
+
+      error =
+        assert_raise ArgumentError, fn -> Plot.geom_errorbar(plot, %{ymin: :lower}) end
+
+      assert error.message =~ "Plot.geom_errorbar/3 needs one of :ymax, :xmax"
+
+      error =
+        assert_raise ArgumentError, fn ->
+          Plot.geom_crossbar(plot, %{ymin: :lower, ymax: :upper}, orientation: :y)
+        end
+
+      assert error.message =~ "Plot.geom_crossbar/3 runs along y"
+
+      for {layer, function} <- [
+            {&Plot.geom_errorbar/3, "Plot.geom_errorbar/3"},
+            {&Plot.geom_crossbar/3, "Plot.geom_crossbar/3"}
+          ] do
+        error =
+          assert_raise ArgumentError, fn ->
+            layer.(plot, %{ymin: :lower, ymax: :upper, width: :label}, [])
+          end
+
+        assert String.starts_with?(
+                 error.message,
+                 "#{function} maps :width to \"label\", a :string column"
+               )
+      end
+    end
+
+    # ggplot2 4.0.3: `annotate("errorbar", x = 3, ymin = 1, ymax = 2, width = 0.5)` and
+    # `annotate("crossbar", x = 3, y = 3, ymin = 2.5, ymax = 3.5)`.
+    test "an error bar or crossbar annotation takes its positions, a width and the crossbar's " <>
+           "part looks" do
+      plot = Plot.new(@rows)
+
+      assert [%Plot.Layer{geom: %Geom.Errorbar{}, fixed: %{width: [0.5, 0.2]}, annotation: true}] =
+               Plot.annotate(plot, :errorbar, x: [3, 4], ymin: 1, ymax: 2, width: [0.5, 0.2]).reversed_layers
+
+      assert [
+               %Plot.Layer{
+                 geom: %Geom.Crossbar{middle: %{color: "#0000FF"}},
+                 mapping: %{x: "x", y: "y", ymin: "ymin", ymax: "ymax"}
+               }
+             ] =
+               Plot.annotate(plot, :crossbar,
+                 x: 3,
+                 y: 3,
+                 ymin: 2.5,
+                 ymax: 3.5,
+                 middle_colour: "blue"
+               ).reversed_layers
+
+      error =
+        assert_raise ArgumentError, fn ->
+          Plot.annotate(plot, :errorbar, y: 1, xmin: 0, xmax: 2, orientation: :x)
+        end
+
+      assert error.message =~ "Plot.annotate/3 runs along x"
+    end
+  end
+
+  describe "position_dodge/1 and a range layer's position:" do
+    test "position_dodge/1 records the width given, as a float, or :none" do
+      assert Plot.position_dodge(width: 1) == %Position.Dodge{width: 1.0}
+      assert Plot.position_dodge() == %Position.Dodge{width: :none}
+
+      assert_raise NimbleOptions.ValidationError, fn -> Plot.position_dodge(width: "wide") end
+      assert_raise NimbleOptions.ValidationError, fn -> Plot.position_dodge(preserve: :single) end
+    end
+
+    test "a range layer is drawn where it is unless position: dodges it, by name or by a struct" do
+      plot =
+        Plot.new(@ranges, %{x: :trt, y: :resp, ymin: :lower, ymax: :upper, xmin: :lower})
+
+      layers = [
+        &Plot.geom_linerange/3,
+        &Plot.geom_pointrange/3,
+        &Plot.geom_errorbar/3,
+        &Plot.geom_crossbar/3
+      ]
+
+      for layer <- layers do
+        assert [%Plot.Layer{position: %Position.Identity{}}] =
+                 layer.(plot, %{}, []).reversed_layers
+
+        assert [%Plot.Layer{position: %Position.Dodge{width: :none}}] =
+                 layer.(plot, %{}, position: :dodge).reversed_layers
+
+        assert [%Plot.Layer{position: %Position.Dodge2{preserve: :total}}] =
+                 layer.(plot, %{}, position: :dodge2).reversed_layers
+
+        dodge = Plot.position_dodge(width: 0.9)
+
+        assert [%Plot.Layer{position: ^dodge}] =
+                 layer.(plot, %{}, position: dodge).reversed_layers
+
+        assert_raise NimbleOptions.ValidationError, fn -> layer.(plot, %{}, position: :stack) end
+      end
+    end
+
+    test "a bar layer takes position_dodge/1's struct; a box plot does not" do
+      plot = Plot.new(@rows, %{x: :cyl, y: :mpg})
+      dodge = Plot.position_dodge(width: 0.5)
+
+      assert [%Plot.Layer{position: ^dodge}] =
+               Plot.geom_col(plot, position: dodge).reversed_layers
+
+      assert_raise NimbleOptions.ValidationError, fn ->
+        Plot.geom_boxplot(plot, position: dodge)
+      end
+    end
+  end
+
+  describe "stat_summary/3" do
+    @summarised %{"cyl" => [4, 4, 6], "mpg" => [22.0, 26.0, 18.0], "vs" => ["a", "b", "a"]}
+
+    test "a summary records mean_se, point ranges with no orientation, and the identity position" do
+      plot = Plot.new(@summarised, %{x: :cyl, y: :mpg})
+
+      assert [
+               %Plot.Layer{
+                 geom: %Geom.Pointrange{orientation: :none, line_end: :butt},
+                 stat: %Stat.Summary{
+                   fun_data: {:mean_se, mult: 1.0},
+                   fun: :none,
+                   fun_min: :none,
+                   fun_max: :none,
+                   orientation: :none
+                 },
+                 position: %Position.Identity{},
+                 data: :none,
+                 mapping: %{},
+                 fixed: %{},
+                 accepted: [
+                   :alpha,
+                   :color,
+                   :fill,
+                   :group,
+                   :linetype,
+                   :linewidth,
+                   :shape,
+                   :size,
+                   :stroke,
+                   :x,
+                   :y
+                 ],
+                 annotation: false,
+                 inherit: true
+               }
+             ] = Plot.stat_summary(plot).reversed_layers
+    end
+
+    test "the summary's options are its stat's, its orientation the stat's alone" do
+      plot = Plot.new(@summarised, %{x: :cyl, y: :mpg})
+      last = fn values -> List.last(values) end
+
+      assert [
+               %Plot.Layer{
+                 geom: %Geom.Errorbar{orientation: :none},
+                 stat: %Stat.Summary{
+                   fun_data: :none,
+                   fun: :median,
+                   fun_min: :min,
+                   fun_max: ^last,
+                   orientation: :y
+                 },
+                 fixed: %{width: 0.5}
+               }
+             ] =
+               Plot.stat_summary(plot,
+                 geom: :errorbar,
+                 fun: :median,
+                 fun_min: :min,
+                 fun_max: last,
+                 orientation: :y,
+                 width: 0.5
+               ).reversed_layers
+
+      assert [%Plot.Layer{stat: %Stat.Summary{fun_data: {:mean_se, mult: 2.0}}}] =
+               Plot.stat_summary(plot, fun_data: {:mean_se, mult: 2}).reversed_layers
+
+      assert [%Plot.Layer{stat: %Stat.Summary{fun_data: {:mean_se, mult: 1.0}}}] =
+               Plot.stat_summary(plot, fun_data: :mean_se).reversed_layers
+    end
+
+    test "each geom takes its function's options, and the bars' position is the identity" do
+      plot = Plot.new(@summarised, %{x: :cyl, y: :mpg})
+
+      kinds =
+        for geom <- [:point, :line, :bar, :crossbar, :linerange, :ribbon] do
+          [layer] = Plot.stat_summary(plot, geom: geom).reversed_layers
+          {layer.geom, layer.position}
+        end
+
+      assert [
+               {%Geom.Point{}, %Position.Identity{}},
+               {%Geom.Line{orientation: :none, line_end: :butt, arrow: :none}, _line},
+               {%Geom.Bar{just: 0.5}, %Position.Identity{}},
+               {%Geom.Crossbar{orientation: :none, line_join: :mitre}, %Position.Identity{}},
+               {%Geom.Linerange{orientation: :none}, %Position.Identity{}},
+               {%Geom.Ribbon{orientation: :none, outline_type: :both}, _ribbon}
+             ] = kinds
+
+      assert [%Plot.Layer{geom: %Geom.Bar{just: +0.0}, position: %Position.Stack{}}] =
+               Plot.stat_summary(plot, geom: :bar, position: :stack, just: 0).reversed_layers
+
+      assert [%Plot.Layer{position: %Position.Jitter{}}] =
+               Plot.stat_summary(plot, geom: :point, position: :jitter).reversed_layers
+
+      assert_raise NimbleOptions.ValidationError, ~r/unknown options \[:width\]/, fn ->
+        Plot.stat_summary(plot, geom: :point, width: 0.5)
+      end
+
+      assert_raise NimbleOptions.ValidationError, ~r/expected :identity, :stack/, fn ->
+        Plot.stat_summary(plot, geom: :bar, position: :jitter)
+      end
+    end
+
+    test "a geom it does not draw with is refused, naming those it does" do
+      plot = Plot.new(@summarised, %{x: :cyl, y: :mpg})
+
+      assert_raise ArgumentError,
+                   "Plot.stat_summary/3 draws with :pointrange, :point, :line, :bar, " <>
+                     ":crossbar, :errorbar, :linerange or :ribbon, got: :col",
+                   fn -> Plot.stat_summary(plot, geom: :col) end
+    end
+
+    test "fun_data: beside fun:, fun_min: or fun_max: is refused, naming them" do
+      plot = Plot.new(@summarised, %{x: :cyl, y: :mpg})
+
+      assert_raise ArgumentError,
+                   "Plot.stat_summary/3 is given fun_data:, the whole summary, and fun: and " <>
+                     "fun_max:, part of one; give fun_data: alone, or fun:, fun_min: and fun_max:",
+                   fn ->
+                     Plot.stat_summary(plot, fun_data: :mean_se, fun: :mean, fun_max: :max)
+                   end
+    end
+
+    test "a summary's values are checked at the call" do
+      plot = Plot.new(@summarised, %{x: :cyl, y: :mpg})
+
+      assert_raise NimbleOptions.ValidationError,
+                   ~r/expected :mean, :median, :min, :max or a function of one argument, got: :sd/,
+                   fn -> Plot.stat_summary(plot, fun: :sd) end
+
+      assert_raise NimbleOptions.ValidationError, ~r/a function of one argument, got: /, fn ->
+        Plot.stat_summary(plot, fun_min: fn left, right -> left + right end)
+      end
+
+      for fun_data <- [:mean_sdl, {:mean_se, mult: "2"}, {:mean_se, [mult: 2, extra: 1]}] do
+        assert_raise NimbleOptions.ValidationError,
+                     ~r/expected :mean_se or {:mean_se, mult: mult}, mult a number, got: /,
+                     fn -> Plot.stat_summary(plot, fun_data: fun_data) end
+      end
+    end
+
+    # ggplot2 4.0.3 aborts building `stat_summary(aes(ymin = 10))`: "`geom_pointrange()` requires
+    # the following missing aesthetics: ymin or xmin and xmax".
+    test "a summary needs x and y, and refuses a range mapped, which it writes" do
+      plot = Plot.new(@summarised, %{x: :cyl})
+
+      assert_raise ArgumentError, ~r/Plot.stat_summary\/3 needs :y/, fn ->
+        Plot.stat_summary(plot)
+      end
+
+      assert_raise ArgumentError, ~r/cannot use :ymin, which its mapping maps/, fn ->
+        Plot.stat_summary(plot, %{y: :mpg, ymin: :mpg})
+      end
+    end
+
+    test "a mapped width is a number where the geom draws one, and rides along where it does not" do
+      plot = Plot.new(@summarised, %{x: :cyl, y: :mpg, width: :vs})
+
+      assert_raise ArgumentError,
+                   "Plot.stat_summary/3 maps :width to \"vs\", a :string column, but its geom " <>
+                     "draws each mark as wide as its width, so it must be a number",
+                   fn -> Plot.stat_summary(plot, geom: :errorbar) end
+
+      assert [%Plot.Layer{}] = Plot.stat_summary(plot, geom: :point).reversed_layers
     end
   end
 
@@ -4299,7 +4805,8 @@ defmodule Giggly.PlotTest do
       error = assert_raise ArgumentError, fn -> Plot.annotate(plot, :curve, x: 1, y: 1) end
 
       assert error.message =~
-               ":point, :col, :bar, :path, :line, :segment, :rug, :text, :label or :rect, got: :curve"
+               ":point, :col, :bar, :path, :line, :segment, :rug, :linerange, :pointrange, " <>
+                 ":errorbar, :crossbar, :text, :label or :rect, got: :curve"
     end
 
     # ggplot2 4.0.3 warns "`geom` must not be \"hline\". Please use `geom_hline()` directly

@@ -57,6 +57,7 @@ defmodule Giggly.Aesthetics do
     staple_colour: :staple_color,
     median_colour: :median_color,
     box_colour: :box_color,
+    middle_colour: :middle_color,
     border_colour: :border_color,
     text_colour: :text_color
   }
