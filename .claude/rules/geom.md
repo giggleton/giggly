@@ -199,7 +199,8 @@ beginning "Each layer's defaults are filled in from the theme".
   `x`, or `y` for `orientation: :y`, as `GeomLine$setup_data()` orders them: ties keep their order,
   infinities sort at their ends, a missing position last, as R's `order()` sorts; it then draws
   and keys as a `Geom.Path` with its parameters, as ggplot2's `GeomLine` is a `GeomPath`. Its
-  orientation is the layer's; one a stat names arrives with the first such stat.
+  orientation is the layer's, or, where it is `:none`, as a summary's line records it, the stat's
+  `flipped_aes`, as `has_flipped_aes(ambiguous = TRUE)` reads it first.
 - **A segment (`Geom.Segment`) is drawn as ggplot2's `GeomSegment` draws one, straight or as a
   path by what `Coord.linear?/1` says, never by matching the coordinate system's kind** (design-log
   §4, the entry beginning "`geom_segment()` draws a straight line"): a straight line per row, in
@@ -208,6 +209,38 @@ beginning "Each layer's defaults are filled in from the theme".
   from `x` or `y` as the panel is drawn, never in `setup_data/3`**, so the layer's table holds what
   was mapped, as ggplot2's `layer_data()` does. A colour of `:none` is a line of no stroke, as
   svglite writes R's `NA`; its key is a path's.
+- **A line range (`Geom.Linerange`) is drawn as ggplot2's `GeomLinerange` draws one, and a point
+  range (`Geom.Pointrange`) as `GeomPointrange` does, through it**: `setup_data/3` writes
+  `flipped_aes`, the struct's `orientation`, or where that is `:none`, along y where the rows have
+  no `ymin` or `ymax`, as `has_flipped_aes(range_is_orthogonal = TRUE)` reads a range; each row
+  is then a segment from `ymin` to `ymax` at its `x`, flipped and flipped back, drawn by
+  `Geom.Segment` with the layer's ends, round corners and no arrowheads, so a line range takes
+  no `linejoin` and draws no arrow. A point range draws every row's line, then every row's point
+  through `Geom.Point` at four times its size, ggplot2's `fatten`, never an option, since R 4.0
+  deprecates it. Their looks are a path's and `GeomPointrange`'s (a third of the points' size,
+  twice the borders' width as the stroke); a line range's key is `draw_key_linerange()`'s, up the
+  key's middle from a tenth to nine tenths, across it for a horizontal layer, needing a path's
+  room, and a point range's that and a point at four times the key's size, needing its size and
+  width added. Each checked against vdiffr's drawing (`test/golden/linerange*.svg`,
+  `pointrange*.svg`).
+- **An error bar (`Geom.Errorbar`) is set up as ggplot2's `GeomErrorbar` sets one up, and a
+  crossbar (`Geom.Crossbar`) as an error bar** (`Errorbar.with_sides/3`): a line range's
+  orientation, then along it its sides at x ∓ width/2 in R's arithmetic, the `width` mapped or
+  set, else 0.9 of the closest spacing in any panel, not counting from zero, 1 on a discrete axis
+  (`compute_data_size(zero = FALSE, discrete = TRUE)`), the axis read after flipping; the width
+  then dropped, R's default left out of the table, and one that is not a number refused. **An
+  error bar is drawn as `GeomErrorbar` draws one**: each row eight points, its whiskers and stem
+  broken by missing points, a group of its own, drawn by `Geom.Path` with the layer's ends and
+  round corners; its key is a path's either way. **A crossbar is drawn as `GeomCrossbar` draws
+  one: every row's box, then every row's line across**, through `Crossbar.parts/3`, **the one
+  home of a box's drawing, which a box plot draws box by box**: a polygon of the box's fill at
+  its alpha and its border in the `box` look, else its own, pinched at notches a box plot gives,
+  and its line across in the `middle` look, else its own at `fatten` times its width (2.5, a box
+  plot's median 2), neither at the row's alpha, its ends and corners the struct's. Its defaults
+  are ggplot2's under the theme (ink, no fill, the borders' width and line type); its key is
+  `draw_key_crossbar()`'s (`Crossbar.key/5`, which a box plot's key draws inside its whiskers and
+  staples), the middle line not widened, needing a path's room. Each checked against vdiffr's
+  drawing (`test/golden/errorbar*.svg`, `crossbar*.svg`).
 - **A line's arrowhead is the layer's `arrow` on each line it draws, made by `Mark.head/3`**:
   closed, it is filled with the arrow's fill, or the line's colour for `:color`, at the line's
   alpha, as ggplot2 applies `alpha()` to `arrow.fill`. A geom says which ends each line's head
@@ -360,8 +393,8 @@ beginning "Each layer's defaults are filled in from the theme".
   `relvarwidth` over the greatest in the layer, in R's arithmetic, dropping `width` and
   `relvarwidth`. **Each panel's boxes are drawn in the order of their groups, each whole before
   the next**, as ggplot2 splits a panel by group: outliers as points (`Geom.Point`), staples where
-  `staplewidth` is not 0, whiskers, the box as a polygon, pinched in at its notches with `notch`,
-  and the median. Each part takes its look from the struct's map for it, which holds only what the
+  `staplewidth` is not 0, whiskers, then the box and its median as a crossbar draws them
+  (`Crossbar.parts/3`), pinched in at its notches with `notch`. Each part takes its look from the struct's map for it, which holds only what the
   layer gave (a look absent is the box's own, `:none` R's `NA`), else the box's row; lines never
   take the box's alpha and its fill does; the median is twice the box's width unless its look
   gives one; the box is by default the theme's ink mixed 20% toward its paper (`#333333`,

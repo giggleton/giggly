@@ -30,7 +30,8 @@ the entry beginning "Each facet, coordinate system, geom, stat and position is a
   `panel` column itself and reads no scale. A position's own
   parameters (a dodge's width, stacking's `vjust` and `reverse`) arrive with the option that sets
   them, as dodging by clusters' `preserve`, `padding` and `reverse` arrived with
-  `Plot.position_dodge2/1`, its `width` waiting for a geom without edges, and the panel's scales
+  `Plot.position_dodge2/1` and dodging's `width` with `Plot.position_dodge/1`, the first reader
+  a line range, which has no edges; dodging by clusters' `width` waits, and the panel's scales
   with the first position that reads one.
 - **Stacking is ggplot2's `position_stack()`, `vjust = 1`**: nothing moves unless two rows of
   the layer share an x, in any panel; then a layer with no `xmin`, an area's, has its `xmin` and
@@ -41,9 +42,12 @@ the entry beginning "Each facet, coordinate system, geom, stat and position is a
   (`Giggly.DataFrame.Arithmetic`), so an infinite bar takes its pile to its infinity and a bar
   above it runs from infinity to infinity, its y R's `0 * Inf`, NaN, which the scale's second
   mapping makes missing.
-- **Dodging is ggplot2's `position_dodge()`, `preserve = "total"`**: each panel's bars at one
-  `xmin` share the panel's first bar's width, ranked by group, lowest leftmost, each the widest
-  bar's width over the number of groups at that x; an x with one group keeps its bar. Dodged
+- **Dodging is ggplot2's `position_dodge()`, `preserve = "total"`**: a mark with no `xmin` and
+  `xmax`, a line range's or a point range's, is first given them, its x ∓ half the `width` given,
+  else its x, as `collide_setup()` gives them, so given none it does not move (R also warns);
+  each panel's marks at one `xmin` then share the `width` given, else the panel's first mark's,
+  ranked by group, lowest leftmost, each the widest mark's width over the number of groups at
+  that x; an x with one group keeps its mark. Dodged
   positions come out doubles, as R's are, so a discrete axis's column stays one type.
 - **Dodging by clusters is ggplot2's `position_dodge2()`, on lists, in R's order and R's
   arithmetic** (design-log §4, the entries beginning "Dodging by clusters"): its widths' sum and

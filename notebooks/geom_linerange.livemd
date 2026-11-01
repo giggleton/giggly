@@ -5,6 +5,15 @@ Mix.install([
   {:giggly, path: Path.join(__DIR__, "..")},
   {:kino, "~> 0.19"}
   ])
+
+alias Giggly.Plot
+
+render = fn plot ->
+  plot
+  |> Giggly.to_svg()
+  |> IO.iodata_to_binary()
+  |> Kino.Image.new(:svg)
+end
 ```
 
 ## About this notebook
@@ -20,7 +29,13 @@ These geoms each draw an interval: a range from `ymin` to `ymax` at an `x`, or f
 `xmax` at a `y` when turned on its side. `geom_linerange()` draws it as a line,
 `geom_pointrange()` as a line with a point at `y`, `geom_errorbar()` as a line capped at each end,
 and `geom_crossbar()` as a box with a line across it at `y`. `geom_errorbarh()` is deprecated in
-favour of `geom_errorbar(orientation = "y")`. Giggly has none of them yet.
+favour of `geom_errorbar(orientation = "y")`. Giggly has `Giggly.Plot.geom_linerange/3`,
+`Giggly.Plot.geom_pointrange/3`, `Giggly.Plot.geom_errorbar/3` and `Giggly.Plot.geom_crossbar/3`,
+turned on their side by mapping `xmin` and `xmax` or by `orientation:`, and dodged with
+`position: :dodge` or `Giggly.Plot.position_dodge/1` and its `width:`; it has no
+`geom_errorbarh()`. A plot is described with `Giggly.Plot` and drawn with `Giggly.to_svg/2`, which
+returns an SVG document. The setup cell aliases `Giggly.Plot`, so the cells write `Plot.new/2`,
+and defines `render`, which draws a plot and shows it below the cell with `Kino.Image`.
 
 ## Lines, points, crossbars and error bars
 
@@ -41,8 +56,42 @@ p + geom_crossbar(aes(ymin = lower, ymax = upper), width = 0.2)
 p + geom_errorbar(aes(ymin = lower, ymax = upper), width = 0.2)
 ```
 
-Not in Giggly yet: `geom_linerange()`, `geom_pointrange()`, `geom_crossbar()` and `geom_errorbar()`
-and their `width` option.
+The cell writes the table out, `trt` and `group` as factors of their numbers with
+`Giggly.Factor.new/2`.
+
+```elixir
+df = %{
+  "trt" => Giggly.Factor.new([1, 1, 2, 2]),
+  "resp" => [1, 5, 3, 4],
+  "group" => Giggly.Factor.new([1, 2, 1, 2]),
+  "upper" => [1.1, 5.3, 3.3, 4.2],
+  "lower" => [0.8, 4.6, 2.4, 3.6]
+}
+
+p = Plot.new(df, %{x: :trt, y: :resp, colour: :group})
+
+p
+|> Plot.geom_linerange(%{ymin: :lower, ymax: :upper})
+|> render.()
+```
+
+```elixir
+p
+|> Plot.geom_pointrange(%{ymin: :lower, ymax: :upper})
+|> render.()
+```
+
+```elixir
+p
+|> Plot.geom_crossbar(%{ymin: :lower, ymax: :upper}, width: 0.2)
+|> render.()
+```
+
+```elixir
+p
+|> Plot.geom_errorbar(%{ymin: :lower, ymax: :upper}, width: 0.2)
+|> render.()
+```
 
 ## Horizontal intervals
 
@@ -54,7 +103,12 @@ ggplot(df, aes(resp, trt, colour = group)) +
 
 Mapping `xmin` and `xmax` rather than `ymin` and `ymax` turns the intervals on their side.
 
-Not in Giggly yet: `geom_linerange()`.
+```elixir
+df
+|> Plot.new(%{x: :resp, y: :trt, colour: :group})
+|> Plot.geom_linerange(%{xmin: :lower, xmax: :upper})
+|> render.()
+```
 
 ## Lines through the group means
 
@@ -65,7 +119,12 @@ p +
   geom_errorbar(aes(ymin = lower, ymax = upper), width = 0.2)
 ```
 
-Not in Giggly yet: `geom_errorbar()` and its `width` option.
+```elixir
+p
+|> Plot.geom_line(%{group: :group})
+|> Plot.geom_errorbar(%{ymin: :lower, ymax: :upper}, width: 0.2)
+|> render.()
+```
 
 ## Dodging bars and error bars
 
@@ -81,8 +140,14 @@ p +
 Each layer is dodged by its own width here, so the narrower error bars do not line up with the
 bars.
 
-Not in Giggly yet: `geom_errorbar()` and its `width` option. Giggly dodges columns already:
-`Giggly.Plot.geom_col/3` with `position: :dodge`.
+```elixir
+p = Plot.new(df, %{x: :trt, y: :resp, fill: :group})
+
+p
+|> Plot.geom_col(position: :dodge)
+|> Plot.geom_errorbar(%{ymin: :lower, ymax: :upper}, position: :dodge, width: 0.25)
+|> render.()
+```
 
 ## Dodging by one width
 
@@ -95,8 +160,17 @@ p +
   geom_errorbar(aes(ymin = lower, ymax = upper), position = dodge, width = 0.25)
 ```
 
-Not in Giggly yet: `position_dodge()`'s options, and `geom_errorbar()` and its `width` option.
-Giggly names a position by an atom, `position: :dodge`, which takes no options.
+`Giggly.Plot.position_dodge/1` takes the width to dodge within, so both layers are dodged within
+0.9 and each error bar sits on its bar.
+
+```elixir
+dodge = Plot.position_dodge(width: 0.9)
+
+p
+|> Plot.geom_col(position: dodge)
+|> Plot.geom_errorbar(%{ymin: :lower, ymax: :upper}, position: dodge, width: 0.25)
+|> render.()
+```
 
 ## Dodging with padding
 
@@ -111,6 +185,7 @@ geom_errorbar(
 )
 ```
 
-Not in Giggly yet: `geom_errorbar()`. `Giggly.Plot.position_dodge2/1` takes `padding:` but no
-`width:`, and R ignores `width = 0.5` here: the error bars have widths of their own, which
-`position_dodge2()` dodges by.
+R ignores `width = 0.5` here: the error bars have widths of their own, which `position_dodge2()`
+dodges by. `Giggly.Plot.position_dodge2/1` takes `padding:` but not `width:`.
+
+Not in Giggly yet: `position_dodge2()`'s `width` option.

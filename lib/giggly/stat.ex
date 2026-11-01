@@ -26,7 +26,8 @@ defprotocol Giggly.Stat do
   # defaults `stat = "align"`, smoothing (`Giggly.Stat.Smooth`) a curve fitted to each group,
   # as `geom_smooth()` defaults `stat = "smooth"`, its band's quantile Giggly's own
   # (`Giggly.Stat.TDistribution`), and densities (`Giggly.Stat.Density`) each group's kernel
-  # density estimate, as `geom_density()` defaults `stat = "density"`. Smoothing and densities
+  # density estimate, as `geom_density()` defaults `stat = "density"`, and summarising
+  # (`Giggly.Stat.Summary`) the y values at each x, as `stat_summary()` does. Smoothing and densities
   # space their places and aligning and densities read a curve between its points as R does
   # (`Giggly.Stat.Curve`).
   #
@@ -46,7 +47,7 @@ defprotocol Giggly.Stat do
   # implementations, which no boundary exports.
   use Boundary,
     deps: [Giggly.Aesthetics, Giggly.DataFrame, Giggly.Resolution, Giggly.Tensor],
-    exports: [Align, Bin, BinHex, Boxplot, Count, Density, Identity, Smooth, Sum]
+    exports: [Align, Bin, BinHex, Boxplot, Count, Density, Identity, Smooth, Sum, Summary]
 
   alias Giggly.DataFrame
 

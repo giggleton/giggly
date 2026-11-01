@@ -29,9 +29,9 @@ what remains.
 The position aesthetics say where a geom draws. `x` and `y` place points, and the positions along a
 line or path; `xend` and `yend` say where a segment or curve ends; `xmin`, `xmax`, `ymin` and `ymax`
 give the edges of ranges and rectangles. Giggly maps `x` and `y` to columns, for points, bars,
-paths, lines and text, `xmin`, `xmax`, `ymin` and `ymax` for rectangles, and `xend` and `yend` for
-segments; it has no ranges. A plot is described with `Giggly.Plot` and drawn with `Giggly.to_svg/2`, which returns an SVG
-document. The setup cell aliases `Giggly.Plot`, so the cells write `Plot.new/2`, and defines
+paths, lines and text, `xmin`, `xmax`, `ymin` and `ymax` for rectangles and for line ranges, point
+ranges, error bars and crossbars, and `xend` and `yend` for segments. A plot is described with
+`Giggly.Plot` and drawn with `Giggly.to_svg/2`, which returns an SVG document. The setup cell aliases `Giggly.Plot`, so the cells write `Plot.new/2`, and defines
 `render`, which draws a plot and shows it below the cell with `Kino.Image`. The cells draw
 `Giggly.Datasets.mtcars/0`, R's `mtcars`: 32 cars from the 1974 *Motor Trend* US magazine, which the
 setup cell binds to `mtcars`, R's name for it.
@@ -61,7 +61,7 @@ ggplot(cuts_df) +
   geom_pointrange()
 ```
 
-Not in Giggly yet: models fitted by `lm()` and `geom_pointrange()`.
+Not in Giggly yet: models fitted by `lm()`, and adding a mapping with `+ aes()`.
 
 ## Annotating a rectangle
 

@@ -17,7 +17,9 @@ remains.
 
 `mean_se()` takes a numeric vector and returns a data frame of one row: the mean in `y`, and the
 mean minus and plus a multiple of the standard error, one by default, in `ymin` and `ymax`. It is
-made for `stat_summary()`. Not in Giggly yet: `mean_se()` and `stat_summary()`.
+made for `stat_summary()`. Giggly has it as the summary `Giggly.Plot.stat_summary/3` draws unless
+given another (`fun_data: :mean_se`), not as a function of a list of values. Not in Giggly yet:
+`mean_se()`.
 
 ## The mean of random values
 

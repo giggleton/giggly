@@ -16,6 +16,16 @@ defmodule Giggly.GeomTest do
   @hline %Geom.Hline{line_end: :butt}
   @vline %Geom.Vline{line_end: :butt}
   @abline %Geom.Abline{line_end: :butt}
+  @linerange %Geom.Linerange{orientation: :none, line_end: :butt}
+  @pointrange %Geom.Pointrange{orientation: :none, line_end: :butt}
+  @errorbar %Geom.Errorbar{orientation: :none, line_end: :butt}
+  @crossbar %Geom.Crossbar{
+    orientation: :none,
+    middle: %{},
+    box: %{},
+    line_end: :butt,
+    line_join: :mitre
+  }
   @rug %Geom.Rug{sides: [:bottom, :left], length: {0.25, :npc}, outside: false, line_end: :butt}
 
   @ribbon %Geom.Ribbon{
@@ -920,6 +930,29 @@ defmodule Giggly.GeomTest do
         Geom.setup_data(%{@line | orientation: :y}, frame, %{x: :continuous, y: :continuous})
 
       assert DataFrame.pull(set_up, :x) === [2.0, 3.0, 1.0]
+    end
+
+    # A summary's line, whose stat writes its orientation.
+    test "a line given no orientation is put in order of y where its rows run along y" do
+      frame =
+        DataFrame.new(
+          x: [1.0, 2.0, 3.0],
+          y: [3.0, 1.0, 2.0],
+          panel: [1, 1, 1],
+          group: [1, 1, 1],
+          flipped_aes: [true, true, true]
+        )
+
+      along_y =
+        Geom.setup_data(%{@line | orientation: :none}, frame, %{x: :continuous, y: :continuous})
+
+      along_x = DataFrame.put(frame, :flipped_aes, [false, false, false])
+
+      assert DataFrame.pull(along_y, :x) === [2.0, 3.0, 1.0]
+
+      assert %{@line | orientation: :none}
+             |> Geom.setup_data(along_x, %{x: :continuous, y: :continuous})
+             |> DataFrame.pull(:x) === [1.0, 2.0, 3.0]
     end
 
     # R's `order()` puts minus infinity first, plus infinity after the numbers and `NA` last.
@@ -1878,6 +1911,358 @@ defmodule Giggly.GeomTest do
 
       assert {polylines.line_end, polylines.line_join, polylines.mitre_limit} ===
                {:square, :round, 10.0}
+    end
+  end
+
+  describe "setup_data/3, draw_panel/5 and draw_key/3 for line ranges and point ranges" do
+    setup do
+      coord = %Coord.Cartesian{}
+
+      %{
+        coord: coord,
+        params: Coord.panel_params(coord, {{0.0, 4.0}, [], []}, {{0.0, 4.0}, [], []})
+      }
+    end
+
+    # ggplot2's `has_flipped_aes(range_is_orthogonal = TRUE)`: a range given in y runs along x,
+    # one given only in x along y, and the layer's orientation over either.
+    test "a range runs along y where it has no ymin or ymax, or as its orientation says" do
+      vertical = DataFrame.new(x: [1.0], ymin: [0.0], ymax: [2.0])
+      horizontal = DataFrame.new(y: [1.0], xmin: [0.0], xmax: [2.0])
+      both = DataFrame.new(x: [1.0], y: [1.0], ymin: [0.0], xmax: [2.0])
+
+      flipped = fn geom, frame ->
+        geom
+        |> Geom.setup_data(frame, @continuous)
+        |> DataFrame.pull(:flipped_aes)
+      end
+
+      assert flipped.(@linerange, vertical) === [false]
+      assert flipped.(@linerange, horizontal) === [true]
+      assert flipped.(@pointrange, both) === [false]
+      assert flipped.(%{@pointrange | orientation: :y}, both) === [true]
+      assert flipped.(%{@linerange | orientation: :x}, horizontal) === [false]
+    end
+
+    test "each row is a segment from its ymin to its ymax at its x, or turned, from its xmin to " <>
+           "its xmax at its y",
+         %{coord: coord, params: params} do
+      vertical =
+        DataFrame.new(
+          x: [1.0, 3.0],
+          ymin: [0.0, 2.0],
+          ymax: [2.0, 4.0],
+          group: [1, 2],
+          flipped_aes: [false, false]
+        )
+
+      horizontal =
+        DataFrame.new(
+          y: [1.0],
+          xmin: [0.0],
+          xmax: [4.0],
+          group: [1],
+          flipped_aes: [true]
+        )
+
+      assert [%Segments{} = up] = draw_panel(@linerange, vertical, coord, params)
+      assert {up.starts, up.ends} === {[{0.25, 0.0}, {0.75, 0.5}], [{0.25, 0.5}, {0.75, 1.0}]}
+
+      assert [%Segments{} = across] = draw_panel(@linerange, horizontal, coord, params)
+      assert {across.starts, across.ends} === {[{0.0, 0.25}], [{1.0, 0.25}]}
+    end
+
+    # ggplot2's `GeomLinerange` hands its rows to `GeomSegment$draw_panel()` with its `lineend`
+    # alone, so its corners are a segment's, round, and it draws no arrowheads.
+    test "a line range is ended as the layer says, its corners round, a row missing an end not " <>
+           "drawn",
+         %{coord: coord, params: params} do
+      frame =
+        DataFrame.new(
+          x: [1.0, 2.0],
+          ymin: [nil, 1.0],
+          ymax: [2.0, 3.0],
+          group: [1, 2],
+          flipped_aes: [false, false]
+        )
+
+      assert [%Segments{} = lines] =
+               draw_panel(%{@linerange | line_end: :round}, frame, coord, params)
+
+      assert {lines.starts, lines.line_end, lines.line_join, lines.arrows} ===
+               {[{0.5, 0.25}], :round, :round, :none}
+    end
+
+    # ggplot2's `GeomPointrange$draw_panel()`: a `gList()` of the line ranges' segments and then
+    # `GeomPoint$draw_panel()` at `size * fatten`, 4.
+    test "a point range draws every line and then every point, at four times its size",
+         %{coord: coord, params: params} do
+      frame =
+        DataFrame.new(
+          x: [1.0, 3.0],
+          y: [1.0, 3.0],
+          ymin: [0.0, 2.0],
+          ymax: [2.0, 4.0],
+          group: [1, 2],
+          flipped_aes: [false, false],
+          size: [0.5, 1.0],
+          stroke: [1.0, 1.0]
+        )
+
+      assert [%Segments{starts: [{0.25, +0.0}, {0.75, 0.5}]}, %Circles{} = points] =
+               draw_panel(@pointrange, frame, coord, params)
+
+      # A missing size draws no point, as `GeomPoint` drops the row.
+      unsized = DataFrame.put(frame, :size, [nil, nil])
+      assert [%Segments{}] = draw_panel(@pointrange, unsized, coord, params)
+
+      as_point =
+        draw_panel(%Geom.Point{}, DataFrame.put(frame, :size, [2.0, 4.0]), coord, params)
+
+      assert [points] == as_point
+    end
+
+    test "a line range's key runs up the key, or across it for a horizontal layer, with the " <>
+           "layer's ends" do
+      assert [%Segments{starts: [{0.5, 0.1}], ends: [{0.5, 0.9}], line_end: :square}] =
+               draw_key(%{@linerange | line_end: :square}, %{flipped_aes: false})
+
+      assert [%Segments{starts: [{0.1, 0.5}], ends: [{0.9, 0.5}]}] =
+               draw_key(@linerange, %{flipped_aes: true})
+    end
+
+    # ggplot2's `draw_key_pointrange()`: `draw_key_linerange()` and `draw_key_point()` at
+    # `size * 4`.
+    test "a point range's key is a line range's with a point over it at four times its size" do
+      key = %{flipped_aes: true, size: 1.5, stroke: 1.0}
+
+      assert [%Segments{starts: [{0.1, 0.5}]} | point] = draw_key(@pointrange, key)
+      assert point == draw_key(%Geom.Point{}, %{key | size: 6.0})
+    end
+  end
+
+  describe "setup_data/3, draw_panel/5 and draw_key/3 for error bars and crossbars" do
+    setup do
+      coord = %Coord.Cartesian{}
+
+      %{
+        coord: coord,
+        params: Coord.panel_params(coord, {{0.0, 4.0}, [], []}, {{0.0, 4.0}, [], []})
+      }
+    end
+
+    # ggplot2's `compute_data_size(zero = FALSE, discrete = TRUE)` across panels: the smallest
+    # spacing in any panel, 1 on a discrete axis, times 0.9.
+    test "a bar's sides are its x less and plus half its width, or 0.9 of the closest spacing in " <>
+           "any panel, the width then dropped" do
+      frame =
+        DataFrame.new(
+          x: [1.0, 3.0, 1.0, 1.5],
+          ymin: [0.0, 0.0, 0.0, 0.0],
+          ymax: [1.0, 1.0, 1.0, 1.0],
+          panel: [1, 1, 2, 2]
+        )
+
+      set_up = Geom.setup_data(@errorbar, frame, @continuous)
+      assert DataFrame.pull(set_up, :xmin) === [0.775, 2.775, 0.775, 1.275]
+      assert DataFrame.pull(set_up, :xmax) === [1.225, 3.225, 1.225, 1.725]
+      refute :width in DataFrame.names(set_up)
+
+      discrete = Geom.setup_data(@crossbar, frame, %{x: :discrete, y: :continuous})
+      assert DataFrame.pull(discrete, :xmin) === [0.55, 2.55, 0.55, 1.05]
+
+      widened =
+        Geom.setup_data(@errorbar, DataFrame.put(frame, :width, [2, 2, 1, 1]), @continuous)
+
+      assert DataFrame.pull(widened, :xmax) === [2.0, 4.0, 1.5, 2.0]
+    end
+
+    test "a horizontal bar's sides are set along y, from the y axis's kind" do
+      frame = DataFrame.new(y: [1.0, 2.0], xmin: [0.0, 0.0], xmax: [1.0, 1.0], panel: [1, 1])
+      set_up = Geom.setup_data(@errorbar, frame, %{x: :continuous, y: :discrete})
+
+      assert DataFrame.pull(set_up, :flipped_aes) === [true, true]
+      assert DataFrame.pull(set_up, :ymin) === [0.55, 1.55]
+      assert DataFrame.pull(set_up, :ymax) === [1.45, 2.45]
+    end
+
+    # ggplot2 4.0.3 fails at `x - width / 2` for a width an expression makes text.
+    test "a width that is not a number is refused when set up" do
+      frame =
+        DataFrame.new(x: [1.0], ymin: [0.0], ymax: [1.0], panel: [1], width: ["wide"])
+
+      for geom <- [@errorbar, @crossbar] do
+        error = assert_raise ArgumentError, fn -> Geom.setup_data(geom, frame, @continuous) end
+        assert error.message =~ "width is a :string column"
+      end
+    end
+
+    # ggplot2's `GeomErrorbar$draw_panel()`: eight points a row, `xmin, xmax, NA, x, x, NA, xmin,
+    # xmax` across and `ymax, ymax, NA, ymax, ymin, NA, ymin, ymin` up, a group a row.
+    test "an error bar is its top whisker, its stem and its bottom whisker, a path a row",
+         %{coord: coord, params: params} do
+      frame =
+        DataFrame.new(
+          x: [2.0],
+          xmin: [1.0],
+          xmax: [3.0],
+          ymin: [1.0],
+          ymax: [3.0],
+          group: [1],
+          flipped_aes: [false]
+        )
+
+      assert [%Polylines{lines: lines, line_end: :butt, line_join: :round}] =
+               draw_panel(@errorbar, frame, coord, params)
+
+      assert lines === [
+               [{0.25, 0.75}, {0.75, 0.75}],
+               [{0.5, 0.75}, {0.5, 0.25}],
+               [{0.25, 0.25}, {0.75, 0.25}]
+             ]
+    end
+
+    test "a horizontal error bar is turned, its whiskers up the panel",
+         %{coord: coord, params: params} do
+      frame =
+        DataFrame.new(
+          y: [2.0],
+          ymin: [1.0],
+          ymax: [3.0],
+          xmin: [1.0],
+          xmax: [3.0],
+          group: [1],
+          flipped_aes: [true]
+        )
+
+      assert [%Polylines{lines: [top | _rest]}] = draw_panel(@errorbar, frame, coord, params)
+      assert top === [{0.75, 0.25}, {0.75, 0.75}]
+    end
+
+    # ggplot2's `GeomCrossbar$draw_panel()`: a `gList()` of `GeomPolygon` over every row, then
+    # `GeomSegment` over every row's middle, at `linewidth * fatten`, 2.5.
+    test "a crossbar layer draws every box, then every line across, 2.5 times the border's width",
+         %{coord: coord, params: params} do
+      frame =
+        DataFrame.new(
+          x: [1.0, 3.0],
+          y: [1.0, 3.0],
+          xmin: [0.5, 2.5],
+          xmax: [1.5, 3.5],
+          ymin: [0.0, 2.0],
+          ymax: [2.0, 4.0],
+          group: [1, 2],
+          flipped_aes: [false, false]
+        )
+
+      assert [%Polygons{} = first, %Polygons{}, %Segments{} = across, %Segments{}] =
+               draw_panel(@crossbar, frame, coord, params)
+
+      assert first.outlines === [
+               [{0.125, 0.5}, {0.125, +0.0}, {0.375, +0.0}, {0.375, 0.5}, {0.125, 0.5}]
+             ]
+
+      assert {first.line_end, first.line_join} === {:butt, :mitre}
+      assert {across.starts, across.ends} === {[{0.125, 0.25}], [{0.375, 0.25}]}
+      assert first.stroke_width === @default_width
+      assert across.stroke_width === 1.25 * (72.27 / 25.4) / 96 * 72
+      assert {first.mitre_limit, across.mitre_limit} === {10.0, 10.0}
+    end
+
+    # R's engine draws no line of no width, and svglite writes a border of none 0 wide.
+    test "a crossbar of a missing width draws its box unbordered and no line across",
+         %{coord: coord, params: params} do
+      frame =
+        DataFrame.new(
+          x: [1.0],
+          y: [1.0],
+          xmin: [0.5],
+          xmax: [1.5],
+          ymin: [0.0],
+          ymax: [2.0],
+          group: [1],
+          flipped_aes: [false],
+          linewidth: [nil]
+        )
+
+      assert [%Polygons{stroke_width: +0.0}] = draw_panel(@crossbar, frame, coord, params)
+    end
+
+    test "a crossbar's middle and box looks replace its own" do
+      geom = %{@crossbar | middle: %{color: "#FF0000", linewidth: 1.0}, box: %{color: "#0000FF"}}
+
+      frame =
+        DataFrame.new(
+          x: [1.0],
+          y: [1.0],
+          xmin: [0.5],
+          xmax: [1.5],
+          ymin: [0.0],
+          ymax: [2.0],
+          group: [1],
+          flipped_aes: [false]
+        )
+
+      params = Coord.panel_params(@cartesian, {{0.0, 4.0}, [], []}, {{0.0, 4.0}, [], []})
+
+      assert [%Polygons{color: ["#0000FF"]}, %Segments{color: ["#FF0000"]} = across] =
+               draw_panel(geom, frame, @cartesian, params)
+
+      assert across.stroke_width === @two_millimetres / 2
+    end
+
+    # ggplot2's `draw_key_crossbar()`: `rectGrob(height = 0.5, width = 0.75)` and a line from
+    # 0.125 to 0.875, each turned for a horizontal layer, the line not widened.
+    test "a crossbar's key is a box and a line across it, turned for a horizontal layer" do
+      assert [%Rectangles{} = box, %Polylines{lines: [[{0.125, 0.5}, {0.875, 0.5}]]} = across] =
+               draw_key(@crossbar, %{flipped_aes: false})
+
+      assert {box.xmin, box.xmax, box.ymin, box.ymax} === {[0.125], [0.875], [0.25], [0.75]}
+      assert across.stroke_width === box.stroke_width
+      assert {box.mitre_limit, across.mitre_limit} === {10.0, 10.0}
+
+      # A missing line type, R's `NA`, draws the box unbordered and no line across.
+      assert [%Rectangles{color: [:none]}] =
+               draw_key(@crossbar, %{flipped_aes: false, linetype: nil})
+
+      assert [%Rectangles{xmin: [0.25], ymin: [0.125]}, %Polylines{lines: [[{0.5, 0.125}, _end]]}] =
+               draw_key(@crossbar, %{flipped_aes: true})
+    end
+
+    test "an error bar's key is a path's, across the key either way" do
+      assert draw_key(@errorbar, %{flipped_aes: false}) == draw_key(@path, %{})
+      assert draw_key(@errorbar, %{flipped_aes: true}) == draw_key(@path, %{})
+    end
+  end
+
+  describe "draw_panel/5 for a range layer's empty panel" do
+    test "a panel of no rows draws nothing, and a layer of no rows is set up with no sides" do
+      params = Coord.panel_params(@cartesian, {{0.0, 4.0}, [], []}, {{0.0, 4.0}, [], []})
+
+      row =
+        DataFrame.new(
+          x: [1.0],
+          y: [1.0],
+          xmin: [0.5],
+          xmax: [1.5],
+          ymin: [0.0],
+          ymax: [2.0],
+          group: [1],
+          panel: [1],
+          flipped_aes: [false]
+        )
+
+      empty = DataFrame.slice(row, [])
+
+      for geom <- [@linerange, @errorbar, @crossbar] do
+        assert draw_panel(geom, empty, @cartesian, params) == []
+      end
+
+      unset = DataFrame.select(empty, x: :x, ymin: :ymin, panel: :panel)
+      set_up = Geom.setup_data(@errorbar, unset, @continuous)
+
+      assert DataFrame.row_count(set_up) == 0
+      assert {DataFrame.pull(set_up, :xmin), DataFrame.pull(set_up, :xmax)} == {[], []}
     end
   end
 
@@ -3149,6 +3534,21 @@ defmodule Giggly.GeomTest do
              end) === [{21.87, 33.47}, {34.62, 38.86}, {33.47, 21.87}, {37.94, 37.94}]
 
       assert rounded_size(key_size(text, %{size: 3.88})) === {9.02, 12.77}
+    end
+
+    test "a line range's key needs a path's room; a point range's its size and line width added" do
+      assert rounded_size(key_size(@linerange, %{linewidth: 8.0})) === {22.68, 22.68}
+
+      assert rounded_size(key_size(@pointrange, %{size: 4.0, linewidth: 4.0})) ===
+               {22.68, 22.68}
+
+      assert rounded_size(key_size(@pointrange, %{})) === {2.83, 2.83}
+      assert key_size(@pointrange, %{size: nil, linewidth: nil}) === {0.0, 0.0}
+    end
+
+    test "an error bar's and a crossbar's key need a path's room" do
+      assert rounded_size(key_size(@errorbar, %{linewidth: 8.0})) === {22.68, 22.68}
+      assert rounded_size(key_size(@crossbar, %{linewidth: 8.0})) === {22.68, 22.68}
     end
 
     test "a box's key needs its size and line width added, a missing one counting 0" do

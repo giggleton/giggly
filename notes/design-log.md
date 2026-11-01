@@ -79,6 +79,39 @@ stops the question being reopened from scratch. A new entry is about 150 words: 
 sentence or two of why, and one line per rejected alternative. What a later decision replaces is
 deleted from the entry it was in, never marked superseded; git history keeps every version.
 
+- **A bootstrap example states its departure once, in its notebook's About (2026-11-01, Steve:
+  "Your recommendation").** stat_summary's About says that ggplot2's examples set no seed, so R
+  draws its `mean_cl_boot` intervals differently on every run, that Giggly draws them from
+  `seed:`, and how far an end moves, in mpg and in points, measured over 500 seeds in R and in
+  Giggly, whose averages and spreads agree; each bootstrap example says in a line that its ends
+  differ by sampling, and one whose axis differs gives its own points. Giggly's cells write a bare
+  `:mean_cl_boot`, as R's give no seed. The drawing check has R draw Giggly's ends through a
+  summary function, as `test/golden/summary_boot.R` does, so everything else is R's. *Rejected:
+  the full statement at every example* — three repeats of one measurement. *Rejected: the first
+  example alone* — the horizontal and Hmisc examples, read on their own, would not say it.
+
+- **`mean_cl_boot` draws its resamples from a `seed:` in its tuple, each position afresh
+  (2026-11-01, Steve: "go").** `{:mean_cl_boot, seed: 7}`, 0 unless given, any integer, as
+  `position_jitter(seed:)` holds the seed of what it draws; `resamples:` is R's `B` (1000).
+  Each position starts `:rand`'s `exsss` from the seed, so its interval depends only on its
+  values, their order and the seed. R's random numbers are never reproduced, so the ends differ
+  from R's by sampling: over 500 seeds on mtcars' cylinders, Giggly's ends have R's mean and
+  spread within sampling error. *Rejected: `seed:` an option of `stat_summary/3`* — refused
+  beside every other summary. *Rejected: one stream per panel, through its positions*, nearer
+  R's single stream: dropping one group would move every other's ends. *Rejected: `Nx.Random`*
+  — slow on `Nx.BinaryBackend`, and a second random source beside jitter's.
+
+- **The Hmisc summaries take Hmisc's arguments, checked at the call (2026-11-01, Steve: "go";
+  checked against Hmisc 5.3.0).** `conf_int:` (0.95) on `:mean_cl_normal`, from 0 and below 1,
+  as a smooth's `level:` refuses R's infinite band at 1, and on `:median_hilow` and
+  `:mean_cl_boot`, 0 to 1, their ends quantiles; `mult:` any number, `:mean_sdl`'s 2;
+  `:mean_cl_normal` takes `conf_int:` or `mult:`, refused together; a tuple records every
+  argument. Each is Hmisc's documented method, measured on 3,003 random vectors: `mean_sdl`
+  digit for digit, `mean_cl_normal` within 4e-13, its t Giggly's own. *Rejected: both
+  `conf_int:` and `mult:`, the `mult` winning*, as R silently ignores `conf.int`. *Rejected:
+  `na.rm` and `reps`* — the stat drops missing rows first, and `reps` returns an attribute a
+  plot never reads.
+
 - **A NaN is `:nan` throughout `Scales.Bounds`, and a `nil` end bounds nothing, `discard/2`'s
   too (2026-11-01, Steve: "A", "A", increment 4's step 1; checked against scales 1.4.0).**
   Every rescaler and `oob_*` function takes R's doubles (`t:Scales.double/0`), infinite ends
@@ -186,6 +219,45 @@ deleted from the entry it was in, never marked superseded; git history keeps eve
   fit. So a theme's text has one shape, every look carrying its `line_spacing`, and `Guide.Parts`
   breaks every text by the one rule. *Rejected: breaking tick and legend labels alone*, the
   spacing handed in at their calls: radial labels unlike R's, and two shapes of text kept.
+
+- **`stat_summary/3` draws with eight geoms, each checked by a schema of its own (2026-10-31,
+  Steve: "Yes"; checked against ggplot2 4.0.3's `stat-summary.R`).** `geom:` takes
+  `:pointrange`, the default, `:point`, `:line`, `:bar`, `:crossbar`, `:errorbar`, `:linerange`
+  and `:ribbon`; another raises naming them. Each geom's options are the summary's beside its
+  own function's but `orientation:`, which is the stat's, the geom recording `:none` and reading
+  `flipped_aes`, the line as `has_flipped_aes(ambiguous = TRUE)` reads it first
+  (`Options.summary/1`, as `annotate/3`'s per-geom schemas); an option the geom cannot use raises,
+  where R warns "Ignoring unknown parameters". `position:` is the geom function's set, `:identity`
+  for every geom, bars included, as R's default. `fun_data:` beside `fun:`, `fun_min:` or
+  `fun_max:` is refused, where R lets `fun.data` win, and a mapped range, which R fails to build.
+  *Rejected: `:col`* — `GeomCol` is an alias of `GeomBar`, and R's docs write `"bar"`. *Rejected:
+  any geom* — each needs its options checked, and paths, areas and text wait for a user.
+
+- **A summary's values are names the frame computes, or a function of the values (2026-10-31,
+  Steve: "go with this").** `fun:`, `fun_min:` and `fun_max:` take `:mean`, `:median` (the frame's
+  type 7 quantile at one half, which matched R's `median()` on 200,000 random vectors), `:min` and
+  `:max`, or a function of a position's values, pulled by the frame's `list` aggregate, as loess
+  pulls a group's, since no engine could run it; `fun_data:` takes a whole summary by name, its
+  arguments in a tuple, `{:mean_se, mult: 2}`, the default `{:mean_se, mult: 1.0}`, and Hmisc's
+  `:mean_cl_normal`, `:mean_sdl`, `:median_hilow` and `:mean_cl_boot` beside it. *Rejected:
+  functions alone* — every summary would pull its rows.
+  *Rejected: `fun_args:`* — R's list applies to every function at once; a tuple names whose.
+
+- **A summary carries a column cell by cell, ggplot2's `uniquecols()` (2026-10-31; checked
+  against ggplot2 4.0.3).** Each position of a group keeps a column where its rows hold one value
+  and has it missing where they hold more; a column holding more everywhere is dropped, as R's
+  `vec_rbind()` fills the cells a column is missing from. *Rejected: `Stat.Carry`'s rule* —
+  ggplot2's default `compute_panel()` applies it to whole groups, and `stat_summary()` does not.
+
+- **The summaries are not public functions on a list (2026-10-31, Steve: "go with this").** A
+  summary is named in `fun:` or `fun_data:` and computed by the stat; `mean_se()` and the Hmisc
+  wrappers called on a vector, as their reference pages' examples do, wait. *Rejected: exporting
+  them* — an API of list statistics beside the plot's, which nothing but those examples calls.
+
+- **`position_dodge/1` takes `width:` alone (2026-10-31, Steve: "go with this").** Any number,
+  kept as a float, `:none` when not given, the range layers dodging within it. *Rejected: R's
+  `preserve`, `orientation` and `reverse` now* — they arrive with the positions increment, which
+  needs them for every dodging layer; the range layers needed only the width.
 
 - **`dictionary/2` matches a value by `Scales.DataRange.key/1`, a map under `dictionary:` (2026-10-31,
   Steve: D1 to D4 "A"; checked against scales 1.4.0).** `dictionary(breaks, dictionary: %{value =>
@@ -3798,10 +3870,26 @@ tells the story (`git show <hash>`). Until 2026-10-15 each milestone also had a 
 `git log -S "<title>" -- notes/design-log.md` finds it in this file's history. The phases are
 §1's roadmap.
 
+- 2026-11-01 — Draw the notebook examples the summaries unlock, and narrow every verdict to what
+  still waits (summaries, step 6, the notebook sweep); §4: "A bootstrap example states its
+  departure once", "The summaries are not public functions"
+- 2026-11-01 — Add Hmisc's summaries to stat_summary(): mean_cl_normal, mean_sdl, median_hilow
+  and a seeded mean_cl_boot (summaries, step 5); §4: "`mean_cl_boot` draws its resamples", "The
+  Hmisc summaries take Hmisc's arguments"
 - 2026-11-01 — Complete R's out-of-range family, with infinities and NaN as R gives them
   (transforms, step 1) (`189efe5`); §4: "A NaN is `:nan` throughout `Scales.Bounds`", "The
   scales package carries every transformation", "`oob:` takes a name or a function",
   "`transform:` reaches the continuous non-position scales"
+- 2026-10-31 — Summarise y at each x with stat_summary(): mean_se, the frame's summaries or a
+  function, drawn by eight geoms (summaries, step 4); §4: "`stat_summary/3` draws with eight
+  geoms", "A summary's values are names", "A summary carries a column cell by cell", "The
+  summaries are not public functions"
+- 2026-10-31 — Add position_dodge(width:), and a position: on the range layers (summaries,
+  step 3); §4: "`position_dodge/1` takes `width:` alone"
+- 2026-10-31 — Add geom_errorbar() and geom_crossbar(), and draw a box plot's box and median
+  through the crossbar (summaries, step 2)
+- 2026-10-31 — Add geom_linerange() and geom_pointrange(): a segment across each row's range, a
+  point on it at four times its size, and their annotations (summaries, step 1)
 - 2026-10-31 — Break axis and legend labels over lines, draw missing labels NA, and draw powers as
   plotmath draws them (labels, step 6) (`def4123`, fixes `c6726c6`, `66602bb`); §4: "Every text a
   guide draws breaks", "A guide drawing its labels together", "A missing label among powers", "A

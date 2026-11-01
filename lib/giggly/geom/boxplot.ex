@@ -102,10 +102,9 @@ defmodule Giggly.Geom.Boxplot do
   defimpl Giggly.Geom, for: __MODULE__ do
     use Boundary, classify_to: Giggly.Geom
 
-    alias Giggly.{Aesthetics, Coord, DataFrame, Geom}
+    alias Giggly.{Aesthetics, DataFrame, Geom}
     alias Giggly.DataFrame.Arithmetic
-    alias Giggly.Geom.{Mark, Point}
-    alias Giggly.Scene.{Polygons, Polylines, Rectangles, Segments}
+    alias Giggly.Geom.{Crossbar, Mark, Point}
     alias Scales.ColorOperations
 
     # How far a box's default colour is mixed from the theme's ink toward its paper, ggplot2's
@@ -117,8 +116,6 @@ defmodule Giggly.Geom.Boxplot do
 
     # Points in a millimetre, grid's `"mm"` in the scene's points, which a key's room is measured in.
     @points_per_millimetre 72 / 25.4
-
-    @mitre_limit 10.0
 
     # The columns a box is drawn from, beside its look.
     @drawn [:x, :xmin, :xmax, :lower, :middle, :upper, :ymin, :ymax, :notchlower, :notchupper]
@@ -324,9 +321,9 @@ defmodule Giggly.Geom.Boxplot do
       left = staple_end(box.xmin, box.x, geom.staplewidth)
       right = staple_end(box.xmax, box.x, geom.staplewidth)
 
-      segments(
+      Crossbar.segments(
         [{{left, box.ymax}, {right, box.ymax}}, {{left, box.ymin}, {right, box.ymin}}],
-        line_look(geom.staple, box),
+        Crossbar.line_look(geom.staple, box),
         {:butt, :round},
         placing
       )
@@ -342,180 +339,34 @@ defmodule Giggly.Geom.Boxplot do
 
     # A box's whiskers, from its upper hinge to `ymax` and from its lower to `ymin`.
     defp whiskers(geom, box, placing) do
-      segments(
+      Crossbar.segments(
         [{{box.x, box.upper}, {box.x, box.ymax}}, {{box.x, box.lower}, {box.x, box.ymin}}],
-        line_look(geom.whisker, box),
+        Crossbar.line_look(geom.whisker, box),
         {:butt, :round},
         placing
       )
     end
 
-    # A box and its median, as ggplot2's `GeomCrossbar` draws them, pinched in at the notches where
-    # the layer notches its boxes.
+    # A box and its median, drawn as a crossbar (`Giggly.Geom.Crossbar.parts/3`), as ggplot2's
+    # `GeomBoxplot` hands them to `GeomCrossbar`, its median twice the box's width, pinched in at
+    # the notches where the layer notches its boxes, cut square and mitred.
     defp crossbar(geom, box, placing) do
-      notched = geom.notch and is_number(box.notchlower) and is_number(box.notchupper)
-      indent = if notched, do: indent(box, geom.notchwidth), else: 0.0
+      style = %{
+        box: geom.box,
+        middle: geom.median,
+        fatten: @median_fatten,
+        notch: geom.notch,
+        notchwidth: geom.notchwidth,
+        line_end: :butt,
+        line_join: :mitre
+      }
 
-      outlined = outline(box, notched, indent)
-      box_look = line_look(geom.box, box)
-      median_start = Arithmetic.add(box.xmin, indent)
-      median_end = Arithmetic.subtract(box.xmax, indent)
-      median = [{{median_start, box.middle}, {median_end, box.middle}}]
-      median_look = median_look(geom.median, box)
-
-      drawn_box = polygon(outlined, box_look, box, placing)
-      Enum.concat(drawn_box, segments(median, median_look, {:butt, :mitre}, placing))
+      {drawn_box, median} = Crossbar.parts(box, style, placing)
+      Enum.concat(drawn_box, median)
     end
 
-    # How far a notch reaches in from each side, R's `(1 - notchwidth) * (xmax - xmin) / 2`.
-    defp indent(box, notchwidth) do
-      (1 - notchwidth)
-      |> Arithmetic.multiply(Arithmetic.subtract(box.xmax, box.xmin))
-      |> Arithmetic.divide(2)
-    end
-
-    # The box's outline in ggplot2's order, closed where it began.
-    defp outline(box, false, _indent) do
-      [
-        {box.xmin, box.upper},
-        {box.xmin, box.lower},
-        {box.xmax, box.lower},
-        {box.xmax, box.upper},
-        {box.xmin, box.upper}
-      ]
-    end
-
-    defp outline(box, true, indent) do
-      inner_left = Arithmetic.add(box.xmin, indent)
-      inner_right = Arithmetic.subtract(box.xmax, indent)
-
-      [
-        {box.xmin, box.upper},
-        {box.xmin, box.notchupper},
-        {inner_left, box.middle},
-        {box.xmin, box.notchlower},
-        {box.xmin, box.lower},
-        {box.xmax, box.lower},
-        {box.xmax, box.notchlower},
-        {inner_right, box.middle},
-        {box.xmax, box.notchupper},
-        {box.xmax, box.upper},
-        {box.xmin, box.upper}
-      ]
-    end
-
-    # A line's look, `{color, width, line type}`: the part's, else the box's.
-    defp line_look(part, box) do
-      {Map.get(part, :color, box.color), Map.get(part, :linewidth, box.linewidth),
-       Map.get(part, :linetype, box.linetype)}
-    end
-
-    # The median's look: its own, else the box's, twice as wide.
-    defp median_look(median, box) do
-      {Map.get(median, :color, box.color),
-       Map.get(median, :linewidth, Arithmetic.multiply(box.linewidth, @median_fatten)),
-       Map.get(median, :linetype, box.linetype)}
-    end
-
-    # Straight lines in one look, each `{start, end}` in a vertical box's terms, placed in the
-    # panel; none where the look draws no line, and a line with an end missing left out.
-    defp segments(lines, {color, width, line_type}, {line_end, line_join}, placing) do
-      placed =
-        lines
-        |> Enum.flat_map(fn {start, finish} -> [start, finish] end)
-        |> place(placing)
-        |> Enum.chunk_every(2)
-        |> Enum.filter(fn ends -> Enum.all?(ends, &placed?/1) end)
-
-      count = length(placed)
-      hex = Mark.hex(color)
-      opacity = Mark.own_opacity(color)
-
-      if not drawn_line?(color, width, line_type) or count == 0 do
-        []
-      else
-        [
-          %Segments{
-            starts: Enum.map(placed, fn [start, _finish] -> start end),
-            ends: Enum.map(placed, fn [_start, finish] -> finish end),
-            offsets: :none,
-            stroke_width: Mark.stroke_width(width),
-            dashes: Mark.dashes(line_type, width),
-            color: List.duplicate(hex, count),
-            opacity: List.duplicate(opacity, count),
-            line_end: line_end,
-            line_join: line_join,
-            mitre_limit: @mitre_limit,
-            arrows: :none
-          }
-        ]
-      end
-    end
-
-    # The box round its outline, in a vertical box's terms, placed in the panel, filled at its
-    # alpha and bordered in its look, left off where the look draws no line. A missing corner, one
-    # a scale's limits cut, splits the outline, as grid splits a polygon at a missing point, and
-    # each run of two corners or more is drawn as a piece of its own.
-    defp polygon(outline, {color, width, line_type}, box, placing) do
-      pieces =
-        outline
-        |> place(placing)
-        |> Enum.chunk_by(&placed?/1)
-        |> Enum.filter(&drawn_piece?/1)
-
-      border = if drawn_line?(color, width, line_type), do: color, else: :none
-      border_width = width || 0.0
-      count = length(pieces)
-      border_color = Mark.hex(border)
-      border_opacity = Mark.own_opacity(border)
-      fill = Mark.hex(box.fill)
-      fill_opacity = Mark.opacity(box.fill, box.alpha)
-
-      if count == 0 do
-        []
-      else
-        [
-          %Polygons{
-            outlines: pieces,
-            offsets: :none,
-            stroke_width: Mark.stroke_width(border_width),
-            color: List.duplicate(border_color, count),
-            color_opacity: List.duplicate(border_opacity, count),
-            fill: List.duplicate(fill, count),
-            fill_opacity: List.duplicate(fill_opacity, count),
-            dashes: Mark.dashes(line_type, border_width),
-            line_end: :butt,
-            line_join: :mitre,
-            mitre_limit: @mitre_limit
-          }
-        ]
-      end
-    end
-
-    # A run of placed corners long enough to draw, two or more, as grid draws a piece of a polygon.
-    defp drawn_piece?([first, _second | _rest]), do: placed?(first)
-    defp drawn_piece?([_alone]), do: false
-
-    defp drawn_line?(color, width, line_type),
-      do: color != :none and is_number(width) and line_type != :none
-
-    defp placed?({x_position, y_position}), do: is_number(x_position) and is_number(y_position)
-
-    # Points in a vertical box's terms, `{along, up}`, placed in the panel through the coordinate
-    # system, a horizontal box's turned first.
-    defp place(points, {flipped, coord, panel_params}) do
-      {x_positions, y_positions} =
-        points
-        |> Enum.map(fn {along, up} -> if flipped, do: {up, along}, else: {along, up} end)
-        |> Enum.unzip()
-
-      placed = Coord.transform(coord, DataFrame.new(x: x_positions, y: y_positions), panel_params)
-      across = DataFrame.pull(placed, :x)
-      up = DataFrame.pull(placed, :y)
-      Enum.zip(across, up)
-    end
-
-    # A legend's key, ggplot2's `draw_key_boxplot()`, turned for a horizontal layer.
+    # A legend's key, ggplot2's `draw_key_boxplot()`, turned for a horizontal layer: its whiskers,
+    # a crossbar's key (`Giggly.Geom.Crossbar.key/5`) and its staples, cut square and mitred.
     @impl Giggly.Geom
     def draw_key(geom, key, _installed_fonts) do
       base = %{
@@ -524,82 +375,31 @@ defmodule Giggly.Geom.Boxplot do
         linetype: Map.fetch!(key, :linetype) || :none
       }
 
-      fill = Mark.key_color(key, :fill)
+      fill = {Mark.key_color(key, :fill), Map.fetch!(key, :alpha)}
       turn = if Map.fetch!(key, :flipped_aes), do: &turned/1, else: &Function.identity/1
       reach = 0.375 * geom.staplewidth
+      ends = {:butt, :mitre}
 
       Enum.concat([
-        key_lines(
+        Crossbar.key_lines(
           [[{0.5, 0.1}, {0.5, 0.25}], [{0.5, 0.75}, {0.5, 0.9}]],
           geom.whisker,
           base,
-          turn
+          turn,
+          ends
         ),
-        key_box(line_look(geom.box, base), fill, Map.fetch!(key, :alpha), turn),
-        key_lines([[{0.125, 0.5}, {0.875, 0.5}]], geom.median, base, turn),
-        key_lines(
+        Crossbar.key(base, fill, {geom.box, geom.median}, turn, ends),
+        Crossbar.key_lines(
           [[{0.5 + reach, 0.1}, {0.5 - reach, 0.1}], [{0.5 + reach, 0.9}, {0.5 - reach, 0.9}]],
           geom.staple,
           base,
-          turn
+          turn,
+          ends
         )
       ])
     end
 
     defp turned({across, up}), do: {up, across}
-
-    defp key_lines(lines, part, base, turn) do
-      {color, width, line_type} = line_look(part, base)
-      count = length(lines)
-      hex = Mark.hex(color)
-      opacity = Mark.own_opacity(color)
-
-      if drawn_line?(color, width, line_type) do
-        [
-          %Polylines{
-            lines: Enum.map(lines, fn points -> Enum.map(points, turn) end),
-            offsets: :none,
-            stroke_width: Mark.stroke_width(width),
-            dashes: Mark.dashes(line_type, width),
-            color: List.duplicate(hex, count),
-            opacity: List.duplicate(opacity, count),
-            line_end: :butt,
-            line_join: :mitre,
-            mitre_limit: @mitre_limit,
-            arrows: :none
-          }
-        ]
-      else
-        []
-      end
-    end
-
-    # The key's box, three quarters of the key wide and half as tall, in its middle.
-    defp key_box({color, width, line_type}, fill, alpha, turn) do
-      border = if drawn_line?(color, width, line_type), do: color, else: :none
-      border_width = width || 0.0
-      {xmin, ymin} = turn.({0.125, 0.25})
-      {xmax, ymax} = turn.({0.875, 0.75})
-
-      [
-        %Rectangles{
-          xmin: [xmin],
-          xmax: [xmax],
-          ymin: [ymin],
-          ymax: [ymax],
-          offsets: :none,
-          fill: [Mark.hex(fill)],
-          fill_opacity: [Mark.opacity(fill, alpha)],
-          color: [Mark.hex(border)],
-          color_opacity: [Mark.own_opacity(border)],
-          stroke_width: Mark.stroke_width(border_width),
-          dashes: Mark.dashes(line_type, border_width),
-          line_end: :butt,
-          line_join: :mitre,
-          mitre_limit: @mitre_limit
-        }
-      ]
-    end
 
     # The room a key needs, its size and line width added, in millimetres, either way, a missing
     # one counting 0, as ggplot2's `set_key_size()` reads a key with no size of its own.

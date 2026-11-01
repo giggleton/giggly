@@ -31,7 +31,8 @@ columns: a label, a shaded rectangle or a segment placed by hand. Any geom can d
 reference lines, `geom_abline()`, `geom_hline()` and `geom_vline()`, which annotate on their own.
 Its positions take part in the scales, so the axes grow to show it, while every other aesthetic
 is set, so an annotation never appears in a legend. Giggly has `Giggly.Plot.annotate/3`, which
-draws with every geom Giggly has: points, bars, paths and lines, segments, text and rectangles. A plot is
+draws with every geom Giggly has: points, bars, paths and lines, segments, text, rectangles and the
+range geoms, line ranges, point ranges, error bars and crossbars. A plot is
 described with `Giggly.Plot` and drawn with `Giggly.to_svg/2`, which returns an SVG document. The
 setup cell aliases `Giggly.Plot`, so the cells write `Plot.new/2`, and defines `render`, which draws
 a plot and shows it below the cell with `Kino.Image`. The data in these examples is
@@ -100,7 +101,21 @@ p + annotate("pointrange", x = 3.5, y = 20, ymin = 12, ymax = 28,
   colour = "red", size = 2.5, linewidth = 1.5)
 ```
 
-Not in Giggly yet: `geom_pointrange()`.
+`"red"` is the same colour in CSS as in R, `#FF0000`.
+
+```elixir
+p
+|> Plot.annotate(:pointrange,
+  x: 3.5,
+  y: 20,
+  ymin: 12,
+  ymax: 28,
+  colour: "red",
+  size: 2.5,
+  linewidth: 1.5
+)
+|> render.()
+```
 
 ## A label at each position
 

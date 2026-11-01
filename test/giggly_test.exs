@@ -4711,6 +4711,140 @@ defmodule GigglyTest do
     end
   end
 
+  describe "layer_data/2, for geom_linerange and geom_pointrange" do
+    # Golden: ggplot2 4.0.3's `layer_data()` in R 4.6.1 for the reference page's
+    # `geom_pointrange(aes(ymin = lower, ymax = upper))`: `flipped_aes` FALSE, then the point
+    # range's defaults, colour black, size 0.5, linewidth 0.5, solid, shape 19, fill and alpha NA, stroke 1; and
+    # `flipped_aes` TRUE for `geom_linerange(aes(xmin = lower, xmax = upper))`, a path's defaults.
+    test "a range layer holds its orientation and ggplot2's defaults" do
+      table = %{
+        "trt" => [1, 2],
+        "resp" => [1.0, 3.0],
+        "lower" => [0.8, 2.4],
+        "upper" => [1.1, 3.3]
+      }
+
+      frame =
+        table
+        |> Plot.new(%{x: :trt, y: :resp})
+        |> Plot.geom_pointrange(%{ymin: :lower, ymax: :upper})
+        |> Giggly.layer_data()
+
+      names = DataFrame.names(frame)
+
+      assert Enum.drop(names, 6) ==
+               [
+                 :flipped_aes,
+                 :color,
+                 :size,
+                 :linewidth,
+                 :linetype,
+                 :shape,
+                 :fill,
+                 :alpha,
+                 :stroke
+               ]
+
+      assert Enum.map(
+               [:flipped_aes, :color, :size, :linewidth, :shape, :fill, :alpha, :stroke],
+               fn
+                 name ->
+                   frame
+                   |> DataFrame.pull(name)
+                   |> hd()
+               end
+             ) === [false, "#000000", 0.5, 0.5, :circle, nil, nil, 1.0]
+
+      across =
+        table
+        |> Plot.new(%{y: :trt, xmin: :lower, xmax: :upper})
+        |> Plot.geom_linerange()
+        |> Giggly.layer_data()
+
+      across_names = DataFrame.names(across)
+
+      assert Enum.drop(across_names, 5) ==
+               [:flipped_aes, :color, :linewidth, :linetype, :alpha]
+
+      assert DataFrame.pull(across, :flipped_aes) === [true, true]
+    end
+  end
+
+  describe "layer_data/2, for geom_errorbar and geom_crossbar" do
+    # Golden: ggplot2 4.0.3's `layer_data()` in R 4.6.1 for the reference page's
+    # `geom_errorbar(aes(ymin = lower, ymax = upper), width = 0.2)`, xmin 0.9 and 1.9, xmax 1.1
+    # and 2.1, the set width 0.2 kept; and for `geom_crossbar()` given no width, xmin 0.55 and
+    # 1.55 on the discrete axis, its own width, 0.9, dropped, where R's table puts it back, its
+    # sides and then the crossbar's defaults closing the table.
+    test "a bar's sides are set from the width it is given, or else 0.9 of its axis's spacing" do
+      table = %{
+        "trt" => Giggly.Factor.new(["1", "2"]),
+        "resp" => [1.0, 3.0],
+        "lower" => [0.8, 2.4],
+        "upper" => [1.1, 3.3]
+      }
+
+      plot = Plot.new(table, %{x: :trt, y: :resp, ymin: :lower, ymax: :upper})
+
+      errorbars =
+        plot
+        |> Plot.geom_errorbar(width: 0.2)
+        |> Giggly.layer_data()
+
+      assert DataFrame.pull(errorbars, :xmin) === [0.9, 1.9]
+      assert DataFrame.pull(errorbars, :xmax) === [1.1, 2.1]
+      assert DataFrame.pull(errorbars, :width) === [0.2, 0.2]
+
+      crossbars =
+        plot
+        |> Plot.geom_crossbar()
+        |> Giggly.layer_data()
+
+      assert DataFrame.pull(crossbars, :xmin) === [0.55, 1.55]
+      refute :width in DataFrame.names(crossbars)
+
+      names = DataFrame.names(crossbars)
+
+      assert Enum.drop(names, 7) ==
+               [:xmin, :xmax, :color, :fill, :linewidth, :linetype, :alpha]
+    end
+  end
+
+  describe "layer_data/2, for stat_summary" do
+    # Golden: ggplot2 4.0.3's `layer_data()` in R 4.6.1 for `ggplot(mtcars, aes(mpg,
+    # factor(cyl))) + stat_summary()`, and `ggplot(mtcars, aes(factor(cyl), mpg)) +
+    # stat_summary(fun = "mean", geom = "bar")`.
+    test "a summary runs along a discrete y alone, and its geom sets up the rows it writes" do
+      mtcars = Giggly.Datasets.mtcars()
+
+      across =
+        mtcars
+        |> Plot.new(%{x: :mpg, y: {:factor, [:cyl]}})
+        |> Plot.stat_summary()
+        |> Giggly.layer_data()
+
+      names = DataFrame.names(across)
+      assert Enum.take(names, 5) == [:y, :group, :x, :xmin, :xmax]
+
+      assert Enum.map([:y, :flipped_aes], fn name -> DataFrame.pull(across, name) end) ==
+               [[1, 2, 3], [true, true, true]]
+
+      bars =
+        mtcars
+        |> Plot.new(%{x: {:factor, [:cyl]}, y: :mpg})
+        |> Plot.stat_summary(fun: :mean, geom: :bar)
+        |> Giggly.layer_data()
+
+      assert Enum.map([:ymin, :ymax, :xmin, :xmax], fn name -> DataFrame.pull(bars, name) end) ===
+               [
+                 [0.0, 0.0, 0.0],
+                 [26.663636363636364, 19.742857142857144, 15.1],
+                 [0.55000000000000004, 1.55, 2.5499999999999998],
+                 [1.45, 2.4500000000000002, 3.4500000000000002]
+               ]
+    end
+  end
+
   describe "layer_data/2, for geom_rug" do
     # Golden: ggplot2 4.0.3's `layer_data()` in R 4.6.1 for `ggplot(df, aes(x, y)) + geom_rug()`
     # over x 1, NA, 3, 4 and y 10, 20, NA, 40: every row kept, with a path's defaults, which the
@@ -12099,6 +12233,267 @@ defmodule GigglyTest do
         )
 
       assert golden?(plot, "hline_vline")
+    end
+
+    # Goldens: test/golden/linerange.svg, linerange_flipped.svg, pointrange.svg,
+    # pointrange_keys.svg and pointrange_annotate.svg, each checked against ggplot2's drawing of
+    # the same plot, made by the R script of its name: every element and clip path matches, the x
+    # axis drawn before the y as in test/golden/point.svg. The reference page's ranges up the
+    # panel and, given xmin and xmax, across it, each group's colour in a legend whose keys run
+    # the ranges' way; its point ranges at their defaults and in a filled shape whose keys need
+    # more room than the theme's; and annotate()'s page's point range over mtcars' points.
+    test "line ranges and point ranges draw as ggplot2 draws them, and so do their keys" do
+      table = %{
+        "trt" => Giggly.Factor.new(["1", "1", "2", "2"]),
+        "resp" => [1.0, 5.0, 3.0, 4.0],
+        "group" => Giggly.Factor.new(["1", "2", "1", "2"]),
+        "upper" => [1.1, 5.3, 3.3, 4.2],
+        "lower" => [0.8, 4.6, 2.4, 3.6]
+      }
+
+      plot = Plot.new(table, %{x: :trt, y: :resp, color: :group})
+      range = %{ymin: :lower, ymax: :upper}
+
+      plots = [
+        linerange: Plot.geom_linerange(plot, range),
+        linerange_flipped:
+          table
+          |> Plot.new(%{x: :resp, y: :trt, color: :group})
+          |> Plot.geom_linerange(%{xmin: :lower, xmax: :upper}),
+        pointrange: Plot.geom_pointrange(plot, range),
+        pointrange_keys:
+          Plot.geom_pointrange(plot, range,
+            size: 5,
+            linewidth: 2,
+            lineend: :round,
+            shape: 21,
+            fill: "white",
+            stroke: 1.5
+          ),
+        pointrange_annotate:
+          Giggly.Datasets.mtcars()
+          |> Plot.new(%{x: :wt, y: :mpg})
+          |> Plot.geom_point()
+          |> Plot.annotate(:pointrange,
+            x: 3.5,
+            y: 20,
+            ymin: 12,
+            ymax: 28,
+            colour: "red",
+            size: 2.5,
+            linewidth: 1.5
+          )
+      ]
+
+      for {name, drawn} <- plots do
+        assert golden?(drawn, Atom.to_string(name)), "#{name} differs from its golden"
+      end
+    end
+
+    # Goldens: test/golden/errorbar.svg, crossbar.svg, errorbar_flipped.svg, crossbar_flipped.svg,
+    # crossbar_looks.svg and errorbar_spaced.svg, each checked against ggplot2's drawing of the
+    # same plot, made by the R script of its name: every element and clip path matches, the x
+    # axis drawn before the y as in test/golden/point.svg. The reference page's error bars and
+    # crossbars 0.2 wide and, turned, 0.9 of a discrete axis's spacing, with their keys; crossbars
+    # filled at half an alpha with a look for each part, ended and joined round; and dotted error
+    # bars on a continuous axis beside an annotated error bar and crossbar.
+    test "error bars and crossbars draw as ggplot2 draws them, and so do their keys" do
+      table = %{
+        "trt" => Giggly.Factor.new(["1", "1", "2", "2"]),
+        "resp" => [1.0, 5.0, 3.0, 4.0],
+        "group" => Giggly.Factor.new(["1", "2", "1", "2"]),
+        "upper" => [1.1, 5.3, 3.3, 4.2],
+        "lower" => [0.8, 4.6, 2.4, 3.6]
+      }
+
+      spaced = %{
+        "x" => [1.0, 2.0, 4.0],
+        "y" => [2.0, 3.0, 1.0],
+        "lo" => [1.0, 2.5, 0.0],
+        "hi" => [3.0, 4.0, 1.5],
+        "g" => ["a", "b", "a"]
+      }
+
+      plot = Plot.new(table, %{x: :trt, y: :resp, color: :group})
+      across = Plot.new(table, %{x: :resp, y: :trt, color: :group})
+      range = %{ymin: :lower, ymax: :upper}
+      turned = %{xmin: :lower, xmax: :upper}
+
+      plots = [
+        errorbar: Plot.geom_errorbar(plot, range, width: 0.2),
+        crossbar: Plot.geom_crossbar(plot, range, width: 0.2),
+        errorbar_flipped: Plot.geom_errorbar(across, turned),
+        crossbar_flipped: Plot.geom_crossbar(across, turned),
+        crossbar_looks:
+          spaced
+          |> Plot.new(%{x: :x, y: :y, ymin: :lo, ymax: :hi, fill: :g})
+          |> Plot.geom_crossbar(
+            alpha: 0.5,
+            linewidth: 1,
+            middle_colour: "red",
+            middle_linetype: :dashed,
+            box_colour: "blue",
+            box_linewidth: 0.3,
+            lineend: :round,
+            linejoin: :round
+          ),
+        errorbar_spaced:
+          spaced
+          |> Plot.new(%{x: :x, y: :y, ymin: :lo, ymax: :hi})
+          |> Plot.geom_errorbar(lineend: :square, linewidth: 1, linetype: :dotted)
+          |> Plot.annotate(:errorbar, x: 3, ymin: 1, ymax: 2, width: 0.5, colour: "red")
+          |> Plot.annotate(:crossbar, x: 3, y: 3, ymin: 2.5, ymax: 3.5, colour: "blue")
+      ]
+
+      for {name, drawn} <- plots do
+        assert golden?(drawn, Atom.to_string(name)), "#{name} differs from its golden"
+      end
+    end
+
+    # Goldens: test/golden/dodge_errorbar.svg, dodge_width.svg, dodge_linerange.svg,
+    # dodge_linerange_width.svg and dodge_pointrange_flipped.svg, each checked against ggplot2's
+    # drawing of the same plot, made by the R script of its name: every element and clip path
+    # matches, the x axis drawn before the y as in test/golden/point.svg. Error bars dodged beside
+    # dodged columns within their own width and within the columns' 0.9; position_dodge's page's
+    # line ranges, unmoved given no width and on their bars given 0.9; and point ranges across the
+    # panel dodged along y.
+    test "dodged ranges are placed as ggplot2 places them" do
+      table = %{
+        "trt" => Giggly.Factor.new(["1", "1", "2", "2"]),
+        "resp" => [1.0, 5.0, 3.0, 4.0],
+        "group" => Giggly.Factor.new(["1", "2", "1", "2"]),
+        "upper" => [1.1, 5.3, 3.3, 4.2],
+        "lower" => [0.8, 4.6, 2.4, 3.6]
+      }
+
+      bars =
+        %{
+          "x" => ["a", "a", "b", "b"],
+          "y" => [2, 3, 4, 5],
+          "g" => [1, 2, 1, 2],
+          "lo" => [1, 2, 3, 4],
+          "hi" => [3, 4, 5, 6]
+        }
+        |> Plot.new(%{x: :x, y: :y, group: :g})
+        |> Plot.geom_col(position: :dodge, fill: "#7F7F7F", colour: "black")
+
+      filled = Plot.new(table, %{x: :trt, y: :resp, fill: :group})
+      range = %{ymin: :lower, ymax: :upper}
+      dodge = Plot.position_dodge(width: 0.9)
+
+      plots = [
+        dodge_errorbar:
+          filled
+          |> Plot.geom_col(position: :dodge)
+          |> Plot.geom_errorbar(range, position: :dodge, width: 0.25),
+        dodge_width:
+          filled
+          |> Plot.geom_col(position: dodge)
+          |> Plot.geom_errorbar(range, position: dodge, width: 0.25),
+        dodge_linerange: Plot.geom_linerange(bars, %{ymin: :lo, ymax: :hi}, position: :dodge),
+        dodge_linerange_width:
+          Plot.geom_linerange(bars, %{ymin: :lo, ymax: :hi}, position: dodge),
+        dodge_pointrange_flipped:
+          table
+          |> Plot.new(%{x: :resp, y: :trt, color: :group})
+          |> Plot.geom_pointrange(%{xmin: :lower, xmax: :upper},
+            position: Plot.position_dodge(width: 0.5)
+          )
+      ]
+
+      for {name, drawn} <- plots do
+        assert golden?(drawn, Atom.to_string(name)), "#{name} differs from its golden"
+      end
+    end
+
+    # Goldens: test/golden/summary.svg, summary_flipped.svg, summary_point.svg,
+    # summary_minmax.svg, summary_line.svg, summary_line_flipped.svg, summary_bar.svg,
+    # summary_crossbar.svg, summary_ribbon.svg, summary_fun_only.svg, summary_normal.svg,
+    # summary_sdl.svg, summary_hilow.svg and summary_boot.svg, each checked against ggplot2's
+    # drawing of the same plot, made by the R script of its name: every element and clip path
+    # matches, the x axis drawn before the y as in test/golden/point.svg. The reference page's
+    # summaries over mtcars' points: its default mean_se as point ranges, up the panel and across
+    # it, medians as points, the mean and range as point ranges, and means as lines, up and
+    # across; bars of means with error bars, crossbars, a ribbon under a line, point ranges given
+    # only their y; and Hmisc's summaries, mean_cl_normal's point ranges, mean_sdl's and
+    # median_hilow's crossbars, and mean_cl_boot's point ranges, which R draws at Giggly's ends,
+    # its random numbers not Giggly's.
+    test "summaries draw as ggplot2 draws them, through each geom" do
+      mtcars = Giggly.Datasets.mtcars()
+      by_cylinder = Plot.new(mtcars, %{x: :cyl, y: :mpg})
+      with_points = Plot.geom_point(by_cylinder)
+      across = Plot.new(mtcars, %{x: :mpg, y: {:factor, [:cyl]}})
+
+      plots = [
+        summary: Plot.stat_summary(with_points, colour: "red", linewidth: 2, size: 3),
+        summary_flipped:
+          across
+          |> Plot.geom_point()
+          |> Plot.stat_summary(colour: "red", linewidth: 2, size: 3),
+        summary_point:
+          Plot.stat_summary(with_points, fun: :median, colour: "red", size: 2, geom: :point),
+        summary_minmax:
+          Plot.stat_summary(with_points, fun: :mean, fun_min: :min, fun_max: :max, colour: "red"),
+        summary_line:
+          mtcars
+          |> Plot.new(%{x: :cyl, y: :mpg, colour: {:factor, [:vs]}})
+          |> Plot.geom_point()
+          |> Plot.stat_summary(fun: :mean, geom: :line),
+        summary_line_flipped:
+          mtcars
+          |> Plot.new(%{x: :mpg, y: {:factor, [:cyl]}, colour: {:factor, [:vs]}, group: :vs})
+          |> Plot.geom_point()
+          |> Plot.stat_summary(fun: :mean, geom: :line),
+        summary_bar:
+          mtcars
+          |> Plot.new(%{x: {:factor, [:cyl]}, y: :mpg})
+          |> Plot.stat_summary(fun: :mean, geom: :bar)
+          |> Plot.stat_summary(geom: :errorbar, width: 0.3),
+        summary_crossbar:
+          Plot.stat_summary(with_points, %{group: :cyl},
+            fun_data: :mean_se,
+            colour: "red",
+            geom: :crossbar,
+            width: 0.2
+          ),
+        summary_ribbon:
+          by_cylinder
+          |> Plot.stat_summary(geom: :ribbon, alpha: 0.3)
+          |> Plot.stat_summary(fun: :mean, geom: :line),
+        summary_fun_only: Plot.stat_summary(by_cylinder, fun: :mean, colour: "red", size: 1),
+        summary_normal:
+          Plot.stat_summary(with_points,
+            fun_data: :mean_cl_normal,
+            colour: "red",
+            linewidth: 2,
+            size: 3
+          ),
+        summary_sdl:
+          Plot.stat_summary(with_points, %{group: :cyl},
+            fun_data: {:mean_sdl, mult: 1},
+            colour: "red",
+            geom: :crossbar,
+            width: 0.2
+          ),
+        summary_hilow:
+          Plot.stat_summary(with_points, %{group: :cyl},
+            fun_data: :median_hilow,
+            colour: "red",
+            geom: :crossbar,
+            width: 0.2
+          ),
+        summary_boot:
+          Plot.stat_summary(with_points,
+            fun_data: :mean_cl_boot,
+            colour: "red",
+            linewidth: 2,
+            size: 3
+          )
+      ]
+
+      for {name, drawn} <- plots do
+        assert golden?(drawn, Atom.to_string(name)), "#{name} differs from its golden"
+      end
     end
 
     # Golden: test/golden/discrete_vline.svg, checked against ggplot2's drawing of the same plot,

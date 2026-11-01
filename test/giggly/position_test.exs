@@ -28,6 +28,65 @@ defmodule Giggly.PositionTest do
     end
   end
 
+  describe "compute_layer/3 for dodging" do
+    # Golden: ggplot2 4.0.3's `layer_data()` in R 4.6.1 for position_dodge's page's line ranges
+    # over x "a", "a", "b", "b" in groups 1 and 2, printed to 17 significant digits:
+    # `position_dodge(width = 0.9)` gives the x, xmin and xmax below; `"dodge"`, no width, leaves
+    # x as it is with xmin and xmax at it.
+    test "a mark with no sides is given them, its x less and plus half the width given, else its x" do
+      frame =
+        DataFrame.new(
+          panel: [1, 1, 1, 1],
+          group: [1, 2, 1, 2],
+          x: [1, 1, 2, 2],
+          ymin: [1, 2, 3, 4],
+          ymax: [3, 4, 5, 6]
+        )
+
+      dodged = Position.compute_layer(%Position.Dodge{width: 0.9}, frame, @continuous)
+
+      assert Enum.map([:x, :xmin, :xmax], fn name -> DataFrame.pull(dodged, name) end) === [
+               [0.775, 1.225, 1.775, 2.225],
+               [0.55, 1.0, 1.5499999999999998, 2.0],
+               [1.0, 1.4500000000000002, 2.0, 2.45]
+             ]
+
+      unmoved = Position.compute_layer(%Position.Dodge{width: :none}, frame, @continuous)
+
+      assert Enum.map([:x, :xmin, :xmax], fn name -> DataFrame.pull(unmoved, name) end) === [
+               [1.0, 1.0, 2.0, 2.0],
+               [1.0, 1.0, 2.0, 2.0],
+               [1.0, 1.0, 2.0, 2.0]
+             ]
+    end
+
+    # Golden: ggplot2 4.0.3's `layer_data()` in R 4.6.1 for the reference page's error bars, 0.25
+    # wide, under `position_dodge(width = 0.9)`, printed to 17 significant digits, at trt 1; under
+    # `"dodge"`, within their own width, x 0.9375 and 1.0625.
+    test "marks with sides share the width given, else the panel's first mark's, keeping their own" do
+      frame =
+        DataFrame.new(
+          panel: [1, 1],
+          group: [1, 2],
+          x: [1, 1],
+          xmin: [0.875, 0.875],
+          xmax: [1.125, 1.125],
+          ymax: [1.1, 5.3]
+        )
+
+      dodged = Position.compute_layer(%Position.Dodge{width: 0.9}, frame, @continuous)
+
+      assert Enum.map([:x, :xmin, :xmax], fn name -> DataFrame.pull(dodged, name) end) === [
+               [0.775, 1.225],
+               [0.7125, 1.1625],
+               [0.8375, 1.2875000000000001]
+             ]
+
+      own = Position.compute_layer(%Position.Dodge{width: :none}, frame, @continuous)
+      assert DataFrame.pull(own, :x) === [0.9375, 1.0625]
+    end
+  end
+
   # Golden: ggplot2 4.0.3's `position_dodge2()` in R 4.6.1, its `setup_params()` and then
   # `compute_panel()` on each panel of the same table, printed to 17 significant digits: a bar
   # Giggly draws has one edge missing, or an infinite x, only from infinite data, so the tables

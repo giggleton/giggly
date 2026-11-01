@@ -8,6 +8,7 @@ Mix.install([
 
 alias Giggly.Plot
 
+mtcars = Giggly.Datasets.mtcars()
 diamonds = Giggly.Datasets.diamonds()
 
 render = fn plot ->
@@ -31,12 +32,25 @@ waiting for, so the page is also a list of what remains.
 summary. The summary is one function that returns a middle and the ends of a range (`fun.data`),
 or a function for each (`fun`, `fun.min` and `fun.max`); given neither, it is the mean and its
 standard error, `mean_se()`. Each summary is drawn as a point with a line through its range,
-`geom_pointrange()`, unless another geom is given. Giggly has none of it yet; the nearest it has
-is `Giggly.Plot.geom_boxplot/3`, which summarises the `y` values at each `x` in five numbers.
+`geom_pointrange()`, unless another geom is given. Giggly has `Giggly.Plot.stat_summary/3`: its
+`fun_data:` names the whole summary, `:mean_se` unless given, or one of the `Hmisc` package's,
+alone or in a tuple with its arguments (`{:mean_sdl, mult: 1}`), and its `fun:`, `fun_min:` and
+`fun_max:` give a summary each, by name or as a function of the values; its `geom:` draws them as
+point ranges, points, lines, bars, crossbars, error bars, line ranges or a ribbon. Not in Giggly
+yet: `stat_summary_bin()`.
+
+`mean_cl_boot()` resamples the data at random. ggplot2's examples set no seed, so R draws these
+intervals a little differently on every run; Giggly draws its resamples from `seed:`, 0 unless
+given (`{:mean_cl_boot, seed: 7}`), so it draws the same intervals every time, and they differ
+from any one of R's by sampling alone. Over 500 seeds on these cars, Giggly's ends and R's have
+the same average, within 0.005 mpg, and the same spread: an end moves about a tenth of an mpg from
+seed to seed, a point at this size, and three quarters of one at most, about 8 points.
+
 A plot is described with `Giggly.Plot` and drawn with `Giggly.to_svg/2`, which returns an SVG
 document. The setup cell aliases `Giggly.Plot`, so the cells write `Plot.new/2`, and defines
-`render`, which draws a plot and shows it below the cell with `Kino.Image`. It binds ggplot2's
-`diamonds`, `Giggly.Datasets.diamonds/0`, to `diamonds`, ggplot2's name for it.
+`render`, which draws a plot and shows it below the cell with `Kino.Image`. It binds R's `mtcars`
+and ggplot2's `diamonds`, `Giggly.Datasets.mtcars/0` and `Giggly.Datasets.diamonds/0`, to their
+names in R.
 
 ## Means with bootstrapped intervals
 
@@ -46,10 +60,19 @@ d + stat_summary(fun.data = "mean_cl_boot", colour = "red", linewidth = 2, size 
 ```
 
 `mean_cl_boot()`, from the `Hmisc` package, gives the mean with a confidence interval found by
-resampling the data.
+resampling the data; Giggly names it `:mean_cl_boot`. Drawn from Giggly's seed, its ends differ
+from R's by sampling, as the About says. `"red"` is the same colour in CSS as in R, `#FF0000`.
 
-Not in Giggly yet: `stat_summary()` and the point ranges it draws, `geom_pointrange()`, and the
-`Hmisc` package's summaries, here `mean_cl_boot()`.
+```elixir
+d =
+  mtcars
+  |> Plot.new(%{x: :cyl, y: :mpg})
+  |> Plot.geom_point()
+
+d
+|> Plot.stat_summary(fun_data: :mean_cl_boot, colour: "red", linewidth: 2, size: 3)
+|> render.()
+```
 
 ## Horizontal summaries
 
@@ -60,7 +83,18 @@ ggplot(mtcars, aes(mpg, factor(cyl))) +
   stat_summary(fun.data = "mean_cl_boot", colour = "red", linewidth = 2, size = 3)
 ```
 
-Not in Giggly yet: `stat_summary()`, `geom_pointrange()` and `mean_cl_boot()`.
+Giggly writes `factor(cyl)` as `{:factor, [:cyl]}`. With `y` alone discrete, the `mpg` values
+are summarised at each `cyl` and the ranges run across. Drawn from Giggly's seed, the ends differ
+from R's by sampling, as the About says; `mpg` runs along the wider axis here, so a tenth of an
+mpg is about 2 points and three quarters of one about 14.
+
+```elixir
+mtcars
+|> Plot.new(%{x: :mpg, y: {:factor, [:cyl]}})
+|> Plot.geom_point()
+|> Plot.stat_summary(fun_data: :mean_cl_boot, colour: "red", linewidth: 2, size: 3)
+|> render.()
+```
 
 ## One summary function
 
@@ -73,9 +107,22 @@ d + aes(colour = factor(vs)) + stat_summary(fun = mean, geom="line")
 ```
 
 The last plot adds a mapping to `d` with `+ aes()`, and joins the means of each group with a
-line.
+line. Giggly draws the first two, naming each summary by an atom, `fun: :median` and
+`fun: :mean`.
 
-Not in Giggly yet: `stat_summary()` and its `fun` option, and adding a mapping with `+ aes()`.
+```elixir
+d
+|> Plot.stat_summary(fun: :median, colour: "red", size: 2, geom: :point)
+|> render.()
+```
+
+```elixir
+d
+|> Plot.stat_summary(fun: :mean, colour: "red", size: 2, geom: :point)
+|> render.()
+```
+
+Not in Giggly yet: adding a mapping with `+ aes()`.
 
 ## A range from three functions
 
@@ -86,8 +133,11 @@ d + stat_summary(fun = mean, fun.min = min, fun.max = max, colour = "red")
 Each point is the mean `mpg` of its `cyl`, and its line runs from the smallest `mpg` to the
 largest.
 
-Not in Giggly yet: `stat_summary()` and its `fun`, `fun.min` and `fun.max` options, and
-`geom_pointrange()`.
+```elixir
+d
+|> Plot.stat_summary(fun: :mean, fun_min: :min, fun_max: :max, colour: "red")
+|> render.()
+```
 
 ## Summaries as bars
 
@@ -97,17 +147,22 @@ d + geom_bar()
 d + stat_summary(aes(y = price), fun = "mean", geom = "bar")
 ```
 
-The first plot counts the diamonds of each cut; the second draws the mean price of each cut as a
-bar. Giggly draws the first, the cuts from Fair to Ideal, the order of their levels.
+The first plot counts the diamonds of each cut, the cuts from Fair to Ideal, the order of their
+levels; the second draws the mean price of each cut as a bar.
 
 ```elixir
-diamonds
-|> Plot.new(%{x: :cut})
+d = Plot.new(diamonds, %{x: :cut})
+
+d
 |> Plot.geom_bar()
 |> render.()
 ```
 
-Not in Giggly yet: `stat_summary()` drawn as bars.
+```elixir
+d
+|> Plot.stat_summary(%{y: :price}, fun: :mean, geom: :bar)
+|> render.()
+```
 
 ## Summaries in bins
 
@@ -134,10 +189,25 @@ p + coord_cartesian(ylim = c(15, 30))
 
 `ylim()` sets the limits of the `y` scale, which drops the rows outside them before the means are
 taken, and so changes the means; `coord_cartesian()` zooms in after the stat, leaving them as
-they were.
+they were. Giggly draws the first two: `Giggly.Plot.ylim/3` drops the rows too, so its means move
+as R's do.
 
-Not in Giggly yet: `stat_summary()` and its `fun` option, and `coord_cartesian()`'s `ylim`
-option.
+```elixir
+p =
+  mtcars
+  |> Plot.new(%{x: :cyl, y: :mpg})
+  |> Plot.stat_summary(fun: :mean, geom: :point)
+
+render.(p)
+```
+
+```elixir
+p
+|> Plot.ylim(15, 30)
+|> render.()
+```
+
+Not in Giggly yet: `coord_cartesian()`'s `ylim` option.
 
 ## Summary functions from Hmisc
 
@@ -159,9 +229,42 @@ d + stat_sum_df("median_hilow", mapping = aes(group = cyl))
 `mean_sdl()` is the mean give or take a multiple of the standard deviation, which `mult = 1`
 sets to one, and `median_hilow()` the median with a range holding the middle of the data.
 
-Not in Giggly yet: `stat_summary()` and its `fun.args` option, crossbars, `geom_crossbar()` and its
-`width` option, and the `Hmisc` package's summaries: `mean_cl_boot()`, `mean_sdl()` and
-`median_hilow()`.
+Giggly's helper is a function of the plot, the summary and the mapping, and a summary's arguments
+go in its tuple, so `fun.args = list(mult = 1)` is `{:mean_sdl, mult: 1}`. The first plot's ends,
+drawn from Giggly's seed, differ from R's by sampling, as the About says.
+
+```elixir
+stat_sum_df = fn plot, fun, mapping ->
+  Plot.stat_summary(plot, mapping, fun_data: fun, colour: "red", geom: :crossbar, width: 0.2)
+end
+
+d =
+  mtcars
+  |> Plot.new(%{x: :cyl, y: :mpg})
+  |> Plot.geom_point()
+
+d
+|> stat_sum_df.(:mean_cl_boot, %{group: :cyl})
+|> render.()
+```
+
+```elixir
+d
+|> stat_sum_df.(:mean_sdl, %{group: :cyl})
+|> render.()
+```
+
+```elixir
+d
+|> stat_sum_df.({:mean_sdl, mult: 1}, %{group: :cyl})
+|> render.()
+```
+
+```elixir
+d
+|> stat_sum_df.(:median_hilow, %{group: :cyl})
+|> render.()
+```
 
 ## Skewed distributions
 
@@ -189,8 +292,7 @@ m2
 # supplementing the raw data with summary statistics is _very_ important
 ```
 
-Not in Giggly yet: the `movies` dataset, `stat_summary()`, `geom_crossbar()` and its `width` option,
-`mean_cl_boot()`, and `xlab()`.
+Not in Giggly yet: the `movies` dataset and `xlab()`.
 
 ## A log scale before or after the stat
 

@@ -270,8 +270,7 @@ ggplot(data = df, aes(x, y, group = grp)) +
 
 Columns are 0.9 wide by default, so dodging the labels by 0.9 puts each over its column.
 
-Not in Giggly yet: `geom_text()`'s `position` option and `position_dodge()`'s options. Giggly names
-a position by an atom, `position: :dodge`, which takes no options yet.
+Not in Giggly yet: `geom_text()`'s `position` option.
 
 ## Labels just above the columns
 
@@ -286,7 +285,7 @@ ggplot(data = df, aes(x, y, group = grp)) +
   )
 ```
 
-Not in Giggly yet: `geom_text()`'s `position` option and `position_dodge()`'s options.
+Not in Giggly yet: `geom_text()`'s `position` option.
 
 ## Labels in the middle of stacked columns
 

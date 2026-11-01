@@ -1,28 +1,34 @@
 defmodule Giggly.Position.Dodge do
   @moduledoc false
 
-  # Dodging, ggplot2's `position_dodge()`: the bars at one x set side by side within the space one
-  # bar takes, as `geom_bar(position = "dodge")` sets them. It takes no parameters yet; ggplot2's
-  # `width = NULL`, `preserve = "total"` and `reverse = FALSE` are how it dodges. Run it through
-  # `Giggly.Position`.
+  # Dodging, ggplot2's `position_dodge()`: the marks at one x set side by side within the space
+  # one takes, as `geom_bar(position = "dodge")` sets them, or within `width`, ggplot2's `width`,
+  # `:none` where it is not given. ggplot2's `preserve = "total"` and `reverse = FALSE` are how it
+  # dodges; its other parameters wait. Run it through `Giggly.Position`.
   #
-  # Each panel's bars are dodged by their `xmin`, the bars at one x ranked by group, lowest first,
-  # as ggplot2's `collide()` orders them for dodging. The n groups at an x share one bar's width:
-  # the k-th is centred `width · ((k - 0.5) / n - 0.5)` from the x, where `width` is the panel's
-  # first bar's width, and is the widest bar's width over n wide, as ggplot2's `pos_dodge()` places
-  # it. An x with one group keeps its bar as it is, so a group missing at an x leaves no gap
-  # (`preserve = "total"`). Every x comes out a double, as R's are. Heights are left alone, and a
-  # row missing its x stays missing. Horizontal bars, those whose `flipped_aes` column says so, are
-  # dodged along y, x and y swapped and swapped back (`Giggly.Position.Orientation`).
+  # A mark with no sides, `xmin` and `xmax`, such as a line range, is first given them, as
+  # ggplot2's `collide_setup()` gives them: its x less and plus half the width, where one is given,
+  # else its x, so that, given none, a mark with no width is dodged by nothing (where ggplot2 also
+  # warns, "Width not defined"). Each panel's marks are then dodged by their `xmin`, the marks at
+  # one x ranked by group, lowest first, as ggplot2's `collide()` orders them for dodging. The n
+  # groups at an x share the width: the k-th is centred `width · ((k - 0.5) / n - 0.5)` from the x,
+  # where `width` is the one given, else the panel's first mark's, and is the widest mark's width
+  # over n wide, as ggplot2's `pos_dodge()` places it. An x with one group keeps its mark as it
+  # is, so a group missing at an x leaves no gap (`preserve = "total"`). Every x comes out a
+  # double, as R's are. Heights are left alone, and a row missing its x stays missing. Horizontal
+  # marks, those whose `flipped_aes` column says so, are dodged along y, x and y swapped and
+  # swapped back (`Giggly.Position.Orientation`).
 
-  defstruct []
+  @enforce_keys [:width]
+  defstruct @enforce_keys
 
-  @type t :: %__MODULE__{}
+  @type t :: %__MODULE__{width: :none | float()}
 
   defimpl Giggly.Position, for: __MODULE__ do
     use Boundary, classify_to: Giggly.Position
 
     alias Giggly.DataFrame
+    alias Giggly.DataFrame.Arithmetic
     alias Giggly.Position.Orientation
 
     @columns [:panel, :group, :x, :xmin, :xmax]
@@ -32,23 +38,39 @@ defmodule Giggly.Position.Dodge do
     def default_aesthetics(_position), do: %{}
 
     @impl Giggly.Position
-    def compute_layer(_position, frame, _axis_kinds) do
+    def compute_layer(position, frame, _axis_kinds) do
       flipped = Orientation.flipped?(frame)
 
       frame
       |> Orientation.flip(flipped)
-      |> moved()
+      |> with_sides(position.width)
+      |> moved(position.width)
       |> Orientation.flip(flipped)
     end
 
-    defp moved(frame) do
+    # ggplot2's `collide_setup()`: a mark with no sides is given them, its x less and plus half the
+    # width given, else its x on both.
+    defp with_sides(frame, width) do
+      if Enum.all?([:xmin, :xmax], fn side -> side in DataFrame.names(frame) end) do
+        frame
+      else
+        x_positions = DataFrame.pull(frame, :x)
+        half = if width == :none, do: 0.0, else: width / 2
+
+        frame
+        |> DataFrame.put(:xmin, Enum.map(x_positions, fn x -> Arithmetic.subtract(x, half) end))
+        |> DataFrame.put(:xmax, Enum.map(x_positions, fn x -> Arithmetic.add(x, half) end))
+      end
+    end
+
+    defp moved(frame, width) do
       dodged =
         @columns
         |> Enum.map(fn name -> DataFrame.pull(frame, name) end)
         |> Enum.zip_with(fn values -> row(values) end)
         |> Enum.with_index(fn row, index -> Map.put(row, :index, index) end)
         |> Enum.group_by(fn row -> row.panel end)
-        |> Enum.flat_map(fn {_panel, rows} -> dodge_panel(rows) end)
+        |> Enum.flat_map(fn {_panel, rows} -> dodge_panel(rows, width) end)
         |> Enum.sort_by(fn row -> row.index end)
 
       Enum.reduce([:x, :xmin, :xmax], frame, fn name, placed ->
@@ -67,10 +89,10 @@ defmodule Giggly.Position.Dodge do
       |> Map.new()
     end
 
-    # ggplot2's `collide()` for one panel: the dodge width is the panel's first bar's width, and
-    # the bars at each `xmin` are dodged together, ranked by group.
-    defp dodge_panel(rows) do
-      width = Enum.find_value(rows, fn row -> bar_width(row) end)
+    # ggplot2's `collide()` for one panel: the dodge width is the one given, else the panel's first
+    # mark's width, and the marks at each `xmin` are dodged together, ranked by group.
+    defp dodge_panel(rows, given) do
+      width = if given == :none, do: Enum.find_value(rows, &bar_width/1), else: given
 
       rows
       |> Enum.group_by(fn row -> row.xmin end)

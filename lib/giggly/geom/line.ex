@@ -15,14 +15,15 @@ defmodule Giggly.Geom.Line do
   # of panel, group and then the position along the line (`setup_data/3`), as ggplot2's
   # `GeomLine$setup_data()` orders them: rows that tie keep their order, an infinite position sorts
   # at its end, and a missing one last, as R's `order()` puts `NA` last. The orientation is the
-  # layer's to give; ggplot2 would also take it from a stat that names one, and no stat a line
-  # takes yet does.
+  # layer's to give, or, where it is `:none`, a summary's lines, the stat's, read from the
+  # `flipped_aes` column it writes, as ggplot2's `has_flipped_aes(ambiguous = TRUE)` reads it
+  # first: along y where the first row's is true, and along x where it is false.
 
   @enforce_keys [:orientation, :line_end, :line_join, :mitre_limit, :arrow]
   defstruct @enforce_keys
 
   @type t :: %__MODULE__{
-          orientation: :x | :y,
+          orientation: :none | :x | :y,
           line_end: Giggly.Scene.Polylines.line_end(),
           line_join: Giggly.Scene.Polylines.line_join(),
           mitre_limit: float(),
@@ -47,11 +48,13 @@ defmodule Giggly.Geom.Line do
 
     @impl Giggly.Geom
     def setup_data(%{orientation: orientation}, frame, _axis_kinds) do
+      along = along(orientation, frame)
+
       order =
         [
           DataFrame.pull(frame, :panel),
           DataFrame.pull(frame, :group),
-          DataFrame.pull(frame, orientation)
+          DataFrame.pull(frame, along)
         ]
         |> Enum.zip_with(fn [panel, group, position] ->
           {panel, group, Arithmetic.sort_key(position)}
@@ -62,6 +65,16 @@ defmodule Giggly.Geom.Line do
 
       DataFrame.slice(frame, order)
     end
+
+    # The axis the rows are put in order of: the orientation, or the stat's where it is `:none`.
+    defp along(:none, frame) do
+      case DataFrame.pull(frame, :flipped_aes) do
+        [true | _rest] -> :y
+        _along_x_or_no_rows -> :x
+      end
+    end
+
+    defp along(orientation, _frame), do: orientation
 
     # A line's defaults are a path's, as ggplot2's `GeomLine` takes `GeomPath`'s `default_aes`.
     @impl Giggly.Geom

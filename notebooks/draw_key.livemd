@@ -25,7 +25,8 @@ with another glyph, named or given as its function, through the layer's `key_gly
 `draw_key_*()` function takes a row of the key's aesthetics, the geom's parameters and the key's
 size, and returns a `grid` grob. Giggly has none of this yet: its legends draw each key as the
 layer's geom draws its own: a point, a bar or rectangle, a line, a filled shape for a ribbon, area
-or density, a line over its band for a smooth, or the letter "a" for text.
+or density, a line over its band for a smooth, a line range, point range, error bar or crossbar,
+or the letter "a" for text.
 
 ## Choosing a layer's key glyph
 
