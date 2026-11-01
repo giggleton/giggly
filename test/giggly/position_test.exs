@@ -85,6 +85,58 @@ defmodule Giggly.PositionTest do
       own = Position.compute_layer(%Position.Dodge{width: :none}, frame, @continuous)
       assert DataFrame.pull(own, :x) === [0.9375, 1.0625]
     end
+
+    # Golden: ggplot2 4.0.3's `layer_data()` in R 4.6.1 for `geom_point(position =
+    # position_dodge(width = 0.9))` of the same rows, printed to 17 significant digits; its
+    # columns end `xmin`, `xmax`, `ymax`, after R's `order`, which Giggly does not write.
+    test "a mark with no ymax is given its y as one, which it keeps" do
+      frame =
+        DataFrame.new(
+          panel: [1, 1, 1, 1],
+          group: [1, 2, 1, 2],
+          x: [1.0, 1.0, 2.0, 2.0],
+          y: [2.0, 3.0, 4.0, -1.0]
+        )
+
+      dodged = Position.compute_layer(%Position.Dodge{width: 0.9}, frame, @continuous)
+
+      assert DataFrame.names(dodged) == [:panel, :group, :x, :y, :xmin, :xmax, :ymax]
+
+      assert Enum.map([:x, :xmin, :xmax, :ymax], fn name -> DataFrame.pull(dodged, name) end) ===
+               [
+                 [0.775, 1.225, 1.775, 2.225],
+                 [0.55, 1.0, 1.5499999999999998, 2.0],
+                 [1.0, 1.4500000000000002, 2.0, 2.4500000000000002],
+                 [2.0, 3.0, 4.0, -1.0]
+               ]
+    end
+
+    # Golden: ggplot2 4.0.3's `layer_data()` in R 4.6.1 for `geom_rect(position = "dodge")` and
+    # `"dodge2"` of the same corners, printed to 17 significant digits: each rectangle's x, which
+    # it keeps, is the middle of its sides.
+    test "a mark with sides and no x, a rectangle, is given their middle as its x" do
+      frame =
+        DataFrame.new(
+          panel: [1, 1, 1],
+          group: [1, 2, 1],
+          xmin: [0.6, 0.6, 1.6],
+          xmax: [1.4, 1.4, 2.4],
+          ymin: [0.0, 0.0, 0.0],
+          ymax: [2.0, 3.0, 1.0]
+        )
+
+      for {position, xmin, xmax} <- [
+            {%Position.Dodge{width: :none}, [0.6000000000000001, 1.0, 1.6000000000000001],
+             [1.0, 1.4, 2.4]},
+            {%Position.Dodge2{preserve: :total, padding: 0.1, reverse: false},
+             [0.6200000000000001, 1.02, 1.6400000000000001], [0.98, 1.38, 2.36]}
+          ] do
+        dodged = Position.compute_layer(position, frame, @continuous)
+
+        assert Enum.map([:x, :xmin, :xmax], fn name -> DataFrame.pull(dodged, name) end) ===
+                 [[0.8, 1.2, 2.0], xmin, xmax]
+      end
+    end
   end
 
   # Golden: ggplot2 4.0.3's `position_dodge2()` in R 4.6.1, its `setup_params()` and then
@@ -192,6 +244,35 @@ defmodule Giggly.PositionTest do
 
   # Golden: ggplot2 4.0.3's `layer_data()` in R 4.6.1 for `geom_area(stat = "identity")` of the
   # same rows, each band set up from 0 to its y as the area geom sets it up and in its order.
+  describe "compute_layer/3 for stacking marks with only a y" do
+    # Golden: ggplot2 4.0.3's `layer_data()` in R 4.6.1 for `geom_point(position = "stack")` of
+    # the same rows: R stacks them by their y, writing `ymax`, then `xmin` and `xmax`, then `ymin`.
+    test "each mark piles by its y, its ymin and ymax its stretch of the pile" do
+      frame =
+        DataFrame.new(
+          panel: [1, 1, 1, 1],
+          group: [1, 2, 1, 2],
+          x: [1.0, 1.0, 2.0, 2.0],
+          y: [2.0, 3.0, 4.0, -1.0]
+        )
+
+      stacked = Position.compute_layer(%Position.Stack{}, frame, @continuous)
+
+      assert DataFrame.names(stacked) == [:panel, :group, :x, :y, :ymax, :xmin, :xmax, :ymin]
+
+      assert Enum.map([:y, :ymin, :ymax, :xmin, :xmax], fn name ->
+               DataFrame.pull(stacked, name)
+             end) ===
+               [
+                 [5.0, 3.0, 4.0, 0.0],
+                 [3.0, 0.0, 0.0, -1.0],
+                 [5.0, 3.0, 4.0, 0.0],
+                 [1.0, 1.0, 2.0, 2.0],
+                 [1.0, 1.0, 2.0, 2.0]
+               ]
+    end
+  end
+
   describe "compute_layer/3 for stacking areas" do
     test "each row's xmin and xmax is its x, and the bands at an x pile up, the first group on top" do
       stacked =

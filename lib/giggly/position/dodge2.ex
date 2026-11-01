@@ -23,7 +23,9 @@ defmodule Giggly.Position.Dodge2 do
   # width. A cluster is placed from its own middle and widths, where R gives each cluster after a
   # bar with no edges the next one's start (design-log §4, the entry beginning "Dodging by clusters
   # places each cluster"); a bar missing an edge is in no cluster, is placed nowhere, and loses its
-  # x, even where no bar of its panel has edges, which R fails at. Heights are left alone.
+  # x, even where no bar of its panel has edges, which R fails at. A mark with sides and no x, a
+  # rectangle, is first given their middle as its x, as R's dodging gives it. Heights are left
+  # alone.
   # Horizontal bars, those whose `flipped_aes` column says so, are dodged along y, x and y swapped
   # and swapped back (`Giggly.Position.Orientation`).
 
@@ -37,7 +39,7 @@ defmodule Giggly.Position.Dodge2 do
 
     alias Giggly.DataFrame
     alias Giggly.DataFrame.Arithmetic
-    alias Giggly.Position.Orientation
+    alias Giggly.Position.{Collide, Orientation}
 
     @columns [:panel, :group, :x, :xmin, :xmax]
 
@@ -51,6 +53,7 @@ defmodule Giggly.Position.Dodge2 do
 
       frame
       |> Orientation.flip(flipped)
+      |> Collide.with_middle()
       |> dodged(position)
       |> Orientation.flip(flipped)
     end

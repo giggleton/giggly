@@ -6,7 +6,8 @@ defmodule Giggly.Position.Dodge do
   # `:none` where it is not given. ggplot2's `preserve = "total"` and `reverse = FALSE` are how it
   # dodges; its other parameters wait. Run it through `Giggly.Position`.
   #
-  # A mark with no sides, `xmin` and `xmax`, such as a line range, is first given them, as
+  # A mark with sides and no x, a rectangle, is first given the middle of its sides as its x, and a
+  # mark with no sides, `xmin` and `xmax`, such as a line range, is given them, as
   # ggplot2's `collide_setup()` gives them: its x less and plus half the width, where one is given,
   # else its x, so that, given none, a mark with no width is dodged by nothing (where ggplot2 also
   # warns, "Width not defined"). Each panel's marks are then dodged by their `xmin`, the marks at
@@ -15,7 +16,8 @@ defmodule Giggly.Position.Dodge do
   # where `width` is the one given, else the panel's first mark's, and is the widest mark's width
   # over n wide, as ggplot2's `pos_dodge()` places it. An x with one group keeps its mark as it
   # is, so a group missing at an x leaves no gap (`preserve = "total"`). Every x comes out a
-  # double, as R's are. Heights are left alone, and a row missing its x stays missing. Horizontal
+  # double, as R's are. Heights are left alone, but a mark with no `ymax`, a point, is given its y
+  # as one, as ggplot2's `collide()` gives it, and a row missing its x stays missing. Horizontal
   # marks, those whose `flipped_aes` column says so, are dodged along y, x and y swapped and
   # swapped back (`Giggly.Position.Orientation`).
 
@@ -28,8 +30,7 @@ defmodule Giggly.Position.Dodge do
     use Boundary, classify_to: Giggly.Position
 
     alias Giggly.DataFrame
-    alias Giggly.DataFrame.Arithmetic
-    alias Giggly.Position.Orientation
+    alias Giggly.Position.{Collide, Orientation}
 
     @columns [:panel, :group, :x, :xmin, :xmax]
 
@@ -43,24 +44,11 @@ defmodule Giggly.Position.Dodge do
 
       frame
       |> Orientation.flip(flipped)
-      |> with_sides(position.width)
+      |> Collide.with_middle()
+      |> Collide.with_sides(position.width)
       |> moved(position.width)
+      |> Collide.with_top()
       |> Orientation.flip(flipped)
-    end
-
-    # ggplot2's `collide_setup()`: a mark with no sides is given them, its x less and plus half the
-    # width given, else its x on both.
-    defp with_sides(frame, width) do
-      if Enum.all?([:xmin, :xmax], fn side -> side in DataFrame.names(frame) end) do
-        frame
-      else
-        x_positions = DataFrame.pull(frame, :x)
-        half = if width == :none, do: 0.0, else: width / 2
-
-        frame
-        |> DataFrame.put(:xmin, Enum.map(x_positions, fn x -> Arithmetic.subtract(x, half) end))
-        |> DataFrame.put(:xmax, Enum.map(x_positions, fn x -> Arithmetic.add(x, half) end))
-      end
     end
 
     defp moved(frame, width) do

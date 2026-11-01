@@ -32,7 +32,8 @@ and `geom_crossbar()` as a box with a line across it at `y`. `geom_errorbarh()` 
 favour of `geom_errorbar(orientation = "y")`. Giggly has `Giggly.Plot.geom_linerange/3`,
 `Giggly.Plot.geom_pointrange/3`, `Giggly.Plot.geom_errorbar/3` and `Giggly.Plot.geom_crossbar/3`,
 turned on their side by mapping `xmin` and `xmax` or by `orientation:`, and dodged with
-`position: :dodge` or `{:dodge, width: width}`; it has no
+`position: :dodge` or `{:dodge, width: width}`, a line range and a point range, which have no
+width of their own, only within a width given; it has no
 `geom_errorbarh()`. A plot is described with `Giggly.Plot` and drawn with `Giggly.to_svg/2`, which
 returns an SVG document. The setup cell aliases `Giggly.Plot`, so the cells write `Plot.new/2`,
 and defines `render`, which draws a plot and shows it below the cell with `Kino.Image`.

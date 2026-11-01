@@ -7,7 +7,9 @@ defmodule Giggly.Position.Stack do
   # stacks. Run it through `Giggly.Position`.
   #
   # Nothing moves unless two rows of the layer share an x, in any panel, as ggplot2 skips stacking
-  # when every x differs. Otherwise a layer whose rows have no `xmin`, as an area's have none, has
+  # when every x differs. Otherwise a layer whose rows have no `ymax`, as a point's have none, is
+  # stacked by its y, its `ymax` and `ymin` written as ggplot2's `setup_data()` and `pos_stack()`
+  # write them, and a layer whose rows have no `xmin`, as an area's have none, has
   # each row's `xmin` and `xmax` set to its x, as ggplot2's `collide()` sets them, and each panel's
   # bars, or an area's bands from 0 to its y, are stacked by their `xmin`, those reaching
   # below zero separately from the rest, each pile in the order of its x and then of its group,
@@ -32,7 +34,7 @@ defmodule Giggly.Position.Stack do
 
     alias Giggly.DataFrame
     alias Giggly.DataFrame.Arithmetic
-    alias Giggly.Position.Orientation
+    alias Giggly.Position.{Collide, Orientation}
 
     # ggplot2's default: each bar's y at the top of its stretch.
     @vjust 1
@@ -63,7 +65,11 @@ defmodule Giggly.Position.Stack do
     end
 
     defp stacked(frame) do
-      frame = with_edges(frame)
+      frame =
+        frame
+        |> Collide.with_top()
+        |> Collide.with_sides(:none)
+        |> with_bottom()
 
       stacked_rows =
         @columns
@@ -79,18 +85,12 @@ defmodule Giggly.Position.Stack do
       end)
     end
 
-    # The frame with each mark's `xmin` and `xmax` its x where it has none, as an area's rows have
-    # none, as ggplot2's `collide()` adds them before it piles the marks by their `xmin`.
-    defp with_edges(frame) do
-      if :xmin in DataFrame.names(frame) do
-        frame
-      else
-        x_positions = DataFrame.pull(frame, :x)
-
-        frame
-        |> DataFrame.put(:xmin, x_positions)
-        |> DataFrame.put(:xmax, x_positions)
-      end
+    # The frame with each mark's `ymin` its y where it has none, which its stretch of the pile
+    # replaces, as ggplot2's `pos_stack()` writes a `ymin` for every mark.
+    defp with_bottom(frame) do
+      if :ymin in DataFrame.names(frame),
+        do: frame,
+        else: DataFrame.put(frame, :ymin, DataFrame.pull(frame, :y))
     end
 
     defp row(values) do

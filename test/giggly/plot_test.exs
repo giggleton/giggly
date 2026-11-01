@@ -282,23 +282,6 @@ defmodule Giggly.PlotTest do
                Plot.geom_point(plot, position: {:jitter, width: 0.1, seed: 3}).reversed_layers
     end
 
-    test "a position points do not take is refused by the option's validation, naming those they do" do
-      plot = Plot.new(@rows, %{x: :wt, y: :mpg})
-
-      for position <- [:stack, {:dodge2, padding: 0.2}] do
-        error =
-          assert_raise NimbleOptions.ValidationError, fn ->
-            Plot.geom_point(plot, position: position)
-          end
-
-        assert error.key == :position
-
-        assert error.message =~
-                 "expected :identity or :jitter, alone or in a tuple with a keyword list of its " <>
-                   "options, got: "
-      end
-    end
-
     # ggplot2's points draw no label; its text does.
     test "an aesthetic points cannot use is refused" do
       plot = Plot.new(@rows, %{x: :wt, y: :mpg})
@@ -814,22 +797,6 @@ defmodule Giggly.PlotTest do
       assert error.key == :fill
     end
 
-    test "a position bars do not take is refused by the option's validation, naming those they do" do
-      plot = Plot.new(@rows, %{x: :cyl})
-
-      for add <- [&Plot.geom_bar/2, &Plot.geom_col/2, &Plot.geom_histogram/2, &Plot.stat_bin/2],
-          position <- [:jitter, {:jitter, seed: 1}] do
-        error =
-          assert_raise NimbleOptions.ValidationError, fn -> add.(plot, position: position) end
-
-        assert error.key == :position
-
-        assert error.message =~
-                 "expected :stack, :dodge or :dodge2, alone or in a tuple with a keyword list of " <>
-                   "its options"
-      end
-    end
-
     test "an option given twice is refused rather than one silently winning" do
       plot = Plot.new(@rows, %{x: :cyl})
 
@@ -945,7 +912,7 @@ defmodule Giggly.PlotTest do
     end
 
     # ggplot2's `geom_jitter()` takes no seed, which only its position takes.
-    test "a negative distance, a position or seed it cannot use, and a seed of its own are refused" do
+    test "a negative distance, a seed its jittering cannot use, and a seed of its own are refused" do
       plot = Plot.new(@rows, %{x: :wt, y: :mpg})
 
       for {options, key, message} <- [
@@ -953,9 +920,6 @@ defmodule Giggly.PlotTest do
             {[height: "1"], :height, ~s(expected a distance, a number 0 or more, got: "1")},
             {[position: {:jitter, seed: 1.5}], :position,
              "in :jitter's options, invalid value for :seed option: expected integer, got: 1.5"},
-            {[position: :stack], :position,
-             "expected :jitter, alone or in a tuple with a keyword list of its options, got: " <>
-               ":stack"},
             {[seed: 1], [:seed], "unknown options [:seed]"}
           ] do
         error =
@@ -983,17 +947,6 @@ defmodule Giggly.PlotTest do
   end
 
   describe "geom_count/3 and stat_sum/3" do
-    test "a count layer takes no position" do
-      plot = Plot.new(@rows, %{x: :wt, y: :mpg})
-
-      for add <- [&Plot.geom_count/2, &Plot.stat_sum/2] do
-        error =
-          assert_raise NimbleOptions.ValidationError, fn -> add.(plot, position: :jitter) end
-
-        assert error.message =~ "unknown options [:position]"
-      end
-    end
-
     test "a count layer records the point geom, counting at each place and no position" do
       plot =
         @rows
@@ -1033,17 +986,6 @@ defmodule Giggly.PlotTest do
 
       assert [%Plot.Layer{fixed: %{shape: :circle_filled, fill: "#FFFFFF", stroke: 1.0}}] =
                plot.reversed_layers
-    end
-
-    test "an option points do not take is refused by the option's validation" do
-      plot = Plot.new(@rows, %{x: :wt, y: :mpg})
-
-      error =
-        assert_raise NimbleOptions.ValidationError, fn ->
-          Plot.geom_count(plot, position: :jitter)
-        end
-
-      assert error.message =~ "unknown options [:position]"
     end
 
     # ggplot2 4.0.3's `stat_sum()` requires x and y.
@@ -1346,10 +1288,10 @@ defmodule Giggly.PlotTest do
 
     # ggplot2 4.0.3's `geom_freqpoly()` sets `pad = TRUE` after reading its arguments, so a
     # polygon is padded whatever `pad` says.
-    test "pad:, position: and fill: are refused, a polygon being padded, unplaced and unfilled" do
+    test "pad: and fill: are refused, a polygon being padded and unfilled" do
       plot = Plot.new(@rows, %{x: :wt})
 
-      for option <- [pad: false, position: :stack, fill: "red"] do
+      for option <- [pad: false, fill: "red"] do
         error =
           assert_raise NimbleOptions.ValidationError, fn -> Plot.geom_freqpoly(plot, [option]) end
 
@@ -1484,46 +1426,6 @@ defmodule Giggly.PlotTest do
       assert [%Plot.Layer{stat: stat, fixed: fixed}] = plot.reversed_layers
       assert stat == %Stat.Boxplot{coef: 3.0, width: 0.3, orientation: :x}
       assert fixed === %{fill: "#FFFFFF", size: 3.0, width: 0.3, alpha: 0.4, linewidth: 2.0}
-    end
-
-    test "varwidth: dodges each box at its own width, whatever position is given" do
-      plot = Plot.new(@rows, %{x: :cyl, y: :mpg})
-      single = %Position.Dodge2{preserve: :single, padding: 0.1, reverse: false}
-
-      for position <- [:dodge2, :dodge] do
-        assert [%Plot.Layer{position: ^single}] =
-                 Plot.geom_boxplot(plot, position: position, varwidth: true).reversed_layers
-      end
-
-      told = {:dodge2, padding: 0.3, reverse: true}
-
-      assert [%Plot.Layer{position: kept}] =
-               Plot.geom_boxplot(plot, position: told, varwidth: true).reversed_layers
-
-      assert kept == %Position.Dodge2{preserve: :single, padding: 0.3, reverse: true}
-
-      assert [%Plot.Layer{position: %Position.Dodge{width: :none}}] =
-               Plot.geom_boxplot(plot, position: :dodge).reversed_layers
-    end
-
-    test "boxes are not stacked, nor dodged within a width given" do
-      plot = Plot.new(@rows, %{x: :cyl, y: :mpg})
-
-      for {position, message} <- [
-            {:stack,
-             "expected :dodge2 or :dodge, alone or in a tuple with a keyword list of its " <>
-               "options, got: :stack"},
-            {{:dodge, width: 0.5},
-             "expected :dodge alone, whose options a box plot does not take, got: " <>
-               "{:dodge, [width: 0.5]}"}
-          ] do
-        error =
-          assert_raise NimbleOptions.ValidationError, fn ->
-            Plot.geom_boxplot(plot, position: position)
-          end
-
-        assert error.message =~ message
-      end
     end
 
     test "a weight the plot maps is refused, and one the layer maps cannot be used" do
@@ -2674,7 +2576,7 @@ defmodule Giggly.PlotTest do
 
       for {position, width} <- [{{:dodge, width: 1}, 1.0}, {{:dodge, []}, :none}] do
         assert [%Plot.Layer{position: %Position.Dodge{width: ^width}}] =
-                 Plot.geom_linerange(plot, position: position).reversed_layers
+                 Plot.geom_errorbar(plot, position: position).reversed_layers
       end
 
       for {position, message} <- [
@@ -2684,51 +2586,6 @@ defmodule Giggly.PlotTest do
         assert_raise NimbleOptions.ValidationError, ~r/#{Regex.escape(message)}/, fn ->
           Plot.geom_linerange(plot, position: position)
         end
-      end
-    end
-
-    test "a range layer is drawn where it is unless position: dodges it, by name or with options" do
-      plot =
-        Plot.new(@ranges, %{x: :trt, y: :resp, ymin: :lower, ymax: :upper, xmin: :lower})
-
-      layers = [
-        &Plot.geom_linerange/3,
-        &Plot.geom_pointrange/3,
-        &Plot.geom_errorbar/3,
-        &Plot.geom_crossbar/3
-      ]
-
-      for layer <- layers do
-        assert [%Plot.Layer{position: %Position.Identity{}}] =
-                 layer.(plot, %{}, []).reversed_layers
-
-        assert [%Plot.Layer{position: %Position.Dodge{width: :none}}] =
-                 layer.(plot, %{}, position: :dodge).reversed_layers
-
-        assert [%Plot.Layer{position: %Position.Dodge2{preserve: :total}}] =
-                 layer.(plot, %{}, position: :dodge2).reversed_layers
-
-        assert [%Plot.Layer{position: %Position.Dodge{width: 0.9}}] =
-                 layer.(plot, %{}, position: {:dodge, width: 0.9}).reversed_layers
-
-        assert_raise NimbleOptions.ValidationError, fn -> layer.(plot, %{}, position: :stack) end
-
-        assert_raise NimbleOptions.ValidationError,
-                     ~r/expected :identity, :dodge or :dodge2/,
-                     fn ->
-                       layer.(plot, %{}, position: {:jitter, seed: 1})
-                     end
-      end
-    end
-
-    test "a bar layer takes dodging within a width given; a box plot does not" do
-      plot = Plot.new(@rows, %{x: :cyl, y: :mpg})
-
-      assert [%Plot.Layer{position: %Position.Dodge{width: 0.5}}] =
-               Plot.geom_col(plot, position: {:dodge, width: 0.5}).reversed_layers
-
-      assert_raise NimbleOptions.ValidationError, fn ->
-        Plot.geom_boxplot(plot, position: {:dodge, width: 0.5})
       end
     end
   end
@@ -2808,7 +2665,7 @@ defmodule Giggly.PlotTest do
                Plot.stat_summary(plot, orientation: :x).reversed_layers
     end
 
-    test "each geom takes its function's options, and the bars' position is the identity" do
+    test "each geom takes its function's options, and its position is the identity unless given" do
       plot = Plot.new(@summarised, %{x: :cyl, y: :mpg})
 
       kinds =
@@ -2819,11 +2676,12 @@ defmodule Giggly.PlotTest do
 
       assert [
                {%Geom.Point{}, %Position.Identity{}},
-               {%Geom.Line{orientation: :none, line_end: :butt, arrow: :none}, _line},
+               {%Geom.Line{orientation: :none, line_end: :butt, arrow: :none},
+                %Position.Identity{}},
                {%Geom.Bar{just: 0.5}, %Position.Identity{}},
                {%Geom.Crossbar{orientation: :none, line_join: :mitre}, %Position.Identity{}},
                {%Geom.Linerange{orientation: :none}, %Position.Identity{}},
-               {%Geom.Ribbon{orientation: :none, outline_type: :both}, _ribbon}
+               {%Geom.Ribbon{orientation: :none, outline_type: :both}, %Position.Identity{}}
              ] = kinds
 
       assert [%Plot.Layer{geom: %Geom.Bar{just: +0.0}, position: %Position.Stack{}}] =
@@ -2842,9 +2700,11 @@ defmodule Giggly.PlotTest do
         Plot.stat_summary(plot, geom: :point, width: 0.5)
       end
 
-      assert_raise NimbleOptions.ValidationError, ~r/expected :identity, :stack/, fn ->
-        Plot.stat_summary(plot, geom: :bar, position: :jitter)
-      end
+      assert_raise NimbleOptions.ValidationError,
+                   ~r/got: :dodge2, since the marks have no width/,
+                   fn ->
+                     Plot.stat_summary(plot, geom: :line, position: :dodge2)
+                   end
     end
 
     test "a geom it does not draw with is refused, naming those it does" do
@@ -3990,7 +3850,7 @@ defmodule Giggly.PlotTest do
       end
     end
 
-    test "a layer missing x or y, a position, or an option not offered is refused" do
+    test "a layer missing x or y is refused" do
       for {function, name} <- [
             {&Plot.geom_hex/1, "geom_hex"},
             {&Plot.stat_bin_hex/1, "stat_bin_hex"}
@@ -4005,12 +3865,6 @@ defmodule Giggly.PlotTest do
 
         assert error.message ==
                  "Plot.#{name}/3 needs #{missing}, but neither its mapping nor the plot's maps it"
-      end
-
-      assert_raise NimbleOptions.ValidationError, ~r/position/, fn ->
-        @hex_values
-        |> Plot.new(%{x: :x, y: :y})
-        |> Plot.geom_hex(position: :identity)
       end
     end
 
@@ -4686,7 +4540,7 @@ defmodule Giggly.PlotTest do
     test "a line takes the options a reference line has, and no other" do
       plot = Plot.new(@rows)
 
-      for option <- [arrow: true, position: :identity, size: 2, linejoin: :round, slope: 1] do
+      for option <- [arrow: true, size: 2, linejoin: :round, slope: 1] do
         assert_raise NimbleOptions.ValidationError, fn ->
           Plot.geom_hline(plot, [{:yintercept, 1} | [option]])
         end
@@ -5360,6 +5214,273 @@ defmodule Giggly.PlotTest do
     end
   end
 
+  describe "a layer's position: what each layer function takes" do
+    @placed %{
+      "x" => [1.0, 2.0],
+      "y" => [3.0, 4.0],
+      "lo" => [2.0, 3.0],
+      "hi" => [4.0, 5.0],
+      "end" => [1.5, 2.5],
+      "g" => ["a", "b"]
+    }
+
+    @kinds %{
+      identity: Position.Identity,
+      stack: Position.Stack,
+      dodge: Position.Dodge,
+      dodge2: Position.Dodge2,
+      jitter: Position.Jitter,
+      nudge: Position.Nudge
+    }
+
+    # Every layer function taking `position:`: its name, the plot and mapping it is added with and
+    # the options it is always given, the family of positions its marks take (ggplot2's, swept
+    # against R), and its default.
+    defp positioned_layers do
+      placed = Plot.new(@placed, %{x: :x, y: :y})
+      along_x = Plot.new(@placed, %{x: :x})
+      ranges = Plot.new(@placed, %{x: :x, y: :y, ymin: :lo, ymax: :hi})
+      grouped = Plot.new(@placed, %{x: :g, y: :y})
+      bare = Plot.new(@placed)
+
+      [
+        {:geom_point, placed, %{}, [], :without_width, :identity},
+        {:geom_jitter, placed, %{}, [], :without_width, :jitter},
+        {:geom_line, placed, %{}, [], :without_width, :identity},
+        {:geom_path, placed, %{}, [], :without_width, :identity},
+        {:geom_segment, placed, %{xend: :end, yend: :y}, [], :without_width, :identity},
+        {:geom_rug, placed, %{}, [], :without_width, :identity},
+        {:geom_text, placed, %{label: :g}, [], :without_width, :nudge},
+        {:geom_label, placed, %{label: :g}, [], :without_width, :nudge},
+        {:geom_count, placed, %{}, [], :without_width, :identity},
+        {:stat_sum, placed, %{}, [], :without_width, :identity},
+        {:geom_linerange, ranges, %{}, [], :without_width, :identity},
+        {:geom_pointrange, ranges, %{}, [], :without_width, :identity},
+        {:geom_ribbon, along_x, %{ymin: :lo, ymax: :hi}, [], :without_width, :identity},
+        {:geom_area, placed, %{}, [], :without_width, :stack},
+        {:geom_density, along_x, %{}, [], :without_width, :identity},
+        {:stat_density, along_x, %{}, [], :without_width, :stack},
+        {:geom_smooth, placed, %{}, [], :without_width, :identity},
+        {:stat_smooth, placed, %{}, [], :without_width, :identity},
+        {:geom_hex, placed, %{}, [], :without_width, :identity},
+        {:stat_bin_hex, placed, %{}, [], :without_width, :identity},
+        {:stat_summary, placed, %{}, [], :without_width, :identity},
+        {:geom_bar, Plot.new(@placed, %{x: :g}), %{}, [], :with_width, :stack},
+        {:geom_col, grouped, %{}, [], :with_width, :stack},
+        {:geom_histogram, along_x, %{}, [], :with_width, :stack},
+        {:stat_bin, along_x, %{}, [], :with_width, :stack},
+        {:geom_freqpoly, along_x, %{}, [], :with_width, :identity},
+        {:geom_errorbar, ranges, %{}, [], :with_width, :identity},
+        {:geom_crossbar, ranges, %{}, [], :with_width, :identity},
+        {:geom_tile, placed, %{}, [], :with_width, :identity},
+        {:geom_raster, placed, %{}, [], :with_width, :identity},
+        {:stat_summary, placed, %{}, [geom: :bar], :with_width, :identity},
+        {:geom_boxplot, grouped, %{}, [], :boxplot, :dodge2},
+        {:geom_rect, bare, %{xmin: :lo, xmax: :hi, ymin: :lo, ymax: :hi}, [], :rect, :identity},
+        {:geom_hline, bare, %{yintercept: :y}, [], :hline, :identity},
+        {:geom_hline, bare, %{}, [yintercept: 2], :hline, :identity},
+        {:geom_vline, bare, %{xintercept: :x}, [], :vline, :identity},
+        {:geom_vline, bare, %{}, [xintercept: 2], :vline, :identity}
+      ]
+    end
+
+    # The top layer `function` adds to `plot` with `mapping`, `given` and `options`.
+    defp added(function, plot, mapping, given, options) do
+      [layer | _below] = apply(Plot, function, [plot, mapping, given ++ options]).reversed_layers
+      layer
+    end
+
+    # The positions each family takes, as a layer gives them, the dodging of marks with no width
+    # within a width given.
+    defp taken(:with_width), do: [:identity, :stack, :dodge, :dodge2, :jitter, :nudge]
+    defp taken(:without_width), do: [:identity, :stack, {:dodge, width: 0.9}, :jitter, :nudge]
+    defp taken(family) when family in [:boxplot, :rect], do: [:identity, :dodge, :dodge2, :nudge]
+    defp taken(family) when family in [:hline, :vline], do: [:identity, :nudge]
+
+    # The positions each family refuses, each with the part of its refusal saying why, as R fails
+    # or moves nothing.
+    defp refused(:with_width), do: []
+
+    defp refused(:without_width) do
+      [
+        {:dodge,
+         "expected :dodge with its width:, {:dodge, width: width}, got: :dodge, since " <>
+           "the marks have no width of their own to share, so none would move"},
+        {:dodge2,
+         "got: :dodge2, since the marks have no width of their own, by which dodging " <>
+           "by clusters sets them side by side, so none would move"}
+      ]
+    end
+
+    defp refused(:boxplot) do
+      [
+        {:stack,
+         "got: :stack, since a box plot's rows have no y once its stat has run, which " <>
+           "stacking piles"},
+        {:jitter,
+         "got: :jitter, since a box plot's rows have no y once its stat has run, " <>
+           "which jittering moves"}
+      ]
+    end
+
+    defp refused(:rect) do
+      [
+        {:stack,
+         "got: :stack, since a rectangle has no x, at which stacking piles marks, so " <>
+           "none would move"},
+        {:jitter, "got: :jitter, since a rectangle has no x or y, which jittering moves"}
+      ]
+    end
+
+    defp refused(:hline), do: line_refusals("a horizontal line")
+    defp refused(:vline), do: line_refusals("a vertical line")
+
+    defp line_refusals(line) do
+      [
+        {:stack, "got: :stack, since #{line} has no y, which stacking piles, so none would move"},
+        {:dodge,
+         "got: :dodge, since #{line} has no x, along which dodging sets marks side by side"},
+        {:dodge2,
+         "got: :dodge2, since #{line} has no x, along which dodging sets marks side by side"},
+        {:jitter, "got: :jitter, since #{line} has no x or y, which jittering moves"}
+      ]
+    end
+
+    test "each layer function records ggplot2's position for it when given none" do
+      for {function, plot, mapping, given, _family, default} <- positioned_layers() do
+        layer = added(function, plot, mapping, given, [])
+        assert {function, given, layer.position.__struct__} == {function, given, @kinds[default]}
+      end
+    end
+
+    test "each layer function takes every position its marks can take, recording its kind" do
+      for {function, plot, mapping, given, family, _default} <- positioned_layers(),
+          position <- taken(family) do
+        layer = added(function, plot, mapping, given, position: position)
+        kind = if is_tuple(position), do: elem(position, 0), else: position
+
+        assert {function, given, position, layer.position.__struct__} ==
+                 {function, given, position, @kinds[kind]}
+      end
+    end
+
+    test "each layer function refuses a position R fails at or moves nothing with, saying why" do
+      for {function, plot, mapping, given, family, _default} <- positioned_layers(),
+          {position, reason} <- refused(family) do
+        error =
+          assert_raise NimbleOptions.ValidationError, fn ->
+            added(function, plot, mapping, given, position: position)
+          end
+
+        assert error.key == :position
+        assert {function, given, error.message =~ reason} == {function, given, true}
+      end
+    end
+
+    test "a refusal names the positions the marks take" do
+      for {function, plot, mapping, given, taken} <- [
+            {:geom_point, Plot.new(@placed, %{x: :x, y: :y}), %{}, [],
+             ":identity, :stack, :dodge, :jitter or :nudge"},
+            {:geom_boxplot, Plot.new(@placed, %{x: :g, y: :y}), %{}, [],
+             ":identity, :dodge, :dodge2 or :nudge"},
+            {:geom_hline, Plot.new(@placed), %{}, [yintercept: 1], ":identity or :nudge"}
+          ] do
+        error =
+          assert_raise NimbleOptions.ValidationError, fn ->
+            added(function, plot, mapping, given, position: :fill)
+          end
+
+        assert error.message =~
+                 "expected #{taken}, alone or in a tuple with a keyword list of its options, " <>
+                   "got: :fill"
+      end
+    end
+
+    test "a diagonal line takes no position, as ggplot2's ignores one" do
+      error =
+        assert_raise NimbleOptions.ValidationError, fn ->
+          @placed
+          |> Plot.new()
+          |> Plot.geom_abline(position: :identity)
+        end
+
+      assert error.message =~ "unknown options [:position]"
+    end
+
+    test "a reference line given values is an annotation moved by its position" do
+      [layer | _below] =
+        @placed
+        |> Plot.new()
+        |> Plot.geom_hline(yintercept: 2, position: :nudge)
+        |> Map.fetch!(:reversed_layers)
+
+      assert %Plot.Layer{annotation: true, position: %Position.Nudge{}} = layer
+    end
+
+    test "text and labels take a nudge only beside nudging, which reads it" do
+      plot = Plot.new(@placed, %{x: :x, y: :y, label: :g})
+
+      for {add, function} <- [
+            {&Plot.geom_text/2, "Plot.geom_text/3"},
+            {&Plot.geom_label/2, "Plot.geom_label/3"}
+          ] do
+        assert [%Plot.Layer{position: %Position.Nudge{}}] =
+                 add.(plot, nudge_y: 0.1, position: :nudge).reversed_layers
+
+        error =
+          assert_raise ArgumentError, fn ->
+            add.(plot, nudge_x: 0.1, nudge_y: 0.1, position: :stack)
+          end
+
+        assert error.message ==
+                 "#{function} takes nudge_x: and nudge_y: only beside position: :nudge, its " <>
+                   "default, got: :stack, which moves no mark by a nudge"
+      end
+    end
+
+    test "beside varwidth: a box plot dodges by clusters alone, each box at its own width" do
+      plot = Plot.new(@placed, %{x: :g, y: :y})
+      single = %Position.Dodge2{preserve: :single, padding: 0.1, reverse: false}
+
+      for position <- [:dodge2, {:dodge2, []}, {:dodge2, preserve: :single}] do
+        assert [%Plot.Layer{position: ^single}] =
+                 Plot.geom_boxplot(plot, position: position, varwidth: true).reversed_layers
+      end
+
+      assert [%Plot.Layer{position: ^single}] =
+               Plot.geom_boxplot(plot, varwidth: true).reversed_layers
+
+      told = {:dodge2, padding: 0.3, reverse: true}
+
+      assert [%Plot.Layer{position: kept}] =
+               Plot.geom_boxplot(plot, position: told, varwidth: true).reversed_layers
+
+      assert kept == %Position.Dodge2{preserve: :single, padding: 0.3, reverse: true}
+
+      for position <- [:identity, :dodge, {:dodge, width: 0.9}, :nudge] do
+        error =
+          assert_raise ArgumentError, fn ->
+            Plot.geom_boxplot(plot, position: position, varwidth: true)
+          end
+
+        assert error.message ==
+                 "Plot.geom_boxplot/3 with varwidth: true takes position: :dodge2 alone or " <>
+                   "with its options, got: #{inspect(position)}, since each box keeps its own " <>
+                   "width, which only dodging by clusters lays side by side"
+      end
+
+      error =
+        assert_raise ArgumentError, fn ->
+          Plot.geom_boxplot(plot, position: {:dodge2, preserve: :total}, varwidth: true)
+        end
+
+      assert error.message ==
+               "Plot.geom_boxplot/3 with varwidth: true takes no position: " <>
+                 "{:dodge2, [preserve: :total]}, since each box keeps its own width, so the " <>
+                 "boxes cannot share their total; leave out preserve:, which is :single"
+    end
+  end
+
   describe "a layer's position: given with its options" do
     test "a name alone and the name with no options record the same position, its defaults" do
       plot = Plot.new(@rows, %{x: :cyl, y: :mpg})
@@ -5388,8 +5509,8 @@ defmodule Giggly.PlotTest do
                "[width: 0.5, width: 0.9]"},
             {{:stack, reverse: true}, "in :stack's options, unknown options [:reverse]"},
             {{:dodge, :wide},
-             "expected :stack, :dodge or :dodge2, alone or in a tuple with a keyword list of " <>
-               "its options, got: {:dodge, :wide}"},
+             "expected :identity, :stack, :dodge, :dodge2, :jitter or :nudge, alone or in a " <>
+               "tuple with a keyword list of its options, got: {:dodge, :wide}"},
             {{"dodge", []}, "got: {\"dodge\", []}"}
           ] do
         error =

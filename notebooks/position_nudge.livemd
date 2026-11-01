@@ -67,8 +67,8 @@ ggplot(df, aes(x, y)) +
   geom_text(aes(label = y), position = position_nudge(y = -0.1))
 ```
 
-Not in Giggly yet: `geom_text()`'s `position` option and `position_nudge()`. Giggly nudges text by
-`geom_text/3`'s own options, as the next example does.
+Not in Giggly yet: `position_nudge()`'s `y` option. Giggly nudges text by `geom_text/3`'s own
+options, as the next example does.
 
 ## Nudging in brief
 

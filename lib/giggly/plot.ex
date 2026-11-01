@@ -47,8 +47,14 @@ defmodule Giggly.Plot do
   given to several layers moves their marks alike, so one bound to a name, `dodge = {:dodge,
   width: 0.9}`, lines labels up with the bars they label.
 
-  An option a position does not take, or a value it cannot use, raises from the layer function
-  given it, naming the position.
+  A layer takes every position that can move its marks. Marks with a width of their own, such as
+  bars, tiles and error bars, take them all. Marks with none, such as points, lines, text, line
+  ranges and areas, are dodged only within a width given, `{:dodge, width: 0.9}`, and never by
+  clusters, since neither would move them. Box plots and rectangles are neither stacked nor
+  jittered, and a horizontal or vertical line is only nudged; a diagonal line takes no position.
+
+  A position a layer's marks do not take raises from the layer function given it, saying why, and
+  so do an option the position does not take and a value it cannot use, naming the position.
 
   ### Leaving marks where they are: `:identity`
 
@@ -98,6 +104,13 @@ defmodule Giggly.Plot do
       iex> frame = Giggly.layer_data(plot)
       iex> Giggly.DataFrame.pull(frame, :xmin)
       [0.5725, 1.0225000000000002, 1.7974999999999999]
+
+  ### Nudging marks: `:nudge`
+
+  Every position a mark has along x moves by its layer's `nudge_x:` and every one along y by its
+  `nudge_y:`, in the units of each axis, options `geom_text/3` and `geom_label/3` take; a layer
+  that gives neither moves nothing. Text and labels are nudged unless `position:` says otherwise,
+  and a nudge beside another position raises. It takes no options.
 
   ### Moving marks a random distance: `:jitter`
 
@@ -930,7 +943,7 @@ defmodule Giggly.Plot do
     layer = %Layer{
       geom: path_geom(validated),
       stat: bin_stat(validated, true),
-      position: %Position.Identity{},
+      position: position(Keyword.fetch!(validated, :position)),
       data: data,
       mapping: resolve(mapping, plot, data, "Plot.geom_freqpoly/3"),
       fixed: fixed(validated),
@@ -958,6 +971,8 @@ defmodule Giggly.Plot do
   0; where both are continuous, they stand along the axis on which every group holds one value,
   or else along `x`, each group a box, so a numeric `x` takes a `:group` to draw more than one.
   `orientation:` says which. Boxes sharing a position are set side by side, as `position:` says.
+  Raises `ArgumentError` for `varwidth: true` beside a position other than `:dodge2`, or beside
+  `{:dodge2, preserve: :total}`, since each box keeps its own width.
 
   Box plots use `:x`, `:y`, `:group`, `:width`, `:alpha`, `:color`, `:fill`, `:linetype` and
   `:linewidth`, and `:shape` and `:size`, which the outliers take, and need `:x` or `:y`. A look
@@ -1150,7 +1165,7 @@ defmodule Giggly.Plot do
     layer = %Layer{
       geom: path_geom(validated),
       stat: %Stat.Identity{},
-      position: %Position.Identity{},
+      position: position(Keyword.fetch!(validated, :position)),
       data: data,
       mapping: resolve(mapping, plot, data, "Plot.geom_path/3"),
       fixed: fixed(validated),
@@ -1195,7 +1210,7 @@ defmodule Giggly.Plot do
     layer = %Layer{
       geom: line_geom(validated),
       stat: %Stat.Identity{},
-      position: %Position.Identity{},
+      position: position(Keyword.fetch!(validated, :position)),
       data: data,
       mapping: resolve(mapping, plot, data, "Plot.geom_line/3"),
       fixed: fixed(validated),
@@ -1262,7 +1277,7 @@ defmodule Giggly.Plot do
     layer = %Layer{
       geom: segment_geom(validated),
       stat: %Stat.Identity{},
-      position: %Position.Identity{},
+      position: position(Keyword.fetch!(validated, :position)),
       data: data,
       mapping: resolve(mapping, plot, data, "Plot.geom_segment/3"),
       fixed: fixed(validated),
@@ -1931,7 +1946,7 @@ defmodule Giggly.Plot do
     layer = %Layer{
       geom: ribbon_geom(validated),
       stat: %Stat.Identity{},
-      position: %Position.Identity{},
+      position: position(Keyword.fetch!(validated, :position)),
       data: data,
       mapping: resolve(mapping, plot, data, "Plot.geom_ribbon/3"),
       fixed: fixed(validated),
@@ -2203,7 +2218,9 @@ defmodule Giggly.Plot do
 
   Text uses `:x`, `:y`, `:label`, `:group`, `:alpha` and `:color`, and needs `:x`, `:y` and
   `:label`; a label never groups the rows. `nudge_x:` and `nudge_y:` move every label, in the
-  units of each axis, and the axes reach the labels where they are drawn.
+  units of each axis, as its position, `:nudge` unless `position:` says otherwise, reads them, and
+  the axes reach the labels where they are drawn. Raises `ArgumentError` for a nudge beside
+  another position, which moves no label by it.
 
   ## Options
 
@@ -2254,7 +2271,7 @@ defmodule Giggly.Plot do
     layer = %Layer{
       geom: text_geom(validated),
       stat: %Stat.Identity{},
-      position: %Position.Nudge{},
+      position: nudging_position(validated, "Plot.geom_text/3"),
       data: data,
       mapping: resolve(mapping, plot, data, "Plot.geom_text/3"),
       fixed: fixed(validated),
@@ -2280,8 +2297,9 @@ defmodule Giggly.Plot do
 
   Labels use `:x`, `:y`, `:label`, `:group`, `:alpha`, `:color`, `:fill`, `:linetype` and
   `:linewidth`, and need `:x`, `:y` and `:label`; a label never groups the rows. `nudge_x:` and
-  `nudge_y:` move every label, in the units of each axis, and the axes reach each label's place,
-  though not its box.
+  `nudge_y:` move every label, in the units of each axis, as its position, `:nudge` unless
+  `position:` says otherwise, reads them, and the axes reach each label's place, though not its
+  box. Raises `ArgumentError` for a nudge beside another position, which moves no label by it.
 
   ## Options
 
@@ -2320,7 +2338,7 @@ defmodule Giggly.Plot do
     layer = %Layer{
       geom: label_geom(validated),
       stat: %Stat.Identity{},
-      position: %Position.Nudge{},
+      position: nudging_position(validated, "Plot.geom_label/3"),
       data: data,
       mapping: resolve(mapping, plot, data, "Plot.geom_label/3"),
       fixed: fixed(validated),
@@ -2381,7 +2399,7 @@ defmodule Giggly.Plot do
     layer = %Layer{
       geom: %Geom.Rect{},
       stat: %Stat.Identity{},
-      position: %Position.Identity{},
+      position: position(Keyword.fetch!(validated, :position)),
       data: data,
       mapping: resolve(mapping, plot, data, "Plot.geom_rect/3"),
       fixed: fixed(validated),
@@ -2448,7 +2466,7 @@ defmodule Giggly.Plot do
     layer = %Layer{
       geom: %Geom.Tile{},
       stat: %Stat.Identity{},
-      position: %Position.Identity{},
+      position: position(Keyword.fetch!(validated, :position)),
       data: data,
       mapping: resolve(mapping, plot, data, "Plot.geom_tile/3"),
       fixed: fixed(validated),
@@ -2513,7 +2531,7 @@ defmodule Giggly.Plot do
         interpolate: Keyword.fetch!(validated, :interpolate)
       },
       stat: %Stat.Identity{},
-      position: %Position.Identity{},
+      position: position(Keyword.fetch!(validated, :position)),
       data: data,
       mapping: resolve(mapping, plot, data, "Plot.geom_raster/3"),
       fixed: set,
@@ -5629,7 +5647,7 @@ defmodule Giggly.Plot do
         fullrange: Keyword.fetch!(validated, :fullrange),
         orientation: Keyword.fetch!(validated, :orientation)
       },
-      position: %Position.Identity{},
+      position: position(Keyword.fetch!(validated, :position)),
       data: data,
       mapping: resolve(mapping, plot, data, function),
       fixed: fixed(validated),
@@ -5705,7 +5723,7 @@ defmodule Giggly.Plot do
     layer = %Layer{
       geom: %Geom.Point{},
       stat: %Stat.Sum{},
-      position: %Position.Identity{},
+      position: position(Keyword.fetch!(validated, :position)),
       data: data,
       mapping: resolve(mapping, plot, data, function),
       fixed: fixed(validated),
@@ -5761,7 +5779,7 @@ defmodule Giggly.Plot do
         bins: Keyword.fetch!(validated, :bins),
         binwidth: Keyword.get(validated, :binwidth, :none)
       },
-      position: %Position.Identity{},
+      position: position(Keyword.fetch!(validated, :position)),
       data: data,
       mapping: resolve(mapping, plot, data, function),
       fixed: fixed(validated),
@@ -5850,6 +5868,7 @@ defmodule Giggly.Plot do
   defp position_struct(:stack, []), do: %Position.Stack{}
   defp position_struct(:dodge, options), do: %Position.Dodge{width: width_given(options)}
   defp position_struct(:dodge2, options), do: struct!(Position.Dodge2, options)
+  defp position_struct(:nudge, []), do: %Position.Nudge{}
 
   defp position_struct(:jitter, options) do
     %Position.Jitter{
@@ -5882,18 +5901,53 @@ defmodule Giggly.Plot do
   end
 
   # A box plot's position: the one given, or, where each box keeps a width of its own, dodging by
-  # clusters at each box's own width, as ggplot2's `geom_boxplot()` makes any position named by a
-  # string `position_dodge2(preserve = "single")` and switches a `position_dodge2()` that
-  # preserves the total, keeping its padding and order (design-log §4, the entry beginning "A box
-  # layer dodges by clusters"). Dodging by clusters given in the call, alone or with options,
-  # arrives validated with its options whole, so the second clause takes the default, a name, and
-  # dodging, which a box plot takes alone.
+  # clusters at each box's own width, `preserve: :single`, as ggplot2's `geom_boxplot()` makes
+  # any position named by a string `position_dodge2(preserve = "single")` and switches a
+  # `position_dodge2()` that preserves the total (design-log §4, the entry beginning "A box layer
+  # dodges by clusters"). Beside `varwidth: true` any other position is refused, as R ignores a
+  # name and dodging moves no box of its own width, and so is preserving the total, which R
+  # ignores; the default arrives as a name.
   defp boxplot_position(position, false), do: position(position)
+  defp boxplot_position(:dodge2, true), do: position({:dodge2, preserve: :single})
 
-  defp boxplot_position({:dodge2, options}, true),
-    do: position({:dodge2, Keyword.put(options, :preserve, :single)})
+  defp boxplot_position({:dodge2, options} = position, true) do
+    if Keyword.get(options, :preserve) == :total do
+      raise ArgumentError,
+            "Plot.geom_boxplot/3 with varwidth: true takes no position: #{inspect(position)}, " <>
+              "since each box keeps its own width, so the boxes cannot share their total; " <>
+              "leave out preserve:, which is :single"
+    end
 
-  defp boxplot_position(_named, true), do: position({:dodge2, preserve: :single})
+    position({:dodge2, Keyword.put(options, :preserve, :single)})
+  end
+
+  defp boxplot_position(position, true) do
+    raise ArgumentError,
+          "Plot.geom_boxplot/3 with varwidth: true takes position: :dodge2 alone or with its " <>
+            "options, got: #{inspect(position)}, since each box keeps its own width, which only " <>
+            "dodging by clusters lays side by side"
+  end
+
+  # A text or label layer's position: the one given, nudging its marks by `nudge_x:` and
+  # `nudge_y:` unless another is, beside which a nudge is refused, as ggplot2's `geom_text()`
+  # ignores a nudge whose position reads none.
+  defp nudging_position(validated, function) do
+    nudges = Keyword.take(validated, [:nudge_x, :nudge_y])
+
+    case {Keyword.fetch!(validated, :position), nudges} do
+      {position, []} ->
+        position(position)
+
+      {position, _nudges} when position in [:nudge, {:nudge, []}] ->
+        position(position)
+
+      {position, nudges} ->
+        raise ArgumentError,
+              "#{function} takes #{Enum.map_join(Keyword.keys(nudges), " and ", fn name -> "#{name}:" end)} " <>
+                "only beside position: :nudge, its default, got: #{inspect(position)}, which " <>
+                "moves no mark by a nudge"
+    end
+  end
 
   # The box geom's struct from `geom_boxplot/3`'s validated options, each part's look holding only
   # those given.
@@ -6203,7 +6257,7 @@ defmodule Giggly.Plot do
     layer = %Layer{
       geom: kind,
       stat: %Stat.Identity{},
-      position: %Position.Identity{},
+      position: Keyword.get(facts, :position, %Position.Identity{}),
       data: table,
       mapping:
         Map.new(columns, fn {aesthetic, _values} -> {aesthetic, Atom.to_string(aesthetic)} end),
@@ -6222,6 +6276,7 @@ defmodule Giggly.Plot do
   # `data:`; or else by its mapping, from its own table or the plot's, each look one value. Either
   # way it takes nothing from the plot's mapping, as ggplot2's sets `inherit.aes = FALSE`.
   defp reference_line_layer(plot, mapping, validated, kind, intercepts, function, facts) do
+    {position, validated} = Keyword.pop(validated, :position, :identity)
     {given, others} = Keyword.split(validated, intercepts)
     unmet = "neither its mapping maps it nor #{options_named(intercepts)} gives it"
 
@@ -6233,7 +6288,7 @@ defmodule Giggly.Plot do
         layer = %Layer{
           geom: kind,
           stat: %Stat.Identity{},
-          position: %Position.Identity{},
+          position: position(position),
           data: data,
           mapping: resolve(mapping, plot, data, function),
           fixed: fixed(validated),
@@ -6256,7 +6311,7 @@ defmodule Giggly.Plot do
           kind,
           function,
           "line",
-          [unmet: unmet] ++ facts
+          [unmet: unmet, position: position(position)] ++ facts
         )
     end
   end

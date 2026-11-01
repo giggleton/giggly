@@ -34,10 +34,9 @@ up with the default legend, and positive values stack upward from zero while neg
 downward. `vjust` places an object that has a position rather than a size, such as a label,
 within its part of the stack, and `reverse` turns the order over. Giggly stacks bars and areas: it
 is the default `position: :stack` of `Giggly.Plot.geom_bar/3`, `Giggly.Plot.geom_col/3`,
-`Giggly.Plot.geom_histogram/3` and `Giggly.Plot.geom_area/3`, and `Giggly.Plot.geom_density/3`
-stacks its curves with `position: :stack`. It has none of the rest yet: no `position_fill()`,
-neither of `position_stack()`'s options, `vjust` and `reverse`, and no `position` option for
-lines, points or text. A plot is described with `Giggly.Plot` and drawn with
+`Giggly.Plot.geom_histogram/3` and `Giggly.Plot.geom_area/3`, and lines, points, text and the
+other layers stack with `position: :stack`. It has none of the rest yet: no `position_fill()`,
+and neither of `position_stack()`'s options, `vjust` and `reverse`. A plot is described with `Giggly.Plot` and drawn with
 `Giggly.to_svg/2`, which returns an SVG document. The setup cell aliases `Giggly.Plot`, so the cells
 write `Plot.new/2`, and defines `render`, which draws a plot and shows it below the cell with
 `Kino.Image`. It binds R's `mtcars` and ggplot2's `diamonds`, `Giggly.Datasets.mtcars/0` and
@@ -188,8 +187,15 @@ ggplot(series, aes(time, value, group = type)) +
   geom_point(aes(colour = type), position = "stack")
 ```
 
-Not in Giggly yet: `geom_line()`'s and `geom_point()`'s `position` option, here `position =
-"stack"`.
+Each point is stacked as its line is, so it sits on it.
+
+```elixir
+series
+|> Plot.new(%{x: :time, y: :value, group: :type})
+|> Plot.geom_line(%{colour: :type}, position: :stack)
+|> Plot.geom_point(%{colour: :type}, position: :stack)
+|> render.()
+```
 
 ## A line on each area
 
@@ -199,7 +205,13 @@ ggplot(series, aes(time, value, group = type)) +
   geom_line(aes(group = type), position = "stack")
 ```
 
-Not in Giggly yet: `geom_line()`'s `position` option, here `position = "stack"`.
+```elixir
+series
+|> Plot.new(%{x: :time, y: :value, group: :type})
+|> Plot.geom_area(%{fill: :type})
+|> Plot.geom_line(%{group: :type}, position: :stack)
+|> render.()
+```
 
 ## Stacking labels
 
@@ -210,7 +222,15 @@ ggplot(series, aes(time, value, group = type)) +
   geom_text(aes(label = type), position = "stack")
 ```
 
-Not in Giggly yet: `geom_text()`'s `position` option, here `position = "stack"`.
+Each label sits at the top of its band, where stacking puts a mark's `y`.
+
+```elixir
+series
+|> Plot.new(%{x: :time, y: :value, group: :type})
+|> Plot.geom_area(%{fill: :type})
+|> Plot.geom_text(%{label: :type}, position: :stack)
+|> render.()
+```
 
 ## Centring labels
 

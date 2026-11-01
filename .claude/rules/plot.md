@@ -81,8 +81,9 @@ stat and position" and "Each facet, coordinate system, geom, stat and position i
   the geom's struct and the stat's, and `geom_segment/3` `%Geom.Segment{}` with the identity stat
   and position, and `geom_rug/3` `%Geom.Rug{}` with the identity stat and its `position:`, and
   `geom_hline/3`, `geom_vline/3` and `geom_abline/3` `%Geom.Hline{}`, `%Geom.Vline{}` and
-  `%Geom.Abline{}` with the identity stat and position, taking no `position:`, as only nudging
-  moves a reference line in R, and `geom_linerange/3`, `geom_pointrange/3`, `geom_errorbar/3`
+  `%Geom.Abline{}` with the identity stat and position unless `position:` nudges a horizontal or
+  vertical line, which values given make an annotation's, and `geom_linerange/3`,
+  `geom_pointrange/3`, `geom_errorbar/3`
   and `geom_crossbar/3` `%Geom.Linerange{}`, `%Geom.Pointrange{}`, `%Geom.Errorbar{}` and
   `%Geom.Crossbar{}` with the identity stat and position, their `orientation:` (`:none` unless
   given) and `lineend:` the geom's, a crossbar's `linejoin:` too, `:mitre` unless given, and its
@@ -90,7 +91,8 @@ stat and position" and "Each facet, coordinate system, geom, stat and position i
   underscored) a map per part of only the looks given, as a box plot's parts are; `width:` sets an
   error bar's or crossbar's width, a mapped one a number, checked at the call, and
   `geom_hex/3` and `stat_bin_hex/3` both `%Geom.Hex{}` with `%Stat.BinHex{}` and
-  `%Position.Identity{}`, taking no `position:`, `bins:` (30) and `binwidth:` the stat's,
+  `%Position.Identity{}` unless `position:` says otherwise, `bins:` (30) and `binwidth:` the
+  stat's,
   each one value for both axes or an `{x, y}` pair, recorded as the pair, bins whole numbers
   above 0 and widths numbers above 0 kept as floats (`validate_hex_bins/1`,
   `validate_hex_binwidth/1`; design-log §4, the entry beginning "`geom_hex()`'s `bins:` and
@@ -150,10 +152,9 @@ stat and position" and "Each facet, coordinate system, geom, stat and position i
   and `orientation:` are the stat's fields, `width:` set in `fixed` too, so it drops a mapped
   width; `outliers:`, `notch:`, `notchwidth:`, `staplewidth:` and `varwidth:` the geom's, and each
   part's look (`outlier_`, `whisker_`, `staple_`, `median_` and `box_` options, `outlier_stroke:`
-  0.5 unless given) a map in the geom of only the looks given. `position:` takes `:dodge2`, its
-  default, alone or with its options, or `:dodge` alone, its options refused; with `varwidth:
-  true` a name records `{:dodge2, preserve: :single}` and dodging by clusters with options
-  `preserve: :single`, its padding and order kept. A `:weight` the plot's mapping gives is
+  0.5 unless given) a map in the geom of only the looks given; its `position:` is dodging by
+  clusters unless given, `varwidth: true` included, as the bullet on `position:` says. A
+  `:weight` the plot's mapping gives is
   refused, naming it, since boxes are not weighted; where one of x and y is mapped,
   `orientation:` must name the other, the axis the boxes stand along, the reverse of binning's
   sense, and where both are it chooses.
@@ -175,7 +176,8 @@ stat and position" and "Each facet, coordinate system, geom, stat and position i
   `%Position.Nudge{}`, as ggplot2 4.0's `geom_text()` defaults `position = "nudge"`, and so does
   `geom_label/3`, with `%Geom.Label{}` and the identity stat, as its `geom_label()` does, and
   `geom_rect/3` `%Geom.Rect{}` with the identity stat and position, and `geom_tile/3`
-  `%Geom.Tile{}` with them, taking no `position:`, and `geom_raster/3` `%Geom.Raster{}` with them,
+  `%Geom.Tile{}` with them, and `geom_raster/3` `%Geom.Raster{}` with them, each position the
+  identity unless `position:` says otherwise,
   its `hjust:` and `vjust:`, 0 to 1, 0.5 unless given, kept as floats, and `interpolate:`, `false`
   unless given, the geom's fields and never set on its rows. `annotate/3` records the kind
   the layer function of its geom's name records (`:col` and `:bar` both `%Geom.Bar{}`), with the
@@ -338,25 +340,37 @@ stat and position" and "Each facet, coordinate system, geom, stat and position i
   width: 0.9}`, and no function builds one** (design-log §4, the entry beginning "A position is
   an option value"): `Options.validate_position/2` checks it against the names the function
   takes and the position's own schema (`Options.position_kind/1`), refusing an option named
-  twice, and records the name with its validated options; `Plot` builds the kind's struct from
-  them, a name alone being the position with no options given, each option not given its
+  twice, and records the position as given; `Plot` builds the kind's struct from
+  it, a name alone being the position with no options given, each option not given its
   default. The options are dodging's `width:`, any number, kept as a float, `:none` when not
   given (R's `preserve`, `orientation` and `reverse` wait), dodging by clusters' `preserve:`,
   `padding:` 0 to 1 and `reverse:`, its `width:` waiting, and jittering's `width:` and `height:`,
   each 0 or more, a float, `:none` when not given, where R moves nothing for a negative one, and
-  `seed:`, any integer, 0 when not given; stacking and the identity take none. Its
+  `seed:`, any integer, 0 when not given; stacking, nudging and the identity take none. Its
   options never become the geom's (design-log §4, the entry beginning "Dodging by clusters takes
-  `preserve:`"). A bar function's position is `:stack`, `:dodge` or `:dodge2`. **A range
-  function's `position:` (`geom_linerange/3`, `geom_pointrange/3`, `geom_errorbar/3`,
-  `geom_crossbar/3`) is `:identity`, its default, `:dodge` or `:dodge2`**; `geom_boxplot/3`
-  takes no dodging's `width:`, which a varying width would need to preserve each box's.
-  **`geom_point/3`'s `position:` is `:identity`, its default, or `:jitter`**; `geom_jitter/3`'s
-  is `:jitter` alone, its own `width:` and `height:` recorded as jittering's and refused beside
+  `preserve:`"). **Every layer function takes every position that moves its marks in ggplot2,
+  found by sweeping each function against each position in R, and refuses the rest, saying why**
+  (design-log §4, the entry beginning "Every layer takes the positions"), by the family of
+  positions its option names (`Options.validate_position/2`'s argument): marks with a width of
+  their own (bars, bins, frequency polygons, error bars, crossbars, tiles, rasters, a summary's
+  bars) take all six; marks with none (points, lines, paths, segments, rugs, text, labels, counts,
+  line and point ranges, ribbons, areas, densities, smooths, hexagons, a summary's other geoms)
+  take `:dodge` only with its `width:` and refuse `:dodge2`, as R warns "Width not defined" and
+  moves none; a box plot and a rectangle refuse stacking and jittering, R failing at a box's
+  missing y and stacking no rectangle, which has no x; a horizontal or vertical line takes only
+  `:identity` and `:nudge`; a diagonal line and an annotation take no `position:`, as R's
+  `geom_abline()` and `annotate()` take none. Each function's default is ggplot2's: stacking for
+  bars, bins, areas and `stat_density/3`, nudging for text and labels, dodging by clusters for box
+  plots, jittering for `geom_jitter/3`, the identity elsewhere. `geom_boxplot/3` with `varwidth:
+  true` records `{:dodge2, preserve: :single}`, keeping the padding and order given, and refuses
+  any other position and `preserve: :total`, where R ignores a name, moves no box of its own width
+  by dodging and drops the total. **Text and labels take `nudge_x:` and `nudge_y:` only beside
+  `:nudge`**, refused beside another position, as R ignores a nudge no position reads.
+  `geom_jitter/3`'s own `width:` and `height:` are recorded as jittering's and refused beside
   `position:`, as ggplot2's `geom_jitter()` refuses both, and it takes no `seed:`, as ggplot2's
   does not (design-log §4, the entry beginning "`geom_jitter` is Phase 3's fourteenth").
-  `geom_rug/3`'s `position:` is `geom_point/3`'s, a jittered rug needing both `:x` and `:y`, as
-  `position_jitter()` does, where it otherwise needs one of them (design-log §4, the entry
-  beginning "`geom_rug()` draws ggplot2's rugs"). The count functions take no position.
+  `geom_rug/3` jittered needs both `:x` and `:y`, as `position_jitter()` does, where it otherwise
+  needs one of them (design-log §4, the entry beginning "`geom_rug()` draws ggplot2's rugs").
 - **An option that sets an aesthetic for every mark (`alpha:`, `colour:`, `fill:`, `linewidth:`)
   is recorded in the layer's `fixed`, by canonical name**, as ggplot2's `aes_params`; every geom
   function takes `alpha:` and `colour:`, the bar, rectangle, ribbon, area, density, smooth,

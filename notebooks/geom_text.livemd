@@ -257,7 +257,29 @@ ggplot(data = df, aes(x, y, group = grp)) +
   geom_text(aes(label = y), position = "dodge")
 ```
 
-Not in Giggly yet: `geom_text()`'s `position` option, here `position = "dodge"`.
+Dodged with no width, the labels are not moved, since text has no width of its own: ggplot2
+warns "Width not defined" and draws them all at the middle of each `x`. Giggly refuses
+`position: :dodge` for marks with no width, saying why, as the cell shows, and the next example
+gives the width.
+
+```elixir
+df = %{
+  "x" => Giggly.Factor.new(["1", "1", "2", "2"]),
+  "y" => [1.0, 3.0, 2.0, 1.0],
+  "grp" => ["a", "b", "a", "b"]
+}
+
+columns =
+  df
+  |> Plot.new(%{x: :x, y: :y, group: :grp})
+  |> Plot.geom_col(%{fill: :grp}, position: :dodge)
+
+try do
+  Plot.geom_text(columns, %{label: :y}, position: :dodge)
+rescue
+  error in NimbleOptions.ValidationError -> error.message
+end
+```
 
 ## Dodging labels by the columns' width
 
@@ -268,9 +290,14 @@ ggplot(data = df, aes(x, y, group = grp)) +
   geom_text(aes(label = y), position = position_dodge(0.9))
 ```
 
-Columns are 0.9 wide by default, so dodging the labels by 0.9 puts each over its column.
+Columns are 0.9 wide by default, so dodging the labels by 0.9 puts each over its column. R's
+`position_dodge(0.9)` is `{:dodge, width: 0.9}`.
 
-Not in Giggly yet: `geom_text()`'s `position` option.
+```elixir
+columns
+|> Plot.geom_text(%{label: :y}, position: {:dodge, width: 0.9})
+|> render.()
+```
 
 ## Labels just above the columns
 
@@ -285,7 +312,17 @@ ggplot(data = df, aes(x, y, group = grp)) +
   )
 ```
 
-Not in Giggly yet: `geom_text()`'s `position` option.
+Each label's `y` is raised by 0.05 and its text set on it, `vjust: 0`, so it stands just above
+its column. Giggly writes `y + 0.05` as `{&Kernel.+/2, [:y, 0.05]}`.
+
+```elixir
+columns
+|> Plot.geom_text(%{label: :y, y: {&Kernel.+/2, [:y, 0.05]}},
+  position: {:dodge, width: 0.9},
+  vjust: 0
+)
+|> render.()
+```
 
 ## Labels in the middle of stacked columns
 

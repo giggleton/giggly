@@ -12350,13 +12350,12 @@ defmodule GigglyTest do
       end
     end
 
-    # Goldens: test/golden/dodge_errorbar.svg, dodge_width.svg, dodge_linerange.svg,
+    # Goldens: test/golden/dodge_errorbar.svg, dodge_width.svg,
     # dodge_linerange_width.svg and dodge_pointrange_flipped.svg, each checked against ggplot2's
     # drawing of the same plot, made by the R script of its name: every element and clip path
     # matches, the x axis drawn before the y as in test/golden/point.svg. Error bars dodged beside
     # dodged columns within their own width and within the columns' 0.9; position_dodge's page's
-    # line ranges, unmoved given no width and on their bars given 0.9; and point ranges across the
-    # panel dodged along y.
+    # line ranges on their bars given 0.9; and point ranges across the panel dodged along y.
     test "dodged ranges are placed as ggplot2 places them" do
       table = %{
         "trt" => Giggly.Factor.new(["1", "1", "2", "2"]),
@@ -12390,7 +12389,6 @@ defmodule GigglyTest do
           filled
           |> Plot.geom_col(position: dodge)
           |> Plot.geom_errorbar(range, position: dodge, width: 0.25),
-        dodge_linerange: Plot.geom_linerange(bars, %{ymin: :lo, ymax: :hi}, position: :dodge),
         dodge_linerange_width:
           Plot.geom_linerange(bars, %{ymin: :lo, ymax: :hi}, position: dodge),
         dodge_pointrange_flipped:
@@ -12399,6 +12397,47 @@ defmodule GigglyTest do
           |> Plot.geom_pointrange(%{xmin: :lower, xmax: :upper},
             position: {:dodge, width: 0.5}
           )
+      ]
+
+      for {name, drawn} <- plots do
+        assert golden?(drawn, Atom.to_string(name)), "#{name} differs from its golden"
+      end
+    end
+
+    # Goldens: test/golden/stack_lines_points.svg, stack_text.svg and dodge_text.svg, each
+    # checked against ggplot2's drawing of the same plot, made by the R script of its name: every
+    # element and clip path matches, the x axis drawn before the y as in test/golden/point.svg.
+    # position_stack's page's lines and points stacked by one group, and its labels stacked over
+    # its areas; geom_text's page's labels dodged within the columns' 0.9.
+    test "points, lines and text are stacked and dodged as ggplot2 moves them" do
+      series = %{
+        "time" => Enum.flat_map([1.0, 2.0, 3.0, 4.0], fn time -> List.duplicate(time, 4) end),
+        "type" => Enum.flat_map(1..4, fn _time -> ["a", "b", "c", "d"] end),
+        "value" => [8, 10, 7, 11, 14, 12, 11, 9, 14, 11, 8, 2, 8, 10, 7, 12]
+      }
+
+      grouped = Plot.new(series, %{x: :time, y: :value, group: :type})
+
+      columns = %{
+        "x" => Giggly.Factor.new(["1", "1", "2", "2"]),
+        "y" => [1.0, 3.0, 2.0, 1.0],
+        "grp" => ["a", "b", "a", "b"]
+      }
+
+      plots = [
+        stack_lines_points:
+          grouped
+          |> Plot.geom_line(%{colour: :type}, position: :stack)
+          |> Plot.geom_point(%{colour: :type}, position: :stack),
+        stack_text:
+          grouped
+          |> Plot.geom_area(%{fill: :type})
+          |> Plot.geom_text(%{label: :type}, position: :stack),
+        dodge_text:
+          columns
+          |> Plot.new(%{x: :x, y: :y, group: :grp})
+          |> Plot.geom_col(%{fill: :grp}, position: :dodge)
+          |> Plot.geom_text(%{label: :y}, position: {:dodge, width: 0.9})
       ]
 
       for {name, drawn} <- plots do

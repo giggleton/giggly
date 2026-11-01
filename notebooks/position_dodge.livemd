@@ -33,8 +33,9 @@ Dodging keeps each mark's vertical position and sets the marks that share an `x`
 each mark by its own extent and leaving a little padding between them, which suits box plots of
 different widths. `width` gives the width to dodge within, for marks narrower than the bars they sit
 beside, and `preserve` keeps either the total width at each position or the width of each mark.
-Giggly dodges bars, histograms and the range geoms as `position_dodge()` does, with
-`position: :dodge` or `{:dodge, width: width}`, and bars, histograms and box plots as
+Giggly dodges any layer as `position_dodge()` does, with `position: :dodge` or `{:dodge, width:
+width}`, marks with no width of their own, such as points, text and line ranges, only within a
+width given, and marks with widths, such as bars, histograms, error bars and box plots, as
 `position_dodge2()` does, with `position: :dodge2` or `{:dodge2, options}` and its `preserve:`,
 `padding:` and `reverse:`, a position's options given in a tuple with its name where ggplot2 calls
 its function. Not in Giggly yet: `position_dodge()`'s `preserve`,
@@ -145,16 +146,19 @@ render.(p)
 p + geom_linerange(aes(ymin = y - 1, ymax = y + 1), position = "dodge")
 ```
 
-With no width to dodge within, the line ranges are not moved apart, and do not sit on their
-columns. Giggly writes `y - 1` as `{&Kernel.-/2, [:y, 1]}` and `y + 1` as
-`{&Kernel.+/2, [:y, 1]}`.
+With no width to dodge within, the line ranges are not moved apart: ggplot2 warns "Width not
+defined" and draws them at the middle of each `x`, off their columns. Giggly refuses
+`position: :dodge` for marks with no width of their own, saying why, as the cell shows. It writes
+`y - 1` as `{&Kernel.-/2, [:y, 1]}` and `y + 1` as `{&Kernel.+/2, [:y, 1]}`.
 
 ```elixir
 range = %{ymin: {&Kernel.-/2, [:y, 1]}, ymax: {&Kernel.+/2, [:y, 1]}}
 
-p
-|> Plot.geom_linerange(range, position: :dodge)
-|> render.()
+try do
+  Plot.geom_linerange(p, range, position: :dodge)
+rescue
+  error in NimbleOptions.ValidationError -> error.message
+end
 ```
 
 ## Giving the width

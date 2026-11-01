@@ -79,6 +79,20 @@ stops the question being reopened from scratch. A new entry is about 150 words: 
 sentence or two of why, and one line per rejected alternative. What a later decision replaces is
 deleted from the entry it was in, never marked superseded; git history keeps every version.
 
+- **Every layer takes the positions that move its marks in ggplot2, and refuses the rest, saying
+  why (2026-11-01, Steve: "B", then "Refuse", "Keep", "Refuse", "Refuse", each call walked with
+  R's output).** An R sweep of every layer function against every position (`layer_data()` and
+  `ggplotGrob()` under `tryCatch`) decides it: where R fails, Giggly refuses with R's reason;
+  where R moves nothing, warning or not, it refuses too — dodging marks with no width of their
+  own without a `width:` ("Width not defined"), dodging them by clusters, stacking a rectangle,
+  which has no x, or a horizontal or vertical line, and any position on a diagonal line, which
+  R's `geom_abline()` does not take; beside `varwidth: true` a box plot takes only dodging by
+  clusters, as R ignores a name there and dodging moves no box of its own width. Where R warns
+  and still moves (a range stacked off zero, each replaced by its stretch of the pile; dodging
+  overlapping x intervals), Giggly moves as R does. *Rejected: each function's list widened to
+  the positions judged sensible* — a guess; R's sweep is not. *Rejected: accepting what R ignores
+  and moving nothing* — a call that silently draws the plot without the position asked for.
+
 - **A position is an option value, `position: :name | {:name, options}`, and no function builds
   one (2026-11-01, Steve: "Sounds good").** R's `position = "fill"` is `:fill`, and
   `position_dodge(width = 0.9)` is `{:dodge, width: 0.9}`; a name alone is the position with no
@@ -631,8 +645,8 @@ deleted from the entry it was in, never marked superseded; git history keeps eve
   *Rejected: placing two points and extending them in the panel*: affine only, and not R's
   arithmetic. *Rejected: one layer kind for both forms*: the argument form's mapping would title
   the axis "yintercept". *Rejected: `annotation: true` for the mapped form*: it loses its legend.
-  *Left out*: `position:` (in R only nudging moves a line, to a value one could write),
-  `arrow:`, which R ignores, `size:`, `show.legend`, `na.rm`; `annotate(:hline)` is refused,
+  *Left out*: `arrow:`, which R ignores, `size:`, `show.legend`, `na.rm`; `annotate(:hline)` is
+  refused,
   naming the function, as R warns.
 
 - **`annotate(:label)` counts a padding as one value, and sets a label's part colours once
@@ -1091,14 +1105,14 @@ deleted from the entry it was in, never marked superseded; git history keeps eve
   `geom_jitter/3` takes a point's options with `width:` and `height:` or `position:`, refused
   together as R refuses them, and no `seed:`, as R's takes none;
   jittering takes `width:`, `height:` (0 or more, where R moves nothing for a negative) and
-  `seed:`; `geom_point/3`'s `position:` is `:identity` or `:jitter`, alone or with them. An amount
+  `seed:`. An amount
   not given is 0.4 of each panel's spacing, as R's. A plot given no seed draws from seed 0
   (Steve: "A"): the same points on every render, and layers of the same rows jitter alike, the
   point-and-label case R needs a seed for. *Rejected: the layer's index as the default seed* —
   layers would differ as R's do, but adding a layer underneath would move every point. *Rejected:
   `Nx.Random`* — jitter is noise, not an analysis result, and Nx would put `Giggly.Tensor` in
   `Position`'s deps. *Deferred:* `position_jitterdodge()`, with dodging's `width:`
-  for marks without edges (Steve); jitter on other geoms.
+  for marks without edges (Steve).
 
 - **A jitter's distances are Erlang's random numbers, and a drawing is checked by R drawing them
   (2026-10-26, Steve, agreeing the proposal).** R's come from its own generator and seeding,
@@ -2009,17 +2023,17 @@ deleted from the entry it was in, never marked superseded; git history keeps eve
   The cost, accepted: a plot weighting a bar layer through its own mapping holds no boxes until
   the weight moves to that layer, where R would have weighed the boxes too.
 
-- **A box layer dodges by clusters unless told otherwise, and `varwidth:` switches its dodging to
-  `preserve: :single` silently (2026-10-22, Steve, scoping distributions' step 6).**
-  `geom_boxplot/3` takes `position:` `:dodge2`, its default, alone or with its options, or
-  `:dodge`; `:stack` is refused, as R fails stacking boxes ("replacement has 0 rows"), and
-  `:identity` waits, as it does for bars. With `varwidth: true`, either name records
-  `{:dodge2, preserve: :single}`, as R replaces any position string, `"identity"` included, and
-  dodging by clusters with options records `preserve: :single` with its `padding` and `reverse`
-  kept, where R warns "Can't preserve total widths when `varwidth = TRUE`" and switches, so every
-  call draws what R draws. *Rejected: raising for dodging by clusters with options* — it records
-  `:total` unless told otherwise, as R's does, so it would refuse the default, a setting nobody
-  wrote, where R only warns.
+- **A box layer dodges by clusters unless told otherwise, and beside `varwidth:` by clusters
+  alone, at `preserve: :single` (2026-10-22, Steve, scoping distributions' step 6; 2026-11-01,
+  Steve: "Refuse", the positions sweep).** `geom_boxplot/3`'s `position:` is `:dodge2` unless
+  given; `:stack` is refused, as R fails stacking boxes ("replacement has 0 rows"). With
+  `varwidth: true`, `:dodge2` records `{:dodge2, preserve: :single}`, and dodging by clusters with
+  options records `preserve: :single` with its `padding` and `reverse` kept, where R warns "Can't
+  preserve total widths when `varwidth = TRUE`" and switches; any other position is refused, as R
+  replaces a position string, `"identity"` included, and dodging moves no box of its own width,
+  and so is `preserve: :total` written out, which R drops. *Rejected: raising for dodging by
+  clusters with options* — it records `:total` unless told otherwise, as R's does, so it would
+  refuse the default, a setting nobody wrote, where R only warns.
 
 - **A box plot's orientation is R's, an ambiguous one chosen silently, and a contrary
   `orientation:` raises where one axis is mapped (2026-10-22, Steve, scoping distributions' step
@@ -3875,6 +3889,9 @@ tells the story (`git show <hash>`). Until 2026-10-15 each milestone also had a 
 `git log -S "<title>" -- notes/design-log.md` finds it in this file's history. The phases are
 §1's roadmap.
 
+- 2026-11-01 — Give every layer function the positions that move its marks in ggplot2, refusing
+  the rest with R's reason (positions, step 2); §4: "Every layer takes the positions", "A box
+  layer dodges by clusters"
 - 2026-11-01 — Give a layer's position as an option value, :name or {:name, options}, and remove
   the position functions (positions, step 1); §4: "A position is an option value"
 - 2026-11-01 — Draw the notebook examples the summaries unlock, and narrow every verdict to what
