@@ -3,7 +3,9 @@ defmodule Scales.Transform do
   The transformation a continuous scale puts its values through before it trains on them, named
   by a value (`t:name/0`): values into transformed space (`transform/2`) and back
   (`inverse/2`), and an axis's default breaks (`breaks/3`), minor breaks (`minor_breaks/3`) and
-  labels (`format/3`) there, as R's transformation objects carry them.
+  labels (`format/3`) there, as R's transformation objects carry them; for a transformation of
+  numbers, also the derivatives both ways (`derivative/2`, `inverse_derivative/2`) and the range
+  data takes in transformed space (`trim_to_domain/2`).
 
   Breaks are found as on an axis showing an extent in transformed space: the extent is squished
   into the transformation's domain (`squish/2`), turned back into data units and broken there,
@@ -14,8 +16,8 @@ defmodule Scales.Transform do
   also lays breaks a calendar or clock step apart (`width/3`).
 
   A value the transformation cannot place, below log10's or the square root's domain, becomes
-  `nil`, as R's `NaN` is missing; a value placed at an infinity is `:infinity` or
-  `:neg_infinity`, and a missing one stays `nil`.
+  `:nan`, R's `NaN`; a value placed at an infinity is `:infinity` or `:neg_infinity`, and a
+  missing one stays `nil`.
   """
 
   # The transformation a continuous scale puts its values through before it trains on them: R's
@@ -24,7 +26,9 @@ defmodule Scales.Transform do
   #
   # A transformation carries what R's object carries and a scale reads: the transformation and its
   # inverse, its domain, and its axis's default breaks, minor breaks and labels (R's `breaks`,
-  # `minor_breaks` and `format`): a log axis wants powers of ten, a date axis calendar dates.
+  # `minor_breaks` and `format`): a log axis wants powers of ten, a date axis calendar dates. One
+  # of numbers carries its derivatives too (R's `d_transform` and `d_inverse`), which the date,
+  # date-time and time transformations have none of, as R's have none.
   #
   # Each is a module implementing this behaviour: the identity (`Transform.Identity`), which a
   # continuous scale of numbers records, as ggplot2's continuous scales default to
@@ -44,7 +48,7 @@ defmodule Scales.Transform do
   # `format/2` is handed both, or `:given` for breaks it did not choose, which a date writes in
   # full.
 
-  alias Scales.Transform
+  alias Scales.{Bounds, Double, Transform}
 
   @breaks_options NimbleOptions.new!(
                     n: [
@@ -76,11 +80,12 @@ defmodule Scales.Transform do
           | :reverse
           | :reciprocal
 
-  @typedoc "The low end of a domain: a number, or none."
-  @type domain_low :: number() | :neg_infinity
+  # A transformation the date, date-time and time transformations are not, whose data are numbers.
+  defguardp is_temporal(name)
+            when name in [:date, :time] or (is_tuple(name) and elem(name, 0) == :datetime)
 
-  # The values in transformed space: a number, `nil`, `:infinity` or `:neg_infinity` each, a value
-  # outside the domain `nil`, as R's NaN is missing.
+  # The values in transformed space: a number, `nil`, `:infinity`, `:neg_infinity` or `:nan` each,
+  # a value outside the domain `:nan`, R's NaN.
   @doc false
   @callback transform(transformation :: name(), values :: list()) :: list()
 
@@ -88,10 +93,10 @@ defmodule Scales.Transform do
   @doc false
   @callback inverse(transformation :: name(), positions :: [number()]) :: list()
 
-  # The domain in transformed space, R's `transform(domain)` sorted, which an extent is squished
-  # into before its breaks are found.
+  # The domain in data units, R's `domain`: `{:neg_infinity, :infinity}` for one that bounds
+  # nothing, every date for the date transformation.
   @doc false
-  @callback domain(transformation :: name()) :: {domain_low(), :infinity}
+  @callback domain(transformation :: name()) :: Scales.Bounds.range()
 
   # The breaks of an axis showing `extent`, in transformed space, in the transformation's order;
   # some may fall outside it. `options` are `breaks/3`'s, validated, and always `[]` for the time
@@ -108,6 +113,19 @@ defmodule Scales.Transform do
               breaks :: [float()],
               extent :: {float(), float()}
             ) :: [float()]
+
+  # The derivative of the transformation at each value, and of its inverse at each position, R's
+  # `d_transform` and `d_inverse`, each a double (`t:Scales.double/0`) taken as R's arithmetic
+  # takes it. A transformation of numbers alone has them.
+  @doc false
+  @callback derivative(transformation :: name(), values :: [Scales.double()]) ::
+              [Scales.double()]
+
+  @doc false
+  @callback inverse_derivative(transformation :: name(), positions :: [Scales.double()]) ::
+              [Scales.double()]
+
+  @optional_callbacks derivative: 2, inverse_derivative: 2
 
   # Each break's label, in the order given: the transformation's own breaks on an axis showing
   # `extent`, found with `options`, `breaks/3`'s, validated, or, for `:given`, breaks a plot gave
@@ -126,7 +144,7 @@ defmodule Scales.Transform do
   ## Examples
 
       iex> Scales.Transform.transform(:log10, [1, 10, 100, 0, -1, nil])
-      [0.0, 1.0, 2.0, :neg_infinity, nil, nil]
+      [0.0, 1.0, 2.0, :neg_infinity, :nan, nil]
 
       iex> Scales.Transform.transform(:date, [~D[1970-01-11], nil])
       [10.0, nil]
@@ -145,12 +163,14 @@ defmodule Scales.Transform do
   @spec inverse(name(), [number()]) :: list()
   def inverse(name, positions), do: module(name).inverse(name, positions)
 
-  # As ggplot2's `get_breaks()` squishes its limits with `oob_squish()` before finding breaks. No
-  # domain has an upper end yet.
+  # As ggplot2's `get_breaks()` squishes its limits with `oob_squish()` into the domain
+  # transformed. A domain that bounds nothing squishes nothing: transformed, its ends are the
+  # infinities or, the reciprocal's, two zeros, a domain of no width, which R leaves unsquished.
+  # Every transformation with a bounded domain rises, so its transformed ends need no sorting.
   @doc """
   The extent `{low, high}`, in transformed space, squished into the domain of the transformation
-  `name`: each end below the domain moved up to it, as R's `oob_squish()` moves it, so log10's
-  breaks are not sought below `-100`.
+  `name`, transformed: each end outside it moved onto it, as R's `oob_squish()` moves it, so
+  log10's breaks are not sought below `-100`.
 
   ## Examples
 
@@ -158,10 +178,94 @@ defmodule Scales.Transform do
       {-100.0, 2.0}
   """
   @spec squish(name(), {float(), float()}) :: {float(), float()}
-  def squish(name, {low, high}) do
-    {domain_low, :infinity} = module(name).domain(name)
-    {squished(low, domain_low), squished(high, domain_low)}
+  def squish(name, extent) do
+    case module(name).domain(name) do
+      {:neg_infinity, :infinity} -> extent
+      domain -> squished(extent, transform(name, Tuple.to_list(domain)))
+    end
   end
+
+  defp squished({low, high}, [domain_low, domain_high]) do
+    [squished_low, squished_high] = Bounds.squish([low, high], {domain_low, domain_high})
+    {squished_low, squished_high}
+  end
+
+  @doc """
+  The range `values` take in transformed space under the transformation `name`, R's
+  `trim_to_domain()`: their range, `nil` and `:nan` left out, squished into the domain and its
+  ends transformed, as `{low, high}`; `:none` with no value to range over, where R warns. Only a
+  transformation of numbers takes one: a date's, date-time's or time's raises
+  `FunctionClauseError`.
+
+  The range is taken before the transformation, so the reciprocal of a range across zero is the
+  reciprocals of its ends, and an infinity is kept, not squished, so one outside the domain
+  transforms to `:nan`, which makes both ends `:nan`, as R's `range()` makes them.
+
+  ## Examples
+
+      iex> Scales.Transform.trim_to_domain(:log10, [-5, 0, 10, 1000, nil])
+      {-100.0, 3.0}
+
+      iex> Scales.Transform.trim_to_domain(:reciprocal, [-5, 0, 10, 1000])
+      {-0.2, 0.001}
+
+      iex> Scales.Transform.trim_to_domain(:log10, [:neg_infinity, 5])
+      {:nan, :nan}
+
+      iex> Scales.Transform.trim_to_domain(:sqrt, [nil, :nan])
+      :none
+  """
+  @spec trim_to_domain(name(), [Scales.double()]) :: {Scales.double(), Scales.double()} | :none
+  def trim_to_domain(name, values) when not is_temporal(name) do
+    case Enum.reduce(values, :none, &widened/2) do
+      :none -> :none
+      {low, high} -> trimmed(name, [low, high])
+    end
+  end
+
+  # A range widened to cover a value, R's `range(na.rm = TRUE)`: each end kept where the value
+  # is not beyond it, so of `-0.0` and `0.0` the first is both ends, as R's.
+  defp widened(value, range) when value in [nil, :nan], do: range
+  defp widened(value, :none), do: {value, value}
+
+  defp widened(value, {low, high}),
+    do: {Double.minimum(low, value), Double.maximum(high, value)}
+
+  defp trimmed(name, ends) do
+    [first, last] = transform(name, Bounds.squish(ends, module(name).domain(name)))
+    {Double.minimum(first, last), Double.maximum(first, last)}
+  end
+
+  @doc """
+  The derivative of the transformation `name` at each of `values`, R's `d_transform`, each a
+  double (`t:Scales.double/0`), its infinities and NaN as R's arithmetic gives them. Only a
+  transformation of numbers has one: a date's, date-time's or time's raises
+  `FunctionClauseError`.
+
+  ## Examples
+
+      iex> Scales.Transform.derivative(:sqrt, [0.25, 0, -1, nil])
+      [1.0, :infinity, :nan, nil]
+
+      iex> Scales.Transform.derivative(:identity, [3, nil])
+      [1.0, 1.0]
+  """
+  @spec derivative(name(), [Scales.double()]) :: [Scales.double()]
+  def derivative(name, values) when not is_temporal(name),
+    do: module(name).derivative(name, values)
+
+  @doc """
+  The derivative of the inverse of the transformation `name` at each of `positions`, in
+  transformed space, R's `d_inverse`, as `derivative/2` gives the transformation's.
+
+  ## Examples
+
+      iex> Scales.Transform.inverse_derivative(:sqrt, [0.5, -2, :infinity])
+      [1.0, -4.0, :infinity]
+  """
+  @spec inverse_derivative(name(), [Scales.double()]) :: [Scales.double()]
+  def inverse_derivative(name, positions) when not is_temporal(name),
+    do: module(name).inverse_derivative(name, positions)
 
   @doc """
   The default breaks, in transformed space, of an axis showing `extent` under the transformation
@@ -294,7 +398,4 @@ defmodule Scales.Transform do
   defp module(:sqrt), do: Transform.Sqrt
   defp module(:reverse), do: Transform.Reverse
   defp module(:reciprocal), do: Transform.Reciprocal
-
-  defp squished(value, low) when is_number(low) and value < low, do: low / 1
-  defp squished(value, _low), do: value
 end

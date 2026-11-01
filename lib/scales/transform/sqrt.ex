@@ -3,19 +3,19 @@ defmodule Scales.Transform.Sqrt do
 
   # The square root, R's `transform_sqrt()`. Use it through `Scales.Transform`.
   #
-  # A number from zero up becomes its square root, a negative one missing, R's NaN; plus infinity
-  # stays itself. Turned back, a position is squared; R's inverse makes one below zero missing,
-  # `ifelse(x < 0, NA, x^2)`, but the domain, zero up, squishes an extent's ends there before
-  # breaks are found, and no break falls below it, so none reaches the inverse here. Its breaks are
+  # A number from zero up becomes its square root, `-0.0`'s `-0.0`, and a negative one or minus
+  # infinity NaN, as R's; plus infinity and NaN stay themselves. Turned back, a position is
+  # squared, one below zero missing, as R's `ifelse(x < 0, NA, x^2)`. Its derivatives are R's,
+  # `0.5 / sqrt(x)` and `2 * x`, in R's IEEE arithmetic (`Scales.Double`). Its breaks are
   # extended Wilkinson's on the range in data units, its minor breaks R's regular ones in
   # square-root space, and its labels the breaks in data units, plain decimals.
 
   @behaviour Scales.Transform
 
-  alias Scales.{Breaks, Labels, MinorBreaks}
+  alias Scales.{Breaks, Double, Labels, MinorBreaks}
 
   @impl Scales.Transform
-  def transform(_transformation, values), do: Enum.map(values, &root/1)
+  def transform(_transformation, values), do: Enum.map(values, &Double.square_root/1)
 
   @impl Scales.Transform
   def inverse(_transformation, positions), do: Enum.map(positions, &squared/1)
@@ -24,12 +24,28 @@ defmodule Scales.Transform.Sqrt do
   def domain(_transformation), do: {0.0, :infinity}
 
   @impl Scales.Transform
+  def derivative(_transformation, values) do
+    Enum.map(values, fn
+      nil -> nil
+      value -> Double.divide(0.5, Double.square_root(value))
+    end)
+  end
+
+  @impl Scales.Transform
+  def inverse_derivative(_transformation, positions) do
+    Enum.map(positions, fn
+      nil -> nil
+      position -> Double.multiply(2.0, position)
+    end)
+  end
+
+  @impl Scales.Transform
   def breaks(_transformation, {low, high}, options) do
     [low, high]
     |> Enum.map(&squared/1)
     |> Enum.min_max()
     |> Breaks.extended(options)
-    |> Enum.map(&root/1)
+    |> Enum.map(&Double.square_root/1)
   end
 
   @impl Scales.Transform
@@ -42,9 +58,6 @@ defmodule Scales.Transform.Sqrt do
     |> Labels.plain()
   end
 
-  defp root(value) when is_number(value) and value >= 0, do: :math.sqrt(value)
-  defp root(:infinity), do: :infinity
-  defp root(_negative_or_missing), do: nil
-
-  defp squared(position), do: position * position
+  defp squared(position) when position < 0, do: nil
+  defp squared(position), do: Double.multiply(position, position)
 end

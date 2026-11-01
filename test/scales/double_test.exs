@@ -107,7 +107,21 @@ defmodule Scales.DoubleTest do
     end
   end
 
-  describe "maximum/2 and mean/2" do
+  describe "minimum/2, maximum/2 and mean/2" do
+    # R's `min(NaN, 1)` and `min(1, NaN)` are NaN, `min(-Inf, 1)` `-Inf` and `min(Inf, 1)` 1.
+    test "the smaller of two, NaN where either is" do
+      assert {Double.minimum(:nan, 1), Double.minimum(1, :nan), Double.minimum(:neg_infinity, 1),
+              Double.minimum(:infinity, 1), Double.minimum(1, 2)} ===
+               {:nan, :nan, :neg_infinity, 1, 1}
+    end
+
+    # R's `1 / min(-0, 0)` and `1 / max(-0, 0)` are `-Inf`, `1 / min(0, -0)` and `1 / max(0, -0)`
+    # `Inf`: of two equals, the first.
+    test "of two equals, the first, so a zero's sign is the first's" do
+      assert {Double.minimum(-0.0, 0.0), Double.maximum(-0.0, 0.0), Double.minimum(0.0, -0.0),
+              Double.maximum(0.0, -0.0)} === {-0.0, -0.0, 0.0, 0.0}
+    end
+
     # R's `max(NaN, 1)` and `max(1, NaN)` are NaN, `max(-Inf, 1)` 1 and `max(Inf, 1)` `Inf`.
     test "the larger of two, NaN where either is" do
       assert {Double.maximum(:nan, 1), Double.maximum(1, :nan), Double.maximum(:neg_infinity, 1),

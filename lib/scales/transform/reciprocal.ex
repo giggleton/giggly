@@ -4,15 +4,17 @@ defmodule Scales.Transform.Reciprocal do
   # The reciprocal, R's `transform_reciprocal()`: one over each value, both ways. Use it through
   # `Scales.Transform`.
   #
-  # Zero becomes plus infinity, as R's `1/0` is `Inf`, and either infinity zero. Its domain is
-  # every number, which R's transformed domain, zero wide, leaves unsquished. Its breaks are
+  # One over each value in R's IEEE arithmetic (`Scales.Double`): zero becomes plus infinity and
+  # `-0.0` minus infinity, as R's `1/0` is `Inf` and `1/-0` `-Inf`, and each infinity a zero of its
+  # sign. Its domain is every number, which R's transformed domain, zero wide, leaves unsquished.
+  # Its derivatives, both ways, are R's `-1 / x^2`. Its breaks are
   # extended Wilkinson's on the range in data units, a reciprocal's positions falling as they
   # rise; its minor breaks are R's regular ones on the breaks in that order, and its labels the
   # breaks in data units, plain decimals.
 
   @behaviour Scales.Transform
 
-  alias Scales.{Breaks, Labels, MinorBreaks}
+  alias Scales.{Breaks, Double, Labels, MinorBreaks}
 
   @impl Scales.Transform
   def transform(_transformation, values), do: Enum.map(values, &reciprocal/1)
@@ -22,6 +24,17 @@ defmodule Scales.Transform.Reciprocal do
 
   @impl Scales.Transform
   def domain(_transformation), do: {:neg_infinity, :infinity}
+
+  @impl Scales.Transform
+  def derivative(_transformation, values) do
+    Enum.map(values, fn
+      nil -> nil
+      value -> Double.divide(-1.0, Double.multiply(value, value))
+    end)
+  end
+
+  @impl Scales.Transform
+  def inverse_derivative(transformation, positions), do: derivative(transformation, positions)
 
   @impl Scales.Transform
   def breaks(_transformation, {low, high}, options) do
@@ -43,8 +56,6 @@ defmodule Scales.Transform.Reciprocal do
     |> Labels.plain()
   end
 
-  defp reciprocal(value) when is_number(value) and value == 0, do: :infinity
-  defp reciprocal(value) when is_number(value), do: 1 / value
-  defp reciprocal(infinity) when infinity in [:infinity, :neg_infinity], do: 0.0
-  defp reciprocal(_missing), do: nil
+  defp reciprocal(nil), do: nil
+  defp reciprocal(value), do: Double.divide(1.0, value)
 end

@@ -112,8 +112,7 @@ R's regular ones: the entry beginning "The panel's grid lines are placed by the 
   infinities** (`t:Scales.double/0`; design-log §4, the entry beginning "A NaN is `:nan`"), and
   **`Scales.Double` is the one home of R's IEEE arithmetic on them**, an infinity past the largest
   double, NaN for 0/0, Inf − Inf and Inf × 0, a zero's sign read from its bit; its operators take
-  no `nil`, which their callers set aside first. Its tests pin R's answers. A transformation
-  still gives `nil` where R gives NaN.
+  no `nil`, which their callers set aside first. Its tests pin R's answers.
 - **The rescaling functions are R's `rescale()`, `rescale_mid()` and `rescale_max()` to the last
   digit** (`Scales.Bounds`), on lists as R's are on vectors, a `nil` in giving `nil` out, as R's
   `NA`, and NaN `:nan`, given or worked out; a value, an end or a midpoint may be an infinity,
@@ -155,12 +154,20 @@ R's regular ones: the entry beginning "The panel's grid lines are placed by the 
   the breaks outside it are dropped. Breaks the transformation did not choose, given or laid by a
   width, are handed `:given` instead of the extent, and a date writes them in full, `2026-09-21`,
   as R's `format()` writes a date its pretty breaks did not name. **Breaks follow ggplot2's `get_breaks()`**: the extent
-  squished into the transformed domain (log10 from -100, sqrt from 0), turned back into data
+  squished into the domain transformed, at both ends (log10 from -100, sqrt from 0), a domain
+  that bounds nothing squishing nothing, turned back into data
   units, broken there, and transformed back, **in the order that leaves them**, so reverse's and
   reciprocal's descend, as R draws them; labels are written, and a labels function handed, the
-  breaks turned back, as R turns them (`10^x`, `x * x`). **A value outside the domain is R's**:
-  log10 places 0 at minus infinity, at the panel's edge, and a negative value, as sqrt does, at
-  `nil`, R's NaN; reverse swaps the infinities, reciprocal places 0 at plus infinity.
+  breaks turned back, as R turns them (`10^x`, `x * x`). **A domain is held in data units, as
+  R's `domain`** (log10's from 1e-100). **A value outside the domain is R's**: log10 places 0 at
+  minus infinity, at the panel's edge, and a negative value, as sqrt does, at `:nan`; reverse
+  swaps the infinities, reciprocal places 0 and `-0.0` at the infinities of their signs, each
+  through `Scales.Double` where R's IEEE arithmetic decides. **A transformation of numbers has
+  R's derivatives both ways and `trim_to_domain/2`** (R's `d_transform`, `d_inverse` and
+  `trim_to_domain()`), every double R's, its tests R's golden over the infinities, both zeros,
+  `nil` and NaN; a date's, date-time's or time's has neither and raises, as R's has no
+  derivatives and takes numbers. `trim_to_domain/2` gives `:none` with nothing to range over,
+  where R warns at an empty `range()` (design-log §4, the entry beginning "A transformation gives R's doubles").
 - **log10's breaks are `Breaks.log/2`'s, five wanted unless `n:` says, in base 10**
   (`Transform.Log10`), on the extent turned back into data units, put back into log space; its
   test pins R's own axis, labels and minor breaks, for each of `breaks_log()`'s branches, and

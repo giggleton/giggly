@@ -123,6 +123,19 @@ deleted from the entry it was in, never marked superseded; git history keeps eve
   package holds two rules. *Rejected: R's `discard()` with an `NA` end*: every value the other end
   keeps comes back `NA`, from R's logical indexing, no rule a caller can use.
 
+- **A transformation gives R's doubles: NaN `:nan`, its derivatives R's at `nil` too, and
+  `trim_to_domain/2` of nothing `:none` (2026-11-01, Steve: "A", "A", "A", increment 4's step 2;
+  checked against scales 1.4.0).** A value outside the domain transforms to `:nan`, R's NaN, and a
+  missing one stays `nil`, as `Scales.Bounds` holds them; Giggly's scales already send either to
+  `na_value`. The identity's and reverse's derivatives are R's `rep(1, length(x))` and `-1`
+  everywhere, `nil` and `:nan` included. `trim_to_domain/2` follows R (range, squish, ends
+  transformed) but gives `:none` with no value to range over. *Rejected: NaN `nil`*: R's two
+  answers made one, the package's rule split between Bounds and Transform. *Rejected: `nil` at
+  `nil` for the identity's derivatives*: a departure for a value nothing reads differently.
+  *Rejected: refusing no values*: every caller would check for empty data first. *Rejected: R's
+  transformed `Inf` and `-Inf`*: R's own warning says they mean nothing, and silently they would
+  read as a range.
+
 - **`transform:` reaches the continuous non-position scales; binned ones wait (2026-11-01, Steve:
   "B", "We don't want to be releasing scales every time we release giggly"; checked against
   ggplot2 4.0.3).** As R's, every continuous colour, fill, alpha, size, radius and line-width
@@ -2275,8 +2288,9 @@ deleted from the entry it was in, never marked superseded; git history keeps eve
   given in data units and transformed, limits then sorted, as ggplot2 sorts them, so a scale
   function takes either order, and `xlim/3`, `ylim/3` and `lims/2` reverse an axis given high to
   low, as ggplot2's `limits()` does. A value outside the domain is R's: `log10(0)` is minus
-  infinity, at the panel's edge, a NaN missing. *Rejected: refusing high-to-low limits on a
-  scale function*: the order means nothing once transformed (`scale_x_reverse` takes both).
+  infinity, at the panel's edge, a NaN, which the scale maps missing. *Rejected: refusing
+  high-to-low limits on a scale function*: the order means nothing once transformed
+  (`scale_x_reverse` takes both).
 
 - **`Scales.Labels`'s `comma/2`, `percent/2` and `currency/2` take every option of scales
   1.4.0's `label_comma()`, `label_percent()` and `label_currency()` (2026-10-18, Steve).**

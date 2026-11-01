@@ -95,7 +95,16 @@ defmodule Scales.Double do
   def absolute(value) when value in @infinities, do: :infinity
   def absolute(value), do: abs(value)
 
-  # The larger of two, R's `max()` on a pair: NaN where either is.
+  # The smaller of two, R's `min()` on a pair: NaN where either is, and `left` where neither is
+  # below the other, so the smaller of `-0.0` and `0.0` is whichever comes first, as R's is.
+  @doc false
+  @spec minimum(operand(), operand()) :: operand()
+  def minimum(:nan, _right), do: :nan
+  def minimum(_left, :nan), do: :nan
+  def minimum(left, right), do: if(less?(right, left), do: right, else: left)
+
+  # The larger of two, R's `max()` on a pair: NaN where either is, and `left` where neither is
+  # above the other.
   @doc false
   @spec maximum(operand(), operand()) :: operand()
   def maximum(:nan, _right), do: :nan

@@ -184,11 +184,11 @@ defmodule Scales.TransformTest do
       end
     end
 
-    test "places zero at minus infinity and a negative value nowhere" do
+    test "places zero at minus infinity and a negative value at NaN" do
       # data.frame(y = c(0, 10, 100)) with scale_y_log10(): layer_data()'s y is -Inf, 1, 2;
-      # log10(-1) is NaN, missing
+      # log10(-1) is NaN
       assert Transform.transform(:log10, [0, -1, 10, :infinity, nil]) ==
-               [:neg_infinity, nil, 1.0, :infinity, nil]
+               [:neg_infinity, :nan, 1.0, :infinity, nil]
     end
   end
 
@@ -243,13 +243,9 @@ defmodule Scales.TransformTest do
                 ], [0.25, 0.60355339059327373, 0.78656609248549314, 0.9330127018922193]}
     end
 
-    test "places a negative value nowhere" do
-      # data.frame(y = c(-1, 4, 9)) with scale_y_sqrt(): layer_data()'s y is NA, 2, 3
-      assert Transform.transform(:sqrt, [-1, 4, 9, :infinity]) == [nil, 2.0, 3.0, :infinity]
-    end
-
-    test "turns a position back by squaring it" do
-      assert Transform.inverse(:sqrt, [3.0, 0.5]) === [9.0, 0.25]
+    # transform_sqrt()$inverse(c(3, 0.5, -0, -1)) is 9, 0.25, 0, NA
+    test "turns a position back by squaring it, one below zero missing" do
+      assert Transform.inverse(:sqrt, [3.0, 0.5, -0.0, -1.0]) === [9.0, 0.25, 0.0, nil]
     end
   end
 
@@ -258,11 +254,6 @@ defmodule Scales.TransformTest do
       # ggplot(mpg, aes(displ, hwy)) + geom_point() + scale_y_reverse()
       assert axis(:reverse, {-45.6, -10.4}) ==
                {[{-20.0, "20"}, {-30.0, "30"}, {-40.0, "40"}], [-15.0, -25.0, -35.0, -45.0]}
-    end
-
-    test "swaps the infinities" do
-      assert Transform.transform(:reverse, [:infinity, :neg_infinity, 2, nil]) ==
-               [:neg_infinity, :infinity, -2, nil]
     end
 
     test "turns a position back by negating it" do
@@ -285,9 +276,10 @@ defmodule Scales.TransformTest do
                 ]}
     end
 
-    test "places zero at plus infinity, either infinity at zero, and a missing value nowhere" do
-      assert Transform.transform(:reciprocal, [0, 4, :infinity, :neg_infinity, nil]) ==
-               [:infinity, 0.25, 0.0, 0.0, nil]
+    # 1 / c(0, -0, 4, Inf, -Inf, NA): Inf, -Inf, 0.25, 0, -0, NA
+    test "places zero at plus infinity, -0.0 at minus, each infinity at its zero, missing nowhere" do
+      assert Transform.transform(:reciprocal, [0, -0.0, 4, :infinity, :neg_infinity, nil]) ===
+               [:infinity, :neg_infinity, 0.25, 0.0, -0.0, nil]
     end
 
     test "turns a position back as it placed it" do
@@ -299,6 +291,187 @@ defmodule Scales.TransformTest do
       # scales::transform_reciprocal(), expand = c(0, 0)): R's extended breaks on the one finite
       # end, 4, give it five times
       assert axis(:reciprocal, {0.0, 0.25}) == {List.duplicate({0.25, "4"}, 5), []}
+    end
+  end
+
+  describe "R's doubles" do
+    # Golden: each transformation's `transform`, `d_transform` and `d_inverse` of these values in
+    # R (`inc4/step2/probe.R`), a zero's sign read as `1 / x`.
+    @doubles [:neg_infinity, -2.0, -0.0, 0.0, 0.5, 2.0, :infinity, nil, :nan]
+
+    test "the identity keeps each, its derivatives 1 everywhere" do
+      ones = List.duplicate(1.0, 9)
+
+      assert {Transform.transform(:identity, @doubles), Transform.derivative(:identity, @doubles),
+              Transform.inverse_derivative(:identity, @doubles)} === {@doubles, ones, ones}
+    end
+
+    test "log10's, NaN below zero" do
+      assert Transform.transform(:log10, @doubles) ===
+               [
+                 :nan,
+                 :nan,
+                 :neg_infinity,
+                 :neg_infinity,
+                 -0.3010299956639812,
+                 0.3010299956639812,
+                 :infinity,
+                 nil,
+                 :nan
+               ]
+
+      assert Transform.derivative(:log10, @doubles) ===
+               [
+                 -0.0,
+                 -0.21714724095162588,
+                 :neg_infinity,
+                 :infinity,
+                 0.86858896380650352,
+                 0.21714724095162588,
+                 0.0,
+                 nil,
+                 :nan
+               ]
+
+      assert Transform.inverse_derivative(:log10, @doubles) ===
+               [
+                 0.0,
+                 0.023025850929940458,
+                 2.3025850929940459,
+                 2.3025850929940459,
+                 7.2814134002118021,
+                 230.25850929940458,
+                 :infinity,
+                 nil,
+                 :nan
+               ]
+    end
+
+    # 10^400 * log(10) is Inf
+    test "log10's inverse derivative past the largest double is plus infinity" do
+      assert Transform.inverse_derivative(:log10, [400.0]) === [:infinity]
+    end
+
+    test "the square root's, NaN below zero and -0.0's its own" do
+      assert Transform.transform(:sqrt, @doubles) ===
+               [
+                 :nan,
+                 :nan,
+                 -0.0,
+                 0.0,
+                 0.70710678118654757,
+                 1.4142135623730951,
+                 :infinity,
+                 nil,
+                 :nan
+               ]
+
+      assert Transform.derivative(:sqrt, @doubles) ===
+               [
+                 :nan,
+                 :nan,
+                 :neg_infinity,
+                 :infinity,
+                 0.70710678118654746,
+                 0.35355339059327373,
+                 0.0,
+                 nil,
+                 :nan
+               ]
+
+      assert Transform.inverse_derivative(:sqrt, @doubles) ===
+               [:neg_infinity, -4.0, -0.0, 0.0, 1.0, 4.0, :infinity, nil, :nan]
+    end
+
+    test "the reversal's, its derivatives -1 everywhere" do
+      minus_ones = List.duplicate(-1.0, 9)
+
+      assert {Transform.transform(:reverse, @doubles), Transform.derivative(:reverse, @doubles),
+              Transform.inverse_derivative(:reverse, @doubles)} ===
+               {[:infinity, 2.0, 0.0, -0.0, -0.5, -2.0, :neg_infinity, nil, :nan], minus_ones,
+                minus_ones}
+    end
+
+    test "the reciprocal's, each zero to the infinity of its sign" do
+      derivatives = [-0.0, -0.25, :neg_infinity, :neg_infinity, -4.0, -0.25, -0.0, nil, :nan]
+
+      assert {Transform.transform(:reciprocal, @doubles),
+              Transform.derivative(:reciprocal, @doubles),
+              Transform.inverse_derivative(:reciprocal, @doubles)} ===
+               {[-0.0, -0.5, :neg_infinity, :infinity, 2.0, 0.5, 0.0, nil, :nan], derivatives,
+                derivatives}
+    end
+
+    test "a date, date-time or time transformation has no derivatives" do
+      for name <- [:date, :time, {:datetime, "UTC", Calendar.UTCOnlyTimeZoneDatabase}] do
+        assert_raise FunctionClauseError, fn -> Transform.derivative(name, [1.0]) end
+        assert_raise FunctionClauseError, fn -> Transform.inverse_derivative(name, [1.0]) end
+      end
+    end
+  end
+
+  describe "trim_to_domain/2" do
+    # Golden: R's `trim_to_domain()` of each (`inc4/step2/probe.R`, `trim.R`), a zero's sign read
+    # as `1 / x`.
+    test "the range squished into the domain, missing values and NaN left out, ends transformed" do
+      values = [-5.0, 0.0, 10.0, 1000.0, nil]
+
+      assert Enum.map(
+               [:identity, :log10, :sqrt, :reverse, :reciprocal],
+               fn name -> Transform.trim_to_domain(name, values) end
+             ) ===
+               [
+                 {-5.0, 1000.0},
+                 {-100.0, 3.0},
+                 {0.0, 31.622776601683793},
+                 {-1000.0, 5.0},
+                 {-0.2, 0.001}
+               ]
+
+      assert Transform.trim_to_domain(:log10, [0.5, :nan, 2.0]) ===
+               {-0.3010299956639812, 0.3010299956639812}
+    end
+
+    test "values all below the domain are its end" do
+      assert {Transform.trim_to_domain(:log10, [-3.0, -1.0]),
+              Transform.trim_to_domain(:sqrt, [-3.0, -1.0])} === {{-100.0, -100.0}, {0.0, 0.0}}
+    end
+
+    test "an infinity is kept, not squished, and one outside the domain makes both ends NaN" do
+      assert {Transform.trim_to_domain(:log10, [:infinity, 3.0, -2.0]),
+              Transform.trim_to_domain(:reverse, [:neg_infinity, 5.0]),
+              Transform.trim_to_domain(:log10, [:neg_infinity, 5.0]),
+              Transform.trim_to_domain(:sqrt, [:neg_infinity, :infinity])} ===
+               {{-100.0, :infinity}, {-5.0, :infinity}, {:nan, :nan}, {:nan, :nan}}
+    end
+
+    test "the ends come out sorted, a reversal's and a reciprocal's included" do
+      assert {Transform.trim_to_domain(:reverse, [-3.0, -1.0]),
+              Transform.trim_to_domain(:reciprocal, [-3.0, -1.0])} ===
+               {{1.0, 3.0}, {-1.0, -0.33333333333333331}}
+    end
+
+    # R's range() of -0 and 0 is the first twice, as min() and max() keep the first of equals;
+    # reciprocal of (-0, 4) is -Inf to 0.25, of (-Inf, Inf) -0 twice.
+    test "of two equal ends, the first is both, so a zero's sign is the first's" do
+      assert {Transform.trim_to_domain(:identity, [-0.0, 0.0]),
+              Transform.trim_to_domain(:identity, [0.0, -0.0]),
+              Transform.trim_to_domain(:reverse, [0.0, 0.0]),
+              Transform.trim_to_domain(:reciprocal, [-0.0, 4.0]),
+              Transform.trim_to_domain(:reciprocal, [:neg_infinity, :infinity])} ===
+               {{-0.0, -0.0}, {0.0, 0.0}, {-0.0, -0.0}, {:neg_infinity, 0.25}, {-0.0, -0.0}}
+    end
+
+    # R warns at a range of nothing and gives the transformed Inf and -Inf.
+    test "no value to range over is :none" do
+      assert {Transform.trim_to_domain(:identity, []),
+              Transform.trim_to_domain(:log10, [nil, :nan])} === {:none, :none}
+    end
+
+    test "a date, date-time or time transformation takes none" do
+      for name <- [:date, :time, {:datetime, "UTC", Calendar.UTCOnlyTimeZoneDatabase}] do
+        assert_raise FunctionClauseError, fn -> Transform.trim_to_domain(name, [1.0]) end
+      end
     end
   end
 
