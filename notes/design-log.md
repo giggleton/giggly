@@ -3938,6 +3938,8 @@ tells the story (`git show <hash>`). Until 2026-10-15 each milestone also had a 
 `git log -S "<title>" -- notes/design-log.md` finds it in this file's history. The phases are
 §1's roadmap.
 
+- 2026-11-01 — Write a plain label past what Erlang writes whole, as R writes it (`4bdb310`);
+  §4: "A plain label past"
 - 2026-11-01 — Draw the notebook examples the summaries unlock, and narrow every verdict to what
   still waits (summaries, step 6, the notebook sweep); §4: "A bootstrap example states its
   departure once", "The summaries are not public functions"

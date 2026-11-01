@@ -1632,6 +1632,12 @@ defmodule Scales.LabelsTest do
       assert Labels.plain([]) == []
     end
 
+    # The exact value of 0.3 to 17 decimals is 0.29999999999999999, as C's sprintf() and R's
+    # format() write it; plain/1's decimals only pad the 15 significant digits it rounds to.
+    test "a break given more decimals than its own digits is padded with zeros" do
+      assert Labels.plain([0.3, 1.0e-17]) == ["0.30000000000000000", "0.00000000000000001"]
+    end
+
     # R: trimws(format(2e257, scientific = FALSE)), its exact digits, 258 characters, past the
     # 256 that Erlang's float_to_binary/2 writes; and format(c(1e-300, 0.25), scientific = FALSE),
     # past its 253 decimals.
