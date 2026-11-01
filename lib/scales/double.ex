@@ -104,7 +104,8 @@ defmodule Scales.Double do
 
   # The mean of two numbers or infinities, R's `mean()` of a pair, which sums in a long double
   # from 0: two numbers whose sum is past the largest double still have a mean, their halves added
-  # then, and two negative zeros' mean is `0.0`, as R's sum starts from a positive zero.
+  # then, and two negative zeros' mean is `0.0`, as R's sum starts from a positive zero. With an
+  # infinity or NaN the sum is an infinity or NaN, which halving leaves as it is.
   @doc false
   @spec mean(operand(), operand()) :: operand()
   def mean(left, right) when is_number(left) and is_number(right) do
@@ -113,11 +114,7 @@ defmodule Scales.Double do
     ArithmeticError -> left / 2 + right / 2
   end
 
-  def mean(left, right) do
-    left
-    |> add(right)
-    |> divide(2)
-  end
+  def mean(left, right), do: add(left, right)
 
   # Whether `left` is below `right`, each a number or an infinity.
   @doc false
@@ -142,19 +139,17 @@ defmodule Scales.Double do
 
   defp zero?(value), do: value == 0
 
-  # A sign, 1 or -1; a zero's is its bit's, so `-0.0` is negative, as IEEE divides by it. A float
-  # is read as a double's bits before any comparison: OTP 29's compiler turns a float guards have
-  # shown equal to 0 into `0.0`, losing a negative zero's sign.
+  # A sign, 1 or -1, a number's read from its bits as a double, so `-0.0` is negative, as IEEE
+  # divides by it, and an integer's, which has no negative zero, as its float's. No comparison comes
+  # first: OTP 29's compiler turns a float guards have shown equal to 0 into `0.0`, losing a
+  # negative zero's sign.
   defp sign(:infinity), do: 1
   defp sign(:neg_infinity), do: -1
 
-  defp sign(number) when is_float(number) do
+  defp sign(number) do
     <<sign_bit::1, _rest::63>> = <<number::float>>
     1 - 2 * sign_bit
   end
-
-  defp sign(number) when number < 0, do: -1
-  defp sign(_number), do: 1
 
   defp infinity(1), do: :infinity
   defp infinity(-1), do: :neg_infinity

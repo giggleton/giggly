@@ -58,8 +58,8 @@ defmodule Scales.Bounds do
       [:nan, 0.0, :nan]
   """
   @spec rescale([Scales.double()], range(), range()) :: [Scales.double()]
-  def rescale(values, {from_low, from_high} = from, {to_low, to_high} = to)
-      when is_bound(from_low) and is_bound(from_high) and is_bound(to_low) and is_bound(to_high) do
+  # An end that is not a number or an infinity is refused by `zero_range?/1`, which reads both.
+  def rescale(values, {from_low, from_high} = from, {to_low, to_high} = to) do
     if zero_range?(from) or zero_range?(to) do
       middled(values, to)
     else
@@ -90,9 +90,9 @@ defmodule Scales.Bounds do
       [10.0, 12.5, 20.0]
   """
   @spec rescale_mid([Scales.double()], range(), range(), bound()) :: [Scales.double()]
+  # An end that is not a number or an infinity is refused by `zero_range?/1`, which reads both.
   def rescale_mid(values, {from_low, from_high} = from, {to_low, to_high} = to, midpoint)
-      when is_bound(from_low) and is_bound(from_high) and is_bound(to_low) and is_bound(to_high) and
-             is_bound(midpoint) do
+      when is_bound(midpoint) do
     if zero_range?(from) or zero_range?(to) do
       middled(values, to)
     else
@@ -138,8 +138,8 @@ defmodule Scales.Bounds do
       [:nan, :infinity, :neg_infinity]
   """
   @spec rescale_max([Scales.double()], range(), range()) :: [Scales.double()]
-  def rescale_max(values, {from_low, from_high}, {to_low, to_high})
-      when is_bound(from_low) and is_bound(from_high) and is_bound(to_low) and is_bound(to_high) do
+  def rescale_max(values, {_from_low, from_high}, {_to_low, to_high})
+      when is_bound(from_high) and is_bound(to_high) do
     each_value(values, fn value ->
       value
       |> Double.divide(from_high)

@@ -3876,6 +3876,10 @@ tells the story (`git show <hash>`). Until 2026-10-15 each milestone also had a 
 - 2026-11-01 — Add Hmisc's summaries to stat_summary(): mean_cl_normal, mean_sdl, median_hilow
   and a seeded mean_cl_boot (summaries, step 5); §4: "`mean_cl_boot` draws its resamples", "The
   Hmisc summaries take Hmisc's arguments"
+- 2026-11-01 — Complete R's out-of-range family, with infinities and NaN as R gives them
+  (transforms, step 1) (`189efe5`); §4: "A NaN is `:nan` throughout `Scales.Bounds`", "The
+  scales package carries every transformation", "`oob:` takes a name or a function",
+  "`transform:` reaches the continuous non-position scales"
 - 2026-10-31 — Summarise y at each x with stat_summary(): mean_se, the frame's summaries or a
   function, drawn by eight geoms (summaries, step 4); §4: "`stat_summary/3` draws with eight
   geoms", "A summary's values are names", "A summary carries a column cell by cell", "The
