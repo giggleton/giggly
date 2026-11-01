@@ -79,6 +79,52 @@ stops the question being reopened from scratch. A new entry is about 150 words: 
 sentence or two of why, and one line per rejected alternative. What a later decision replaces is
 deleted from the entry it was in, never marked superseded; git history keeps every version.
 
+- **A NaN is `:nan` throughout `Scales.Bounds`, and a `nil` end bounds nothing, `discard/2`'s
+  too (2026-11-01, Steve: "A", "A", increment 4's step 1; checked against scales 1.4.0).**
+  Every rescaler and `oob_*` function takes R's doubles (`t:Scales.double/0`), infinite ends
+  among them, through an internal `Scales.Double` of IEEE arithmetic: a NaN given or worked out
+  (0/0, Inf − Inf, Inf/Inf) is `:nan`, `NA` is `nil`, as in the frame, so `rescale_max()`'s 0
+  over a high end of 0 is `:nan`; Giggly's scales map either to `na_value`, as ggplot2's
+  `is.na()` does. `discard/2` with a `nil` end bounds nothing on that side, as `censor/2` and
+  `squish/2` do. *Rejected: a computed NaN kept `nil`*: R's two answers become one, and the
+  package holds two rules. *Rejected: R's `discard()` with an `NA` end*: every value the other end
+  keeps comes back `NA`, from R's logical indexing, no rule a caller can use.
+
+- **`transform:` reaches the continuous non-position scales; binned ones wait (2026-11-01, Steve:
+  "B", "We don't want to be releasing scales every time we release giggly"; checked against
+  ggplot2 4.0.3).** As R's, every continuous colour, fill, alpha, size, radius and line-width
+  scale takes a transformation: it trains, breaks and places in transformed space, its legend and
+  colour bar too, and labels in data units (log10 colours 1 to 10,000 evenly). A binned scale
+  takes none until Giggly's binned work, which reopens its widened breaks and limits and needs
+  nothing new from scales. *Rejected: binned now*: R works its widened breaks out in transformed
+  space branch by branch, for no example. *Rejected: x and y only*: log colour and size are what
+  users reach for.
+
+- **`oob:` takes a name or a function on every continuous and binned scale, and `:discard` is
+  refused (2026-11-01, Steve: "A"; checked against ggplot2 4.0.3).** As R's `oob`: `:censor`
+  (the default, a binned scale's `:squish`), `:censor_any`, `:squish`, `:squish_any`,
+  `:squish_infinite`, `:keep`, or `fn values, {low, high} -> values end`, in transformed space,
+  run at a position scale's two maps, a list of another length raising when run. `:discard` is
+  refused at the call: R's `oob_discard()` returns fewer values and ggplot2 recycles them (five
+  points all drawn at y = 20); the package keeps `Bounds.discard/2`. *Rejected: names only*: no
+  cap at a value, R's `~ pmin(.x, 25)`. *Rejected: `:discard` dropping the rows*: a meaning R
+  never gave it.
+
+- **The scales package carries every transformation of scales 1.4.0: a user's own holds
+  functions, the maths Erlang lacks is the package's own, logit and probit, and derivatives
+  (2026-11-01, Steve: "A", "A", "A", "B"; checked against scales 1.4.0).** A user's own is
+  `Scales.Transform.new/2`, R's `new_transform()`: functions of one value (`&Mod.fun/1` keeps it
+  readable), a domain, breaks handed limits in data units; built-ins stay names. log1p (Goldberg's
+  `log(u) * x / (u - 1)`), expm1 (Kahan's), the normal CDF (`erfc` with its argument's rounding
+  corrected) and quantile (bisection on it) match R to a few ulps, 2.4e-15 relatively at worst.
+  `:logit`, `:probit`, and the normal and logistic with R's parameters; other distributions
+  through `new/2`. Every numeric transformation has R's derivatives, a composition's by the chain
+  rule. *Rejected: a module a user writes*: internal callbacks made API. *Rejected: Nx*: its
+  `log1p` is `log(x + 1)`, and `erf_inv(2p − 1)` 6.7e-5 off, `-Inf` below p ≈ 3e-17.
+  *Rejected: Cauchy and other closed forms, or R's whole stats list*: kernels nobody asked for.
+  *Rejected: derivatives left out*: nothing in ggplot2 reads them, but they are part of R's
+  object, and scales should not need reopening for a tool's density.
+
 - **A plotmath piece is a text of its own, start-anchored where its box puts it (2026-10-31,
   Steve: "A"; checked against vdiffr 1.0.9).** vdiffr writes a power as one `<text>` per piece,
   sign, base, exponent's sign, exponent, each at its own size, a label's after the one before; so
@@ -721,18 +767,15 @@ deleted from the entry it was in, never marked superseded; git history keeps eve
   *Rejected: R's guide-dependent limits*: `map/2` would read the guide. *Rejected: refusing
   breaks outside the limits*: round breaks such as 0 to 500 are common.
 
-- **A squished value is R's `oob_squish()`, finite numbers only, and an end is a number or
-  `nil` (2026-10-29, Steve, increment 1's step 6; checked against scales 1.4.0).** `squish/2`
+- **A squished value is R's `oob_squish()`, finite numbers only, and an end of `nil` squishes
+  nothing (2026-10-29, Steve, increment 1's step 6; checked against scales 1.4.0).** `squish/2`
   takes a list and a range as `censor/2` does: a finite number below the low end is moved up to
   it, then one above the high end down to it, in R's order, so a range given high to low puts
   every number at its high end and a zero-wide one every number at it; a moved value takes the
   end as given, a negative zero's sign included. `nil`, the infinities, values that are not
   numbers and `:nan` are kept, NaN as R keeps it (Steve: "A"), and a `nil` end squishes nothing
-  on its side, as R's `NA` end does. An end that is an infinity is refused, by `censor/2` too
-  (Steve: "A"), which ignored one where R's `oob_censor(x, c(2, -Inf))` censors every number;
-  infinite ends wait for increment 4's out-of-range values. *Rejected: NaN made `nil`, as
-  `censor/2` makes it*: not R's answer, and a plot draws both as missing. *Rejected: infinite
-  ends taken now*: nothing in Giggly hands one, as `limits:` takes a number or `nil`.
+  on its side, as R's `NA` end does. *Rejected: NaN made `nil`*: not R's answer, and a plot draws
+  both as missing.
 
 - **A brewer or distiller scale takes R's options and refuses at the call what R fails on or
   reads loosely (2026-10-28, Steve, increment 1's step 5; checked against ggplot2 4.0.3).** Each
@@ -2160,10 +2203,8 @@ deleted from the entry it was in, never marked superseded; git history keeps eve
   given in data units and transformed, limits then sorted, as ggplot2 sorts them, so a scale
   function takes either order, and `xlim/3`, `ylim/3` and `lims/2` reverse an axis given high to
   low, as ggplot2's `limits()` does. A value outside the domain is R's: `log10(0)` is minus
-  infinity, at the panel's edge, a NaN missing. *Rejected: R's other transformations* (log, log2,
-  exp, pseudo_log): no example draws one. *Rejected: transformations a user defines*: `Transform`
-  made API, built from closures. *Rejected: refusing high-to-low limits on a scale function*: the
-  order means nothing once transformed (`scale_x_reverse` takes both).
+  infinity, at the panel's edge, a NaN missing. *Rejected: refusing high-to-low limits on a
+  scale function*: the order means nothing once transformed (`scale_x_reverse` takes both).
 
 - **`Scales.Labels`'s `comma/2`, `percent/2` and `currency/2` take every option of scales
   1.4.0's `label_comma()`, `label_percent()` and `label_currency()` (2026-10-18, Steve).**

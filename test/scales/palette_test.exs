@@ -27,6 +27,39 @@ defmodule Scales.PaletteTest do
       assert Palette.continuous({:abs_area, 6.0}, [4, 2, 1, -0.5, -0.25, 0.25, nil]) ===
                [12.0, 8.4852813742385713, 6.0, 4.2426406871192857, 3.0, 3.0, nil]
     end
+
+    # R's `pal_rescale(c(0.1, 1))`, `pal_area(c(1, 6))`, `abs_area(6)` and `pal_identity()` on
+    # `c(-Inf, -0.5, Inf, NA, NaN)`: an infinity and NaN through R's arithmetic, a square root
+    # below 0 NaN.
+    test "a number's palette takes an infinity and NaN through R's arithmetic" do
+      places = [:neg_infinity, -0.5, :infinity, nil, :nan]
+
+      assert {Palette.continuous({:rescale, {0.1, 1.0}}, places),
+              Palette.continuous({:area, {1.0, 6.0}}, places),
+              Palette.continuous({:abs_area, 6.0}, places), Palette.continuous(:identity, places)} ===
+               {[:neg_infinity, -0.34999999999999998, :infinity, nil, :nan],
+                [:nan, :nan, :infinity, nil, :nan],
+                [:infinity, 4.2426406871192857, :infinity, nil, :nan], places}
+    end
+
+    # R's `1 / pal_area(c(0, 1))(-0)` is `Inf`: the square root of -0 is -0, rescaled to 0.
+    test "an area palette rescales a negative zero's square root to 0" do
+      assert Palette.continuous({:area, {0.0, 1.0}}, [-0.0]) === [0.0]
+    end
+
+    # R's `as_continuous_pal(pal_manual(c(1, 5, 9)))(c(-Inf, 0, 0.5, 1.5, Inf, NA, NaN))` is `NA 1
+    # 5 NA NA NA NaN`: NaN kept, where every other palette's colour is missing.
+    test "a manual palette of numbers keeps NaN, and gives nil at an infinity" do
+      assert Palette.continuous({:manual, [1.0, 5.0, 9.0]}, [
+               :neg_infinity,
+               0,
+               0.5,
+               1.5,
+               :infinity,
+               nil,
+               :nan
+             ]) === [nil, 1.0, 5.0, nil, nil, nil, :nan]
+    end
   end
 
   # Golden: scales 1.4.0's `pal_gradient_n()` and `colour_ramp()` in R 4.6.1, through farver
@@ -63,11 +96,33 @@ defmodule Scales.PaletteTest do
                ["#4682B4", "#4682B4", "#4682B4", nil]
     end
 
-    # One colour reads no place, so only the check refuses one.
-    test "a place that is neither a number nor nil is refused, even by one colour" do
-      assert_raise FunctionClauseError, fn ->
-        Palette.continuous({:gradient, ["#4682B4"]}, [:infinity])
-      end
+    # R's `pal_gradient_n("red")(c(-Inf, 0, 0.5, 1.5, Inf, NA, NaN))` is `red` but for `NA` and
+    # `NaN`, `ifelse(is.na(x), NA, colour)`.
+    test "one colour is an infinity's too, but not a missing place's or NaN's" do
+      assert Palette.continuous({:gradient, ["#4682B4"]}, [
+               :neg_infinity,
+               1.5,
+               :infinity,
+               nil,
+               :nan
+             ]) ===
+               ["#4682B4", "#4682B4", "#4682B4", nil, nil]
+    end
+
+    # R's `pal_gradient_n(c("red", "blue"))`, with `values = c(0, 0.25)` too, on `c(-Inf, Inf,
+    # NaN)`: no colour, `NA` each.
+    test "a gradient gives no colour at an infinity or NaN" do
+      assert {Palette.continuous({:gradient, ["#FF0000", "#0000FF"]}, [
+                :neg_infinity,
+                :infinity,
+                :nan
+              ]),
+              Palette.continuous({:gradient, ["#FF0000", "#0000FF"], [0, 0.25]}, [
+                :neg_infinity,
+                :infinity,
+                :nan
+              ])} ===
+               {[nil, nil, nil], [nil, nil, nil]}
     end
 
     test "a place outside 0 to 1 gives nil, as R gives NA, but one colour's is that colour" do

@@ -46,7 +46,8 @@ R's regular ones: the entry beginning "The panel's grid lines are placed by the 
   (`ColorOperations.viridis/2`), `{:shape, :solid}` or `{:shape, :open}`, R's `pal_shape()`, six
   shapes by name, `:linetype`, R's `pal_linetype()`, 13 line types as dash patterns,
   `{:manual, values}`, R's `pal_manual()`, a list, and `{:brewer, %{palette:, direction:}}`, R's
-  `pal_brewer()`. A `nil` place gives `nil`. Each matched R to the last digit; its tests pin R's
+  `pal_brewer()`. A `nil` place gives `nil`, an infinite or NaN one R's answer. Each matched R to
+  the last digit; its tests pin R's
   figures. ggplot2's palettes, the ordinal sequences and a manual
   palette matched by name or by breaks, are Giggly's (`scale.md`).
 - **A discrete palette past its end gives `nil`, as R gives `NA`, and raises nothing**: R also
@@ -107,19 +108,30 @@ R's regular ones: the entry beginning "The panel's grid lines are placed by the 
   once raised to the power 2.2, brought back by `1 / 2.2` and written as `gray()` writes them, the
   byte `255 * level + 0.5` truncated. R spaces them with `seq.int()`, which in R 4.6.1 steps on
   from the start as `seq()` does, so `seq()` it is.
+- **A double is R's: `nil` its `NA`, `:nan` its NaN, `:infinity` and `:neg_infinity` its
+  infinities** (`t:Scales.double/0`; design-log §4, the entry beginning "A NaN is `:nan`"), and
+  **`Scales.Double` is the one home of R's IEEE arithmetic on them**, an infinity past the largest
+  double, NaN for 0/0, Inf − Inf and Inf × 0, a zero's sign read from its bit; its operators take
+  no `nil`, which their callers set aside first. Its tests pin R's answers. A transformation
+  still gives `nil` where R gives NaN.
 - **The rescaling functions are R's `rescale()`, `rescale_mid()` and `rescale_max()` to the last
   digit** (`Scales.Bounds`), on lists as R's are on vectors, a `nil` in giving `nil` out, as R's
-  `NA`: either range zero wide by `zero_range()` puts every value at the middle of `to`, which R
-  checks and the formula alone would not; over a high end of 0, `rescale_max()` gives R's IEEE
-  answer, an infinity of the signs' product, a negative zero's sign counting, or NaN as `nil`. Its
-  tests pin R's figures; Giggly's rescalers call these, and Giggly raises at an infinity.
-- **Censoring and squishing are R's `oob_censor()` and `oob_squish()` on finite numbers**
-  (`Scales.Bounds`; design-log §4, the entry beginning "A squished value is R's"): a number outside
-  the range `nil`, or moved onto its ends in R's order, low first, so a range high to low squishes
-  every number to its high end; the infinities, `nil` and what is not a number kept; `:nan` kept
-  by `squish/2`, `nil` from `censor/2`, as ggplot2's position scale maps it. An end is a number
-  or `nil`, which moves nothing on its side; an infinite end is refused. Their tests pin R's
-  figures.
+  `NA`, and NaN `:nan`, given or worked out; a value, an end or a midpoint may be an infinity,
+  through `Scales.Double`: either range zero wide by `zero_range()` (both ends one infinity too)
+  puts every value at the middle of `to`, R's long-double mean, which R checks and the formula
+  alone would not, but `nil` for `nil` and NaN, as R gives `NA`; over a high end of 0,
+  `rescale_max()` gives an infinity of the signs' product, a negative zero's sign counting, or
+  `:nan`. `rescale_none/1` gives the values back. Its tests pin R's figures; Giggly's rescalers
+  call these, and Giggly raises at an infinity.
+- **Values outside a range are R's `oob_*` family** (`Scales.Bounds`; design-log §4, the entries
+  beginning "A squished value is R's" and "A NaN is `:nan`"): `censor/2` and `squish/2` move
+  finite numbers alone, `censor_any/2` and `squish_any/2` the infinities too, to `nil` or onto
+  the ends in R's order, low first, so a range high to low squishes every number to its high end;
+  `squish_infinite/2` replaces `:neg_infinity` by the low end, then `:infinity` by the high, a
+  finite number kept; `discard/2` drops what is outside, `nil` kept and NaN made `nil`;
+  `keep/2` changes nothing. `nil`, NaN and what is not a number are kept by the rest. An end is a
+  number, an infinity, compared as R compares it, or `nil`, which bounds nothing on its side, in
+  `discard/2` too, where R gives `NA` for every value (a departure). Their tests pin R's figures.
 - **Training follows R's `scales`** (`Scales.DataRange`). A continuous range spans the finite numbers only (`nil` and
   the non-finite floats skipped). **A discrete scale merges each training as R's
   `discrete_range()` does** (design-log §4, the entry beginning "A discrete scale fed levelled and
