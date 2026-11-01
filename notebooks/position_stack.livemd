@@ -242,7 +242,7 @@ ggplot(series, aes(time, value, group = type)) +
   geom_text(aes(label = type), position = position_stack(vjust = 0.5))
 ```
 
-Not in Giggly yet: `geom_text()`'s `position` option, and `position_stack()`'s `vjust` option.
+Not in Giggly yet: `position_stack()`'s `vjust` option.
 
 ## Negative values
 
@@ -274,4 +274,4 @@ ggplot(data = df, aes(x, y, group = grp)) +
   geom_text(aes(label = grp), position = position_stack(vjust = 0.5))
 ```
 
-Not in Giggly yet: `geom_text()`'s `position` option and `position_stack()`'s `vjust` option.
+Not in Giggly yet: `position_stack()`'s `vjust` option.
