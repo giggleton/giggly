@@ -425,6 +425,55 @@ defmodule Giggly.ScaleTest do
                [{2.0, "2 of 4"}, {3.0, "3 of 4"}, {4.0, "4 of 4"}, {5.0, "5 of 4"}]
     end
 
+    # Golden: ggplot2 4.0.3 draws a missing label `NA`, given in a list or by a function alike; one
+    # among `label_log()`'s powers, a logical `NA` in an expression vector, it draws as nothing on an
+    # axis or a bar and `NA` in a legend, so the scale leaves it to the guide.
+    test "a missing label is written NA, and left missing among powers" do
+      power = {:power, "10", "3"}
+      signed = {:signed, "-", power}
+
+      labelled =
+        Enum.map(
+          [
+            ["two", nil],
+            fn _breaks -> [nil, "three"] end,
+            fn _breaks -> [nil, power] end,
+            fn _breaks -> [signed, nil] end,
+            fn _breaks -> ["0", power] end
+          ],
+          fn labels ->
+            scale = weights(breaks: [2.0, 3.0], labels: labels)
+            Scale.breaks(scale, Scale.dimension(scale))
+          end
+        )
+
+      assert labelled === [
+               [{2.0, "two"}, {3.0, "NA"}],
+               [{2.0, "NA"}, {3.0, "three"}],
+               [{2.0, nil}, {3.0, power}],
+               [{2.0, signed}, {3.0, nil}],
+               [{2.0, "0"}, {3.0, power}]
+             ]
+    end
+
+    test "a labels function's label shaped like no power is refused" do
+      for label <- [
+            {:power, 10, "3"},
+            {:power, "10", 3},
+            {:power, "10"},
+            {:signed, "−", {:power, "10", "3"}},
+            {:signed, "-", "10"},
+            {:signed, "-", {:signed, "-", {:power, "10", "3"}}}
+          ] do
+        scale = weights(breaks: [2.0], labels: fn _breaks -> [label] end)
+        got = Regex.escape("breaks [2.0], got: #{inspect([label])}")
+
+        assert_raise ArgumentError,
+                     ~r/^a scale's labels function must return a string, a power or nil .*#{got}$/,
+                     fn -> Scale.breaks(scale, Scale.dimension(scale)) end
+      end
+    end
+
     test "a labels function that does not give a string for each break is refused" do
       for labeller <- [
             fn _breaks -> ["one"] end,
@@ -433,9 +482,11 @@ defmodule Giggly.ScaleTest do
           ] do
         scale = weights(labels: labeller)
 
-        assert_raise ArgumentError, ~r/must return a string for each of the breaks/, fn ->
-          Scale.breaks(scale, Scale.dimension(scale))
-        end
+        assert_raise ArgumentError,
+                     ~r/must return a string, a power or nil for each of the breaks/,
+                     fn ->
+                       Scale.breaks(scale, Scale.dimension(scale))
+                     end
       end
     end
 
@@ -574,9 +625,29 @@ defmodule Giggly.ScaleTest do
                      Scale.breaks(short, Scale.dimension(short))
                    end
 
-      assert_raise ArgumentError, ~r/labels function must return a string for each/, fn ->
-        Scale.breaks(counted, Scale.dimension(counted))
-      end
+      assert_raise ArgumentError,
+                   ~r/labels function must return a string, a power or nil for each/,
+                   fn ->
+                     Scale.breaks(counted, Scale.dimension(counted))
+                   end
+    end
+
+    # Golden: ggplot2 4.0.3 draws a discrete scale's missing label `NA`, given in a named vector or
+    # by a function alike.
+    test "a missing label in a list, a map or a function's is written NA" do
+      listed = letters(labels: ["P", nil, "R", "S"])
+      mapped = letters(labels: %{"q" => nil})
+
+      called =
+        letters(labels: fn values -> Enum.map(values, fn value -> value && "x" end) end)
+
+      assert Enum.map([listed, mapped, called], fn scale ->
+               Scale.breaks(scale, Scale.dimension(scale))
+             end) === [
+               [{1, "P"}, {2, "NA"}, {3, "R"}, {4, "S"}],
+               [{1, "p"}, {2, "NA"}, {3, "r"}, {4, "NA"}],
+               [{1, "x"}, {2, "x"}, {3, "x"}, {4, "NA"}]
+             ]
     end
 
     # Golden: ggplot2 4.0.3 in R 4.6.1, the panel's x range and labels for factor(c(4, 6, 8, 10))
@@ -1680,6 +1751,16 @@ defmodule Giggly.ScaleTest do
 
       assert Scale.map(scale, [52, 150, 335]) ===
                ["#7F7F7F", "#7F7F7F" | Palette.continuous(palette, [275 / 300])]
+    end
+
+    test "a missing label, given in a list or by a function, is written NA" do
+      listed = binned([0, 10], labels: ["a", nil, "c"])
+
+      called =
+        binned([0, 10], labels: fn [_first | rest] -> [nil | Enum.map(rest, &to_string/1)] end)
+
+      assert {Scale.legend_breaks(listed), Scale.legend_breaks(called)} ===
+               {[{2.5, "a"}, {5.0, "NA"}, {7.5, "c"}], [{2.5, "NA"}, {5.0, "5.0"}, {7.5, "7.5"}]}
     end
 
     test "its labels are written plainly, given in a list, from a function, or left out" do

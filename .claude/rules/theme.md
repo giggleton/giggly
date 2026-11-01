@@ -167,15 +167,15 @@ theme's families reaches: the entry beginning "A text's family is the theme's".
   from it (`Geom.default_aesthetics/2`), mixing its colours from the ink and paper. **The
   palettes are not the theme's:** ggplot2 4's `set_palettes()` takes a scale's palette from the
   theme, and `theme_gray()` sets none, so the scale's fallback, `pal_hue()`, is its default here.
-- **A title's look carries its line spacing** (`Theme.title()`: `line_spacing`, the points from
-  one line's baseline to the next's, its `lineheight`, 0.9 unless set, x 1.2 times its size, as
-  R's graphics engine reads it), since only titles and strips break over lines: the strips' text
-  (`strip_text_x_top`, `strip_text_y_right`, 0.9 at 8.8 points, 9.504 apart), the axes' and the
-  legends' titles, and the plot's own, `theme_gray()`'s `plot.title` (1.2 times the base size,
+- **Every text's look carries its line spacing** (`Theme.text()`: `line_spacing`, the points
+  from one line's baseline to the next's, its `lineheight`, 0.9 unless set, x 1.2 times its size,
+  as R's graphics engine reads it), since every text a guide draws breaks over lines: tick labels
+  and a legend's (0.9 at 8.8 points, 9.504 apart), the strips' text (`strip_text_x_top`,
+  `strip_text_y_right`), the axes' and the legends' titles, and the plot's own, `theme_gray()`'s `plot.title` (1.2 times the base size,
   `half_line`
   below it, left-aligned and hung), `plot.subtitle` (the base size, `half_line` below, the same),
   `plot.caption` (0.8 of it, `half_line` above, right-aligned and hung) and `plot.tag` (1.2 times
-  it, no margin, centred), all black. Any other text takes a `lineheight` and holds none.
+  it, no margin, centred), all black.
 - **A legend's look is `theme_gray()`'s at its defaults**: right of the panels, centred
   (`legend.justification`), in a box with no margin and no background; paper white with no border,
   `half_line` inside its edge (`legend.margin`, from the theme's `margins`), `2 * half_line` from

@@ -56,11 +56,11 @@ defmodule Giggly.Guide.Strip do
   # points, and its primitives, placed in a cell that deep and as long as the panel's side.
   defp strip(label, side, {%{margin: margin} = text_look, background}, installed_fonts) do
     {place, offset} = Parts.anchor(text_look, :both)
-    text = Parts.text([label], [place], offset, text_look, installed_fonts)
+    texts = Parts.text([label], [place], offset, text_look, installed_fonts)
     extent = Parts.extent([label], text_look, installed_fonts)
     background_rect = background(background)
 
-    {depth(side, margin, extent), Enum.concat(background_rect, [text])}
+    {depth(side, margin, extent), Enum.concat(background_rect, texts)}
   end
 
   # A strip's depth away from its panel: its label turned and its margins across that way.

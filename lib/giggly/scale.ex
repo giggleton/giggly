@@ -123,8 +123,19 @@ defmodule Giggly.Scale do
   @typedoc "A scale: a continuous, a discrete or a binned one."
   @type t :: Continuous.t() | Discrete.t() | Binned.t()
 
-  @typedoc "A break on an axis: its position and its label, `:none` where the axis has no labels."
-  @type break :: {number(), String.t() | :none}
+  @typedoc """
+  A break's label: text, or a power, as `Scales.Labels.log/2` writes one, signed or not; `nil`
+  for a missing one among powers; `:none` where the scale has no labels.
+  """
+  @type label ::
+          String.t()
+          | {:power, String.t(), String.t()}
+          | {:signed, String.t(), {:power, String.t(), String.t()}}
+          | nil
+          | :none
+
+  @typedoc "A break on an axis: its position and its label."
+  @type break :: {number(), label()}
 
   # A day's last microsecond, in seconds since midnight: the latest time of day.
   @last_second 86_399.999_999
@@ -544,7 +555,7 @@ defmodule Giggly.Scale do
 
   def breaks(%Continuous{breaks: :default} = scale, extent) do
     positions = default_breaks(scale, limits(scale), extent)
-    Enum.zip(positions, labels(scale, positions, :default, extent))
+    Enum.zip(positions, written(labels(scale, positions, :default, extent)))
   end
 
   def breaks(%Continuous{breaks: {:width, step}, transform: transform} = scale, extent) do
@@ -553,7 +564,7 @@ defmodule Giggly.Scale do
       |> Transform.width(step, extent)
       |> Enum.filter(fn position -> placed_inside?(position, extent) end)
 
-    Enum.zip(positions, labels(scale, positions, :width, extent))
+    Enum.zip(positions, written(labels(scale, positions, :width, extent)))
   end
 
   def breaks(%Discrete{} = scale, _extent) do
@@ -593,7 +604,7 @@ defmodule Giggly.Scale do
       end)
       |> Enum.unzip()
 
-    Enum.zip(values, discrete_labels(scale, values, {indexes, length(candidates)}))
+    Enum.zip(values, written(discrete_labels(scale, values, {indexes, length(candidates)})))
   end
 
   # The values a discrete scale may mark, and the scale that labels them: its breaks where given,
@@ -652,7 +663,7 @@ defmodule Giggly.Scale do
   # function's those it returns on the limits (`Binned.called/1`), labelled by `binned_labels/3`;
   # `:none` gives none.
   @doc false
-  @spec legend_breaks(t()) :: [{term(), String.t() | :none}]
+  @spec legend_breaks(t()) :: [{term(), label()}]
   def legend_breaks(%Continuous{} = scale) do
     case limits(scale) do
       :none -> []
@@ -670,7 +681,7 @@ defmodule Giggly.Scale do
       |> Binned.breaks()
       |> Enum.unzip()
 
-    Enum.zip(values, binned_labels(scale, values, indexes))
+    Enum.zip(values, written(binned_labels(scale, values, indexes)))
   end
 
   # The labels of a binned scale's breaks `values`, which are those at `indexes` among the breaks
@@ -705,7 +716,7 @@ defmodule Giggly.Scale do
   # by its function handed the two, or `:none`; none where it does not show them. Beside a list of
   # labels, which labels its breaks alone, it raises, where R ignores `show.limits` with a warning.
   @doc false
-  @spec shown_limits(t()) :: [{float(), String.t() | :none}]
+  @spec shown_limits(t()) :: [{float(), label()}]
   def shown_limits(%Binned{show_limits: true, labels: given}) when is_list(given) do
     raise ArgumentError,
           "a binned scale shows its limits beside labels written by default or by a function, " <>
@@ -716,7 +727,7 @@ defmodule Giggly.Scale do
     scale = Binned.called(binned)
     {low, high} = Binned.limits(scale)
     limits = [low, high]
-    Enum.zip(limits, binned_labels(scale, limits, []))
+    Enum.zip(limits, written(binned_labels(scale, limits, [])))
   end
 
   def shown_limits(_scale), do: []
@@ -753,7 +764,7 @@ defmodule Giggly.Scale do
   # binned one has, a function's breaks too (`Binned.called/1`).
   @doc false
   @spec steps(Continuous.t() | Binned.t(), [float()]) ::
-          {[float() | nil], [{float(), float(), String.t() | :none}]}
+          {[float() | nil], [{float(), float(), label()}]}
   def steps(%Binned{} = binned, values), do: stepped(Binned.called(binned), values)
   def steps(%Continuous{} = scale, values), do: stepped(scale, values)
 
@@ -983,7 +994,7 @@ defmodule Giggly.Scale do
       |> Enum.filter(fn {position, _index} -> placed_inside?(position, extent) end)
       |> Enum.unzip()
 
-    Enum.zip(kept, labels(scale, kept, indexes, extent))
+    Enum.zip(kept, written(labels(scale, kept, indexes, extent)))
   end
 
   # A list of labels beside a breaks function is one for each break it returns, as R fails on
@@ -1039,9 +1050,9 @@ defmodule Giggly.Scale do
   # positions, each break written in its format by `Calendar.strftime/3`, `:none` for each where it
   # has none, or its transformation's (`Transform.format/3`), told whether they are the default
   # breaks, since a date's default breaks take the format of the step they were chosen by and any
-  # others are written in full. A function must return a string for each break, or the plot cannot
-  # be drawn. A function and a format are handed the breaks in data units, turned back from their
-  # positions, as ggplot2 hands them.
+  # others are written in full. A function must return a label for each break, a string, a power or
+  # `nil`, or the plot cannot be drawn. A function and a format are handed the breaks in data
+  # units, turned back from their positions, as ggplot2 hands them.
   defp labels(%Continuous{labels: :none}, positions, _origin, _extent),
     do: List.duplicate(:none, length(positions))
 
@@ -1075,19 +1086,37 @@ defmodule Giggly.Scale do
   defp labels(%Continuous{labels: :default, transform: transform}, positions, _given, _extent),
     do: Transform.format(transform, positions, :given)
 
-  # What a labels function returns for `breaks`, which must be a string for each.
+  # What a labels function returns for `breaks`, which must be a label for each: a string, a power
+  # or `nil`.
   defp labelled(labeller, breaks) do
     labelled = labeller.(breaks)
 
     if is_list(labelled) and length(labelled) == length(breaks) and
-         Enum.all?(labelled, &is_binary/1) do
+         Enum.all?(labelled, fn label -> is_binary(label) or is_nil(label) or power?(label) end) do
       labelled
     else
       raise ArgumentError,
-            "a scale's labels function must return a string for each of the breaks " <>
-              "#{inspect(breaks)}, got: #{inspect(labelled)}"
+            "a scale's labels function must return a string, a power or nil for each of the " <>
+              "breaks #{inspect(breaks)}, got: #{inspect(labelled)}"
     end
   end
+
+  # A scale's labels as its guide draws them: a missing one (`nil`) written `NA`, as R draws a
+  # missing label, but left `nil` among powers, which a guide draws as R draws a missing label in
+  # an expression vector, as nothing where it draws its labels together and `NA` where it draws
+  # each alone (`Giggly.Guide.Plotmath`).
+  defp written(labels) do
+    if Enum.any?(labels, &power?/1),
+      do: labels,
+      else: Enum.map(labels, fn label -> label || "NA" end)
+  end
+
+  defp power?({:power, base, exponent}), do: is_binary(base) and is_binary(exponent)
+
+  defp power?({:signed, sign, {:power, _base, _exponent} = power}),
+    do: sign in ["-", "+"] and power?(power)
+
+  defp power?(_label), do: false
 
   defp inside?(position, {low, high}), do: position >= low and position <= high
 

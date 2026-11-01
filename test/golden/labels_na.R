@@ -1,0 +1,29 @@
+# The plot test/golden/labels_na.svg draws, drawn by ggplot2 itself, as ggplot2's own visual
+# tests draw their snapshots: the independent check on that golden whenever it changes. The suite
+# never runs this; it needs R, ggplot2 and vdiffr, saved as the Docker image
+# giggly-r:ggplot2-4.0.3. From the repository's root:
+#
+#   docker run --rm -v "$PWD/test/golden":/golden:ro giggly-r:ggplot2-4.0.3 \
+#     Rscript /golden/labels_na.R > labels_na.ggplot2.svg
+#
+# and compare the two drawings element by element, as test/golden/point.R describes.
+#
+# Missing labels, drawn NA and measured as NA: from a list of labels on the x axis, from a labels
+# function on the y axis, and from a list on a legend. First checked with ggplot2 4.0.3 and vdiffr
+# 1.0.9: every element and clip path matches but svglite's around the whole drawing, and the one
+# departure is test/golden/point.R's, the x axis drawn before the y.
+
+library(ggplot2)
+
+points <- data.frame(x = c(1, 10, 100, 1000), y = c(1, 2, 3, 4), g = c("a", "b", "c", "d"))
+
+plot <- ggplot(points, aes(x, y, colour = g)) +
+  geom_point() +
+  scale_x_continuous(breaks = c(250, 500, 750), labels = c("one", NA, "three")) +
+  scale_y_continuous(breaks = c(2, 3), labels = function(breaks) c(NA, "three")) +
+  scale_colour_discrete(labels = c("one", NA, "three", "four")) +
+  theme_gray()
+
+file <- tempfile(fileext = ".svg")
+vdiffr::write_svg(plot, file)
+cat(readLines(file), sep = "\n")

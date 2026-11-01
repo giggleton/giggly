@@ -102,9 +102,9 @@ defmodule Scales.LabelsTextTest do
     # R writes any value with `as.character()` first, `1e+05`, `TRUE`; strings alone are taken.
     test "refuses what is not a list of strings and nils" do
       for labels <- [[1.0e5], [true], ["a", :b], ["\xFF"], "a b"] do
-        assert_raise ArgumentError, ~r"Labels.wrap/2 takes a list of strings and nils", fn ->
-          Labels.wrap(labels, width: 10)
-        end
+        error = assert_raise ArgumentError, fn -> Labels.wrap(labels, width: 10) end
+        assert error.message =~ ~r"^Labels\.wrap/2 "
+        assert error.message =~ "got: #{inspect(labels)}"
       end
     end
 
@@ -175,7 +175,7 @@ defmodule Scales.LabelsTextTest do
     end
 
     test "raises on a value it lacks that is not a string, without nomatch:" do
-      assert_raise ArgumentError, ~r"Labels.dictionary/2 has no label for 2.0", fn ->
+      assert_raise ArgumentError, ~r"^Labels.dictionary/2 has no label for 2.0", fn ->
         Labels.dictionary([2.0], dictionary: %{1 => "one"})
       end
     end
@@ -184,9 +184,12 @@ defmodule Scales.LabelsTextTest do
       for dictionary <-
             [%{nil => "none"}, %{1 => "a", 1.0 => "b"}, %{0.0 => "a", -0.0 => "b"}] ++
               [%{"a" => 1}, %{"a" => :b}, [{"a", "A"}], ["A"]] do
-        assert_raise NimbleOptions.ValidationError, fn ->
-          Labels.dictionary(["a"], dictionary: dictionary)
-        end
+        error =
+          assert_raise NimbleOptions.ValidationError, fn ->
+            Labels.dictionary(["a"], dictionary: dictionary)
+          end
+
+        assert error.message =~ "got: #{inspect(dictionary)}"
       end
     end
 
@@ -202,9 +205,9 @@ defmodule Scales.LabelsTextTest do
         assert_raise NimbleOptions.ValidationError, fn -> Labels.dictionary(["a"], options) end
       end
 
-      assert_raise ArgumentError, ~r"Labels.dictionary/2 takes a list of values", fn ->
-        Labels.dictionary("a", dictionary: @fruit)
-      end
+      error = assert_raise ArgumentError, fn -> Labels.dictionary("a", dictionary: @fruit) end
+      assert error.message =~ ~r"^Labels\.dictionary/2 "
+      assert error.message =~ ~s(got: "a")
     end
   end
 end

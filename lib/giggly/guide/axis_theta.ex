@@ -22,7 +22,7 @@ defmodule Giggly.Guide.AxisTheta do
   # the blank line type; the labels keep their place beyond removed ticks, as ggplot2's angle axis
   # keeps the ticks' length in their offset.
 
-  alias Giggly.Guide.Parts
+  alias Giggly.Guide.{Parts, Plotmath}
   alias Giggly.Scene.Polylines
   alias Giggly.Theme
 
@@ -71,9 +71,12 @@ defmodule Giggly.Guide.AxisTheta do
     turn = text_look.angle / 180 * :math.pi()
 
     # A scale with no labels has a tick at each break and nothing beside it.
-    breaks
-    |> Enum.reject(fn {_place, _angle, label} -> label == :none end)
-    |> Enum.map(fn {place, angle, label} ->
+    labelled = Enum.reject(breaks, fn {_place, _angle, label} -> label == :none end)
+
+    labelled
+    |> Enum.map(fn {_place, _angle, label} -> label end)
+    |> Plotmath.expressions()
+    |> Enum.zip_with(labelled, fn label, {place, angle, _label} ->
       look = %{
         text_look
         | hjust: 0.5 - :math.sin(angle + turn) / 2,
@@ -83,6 +86,7 @@ defmodule Giggly.Guide.AxisTheta do
       offset = {label_offset * :math.sin(angle), label_offset * :math.cos(angle)}
       Parts.text([label], [place], offset, look, installed_fonts)
     end)
+    |> Enum.concat()
   end
 
   # The line round the circle's edge, through `points`; none where the theme removes it or gives it

@@ -41,7 +41,7 @@ defmodule Giggly.Guide.Axis do
   # its lines turned; an axis with no title takes no room.
 
   alias Giggly.{Coord, Guide, Scene, Theme}
-  alias Giggly.Guide.Parts
+  alias Giggly.Guide.{Parts, Plotmath}
   alias Giggly.Scene.Polylines
 
   # Ticks and the axis's line are drawn at their colour's opacity, their ends and dashes as the
@@ -139,30 +139,37 @@ defmodule Giggly.Guide.Axis do
   # break, and up at its turned justification of their room below the ticks, which the cell's y,
   # running up from its bottom, places under the ticks hung from its top.
   defp draw_axis(breaks, :bottom, :x, {%{margin: margin} = text_look, ticks}, installed_fonts) do
-    {places, labels} = Enum.unzip(breaks)
+    {places, labels} = unzipped(breaks)
     {_width, labels_height} = Parts.extent(labels, text_look, installed_fonts)
     room = margin.top + labels_height + margin.bottom
     height = reach(ticks) + room
     {{_across, up}, offset} = Parts.anchor(text_look, :up)
     label_places = Enum.map(places, fn place -> {place, up * room / height} end)
-    text = Parts.text(labels, label_places, offset, text_look, installed_fonts)
+    texts = Parts.text(labels, label_places, offset, text_look, installed_fonts)
 
     tick_lines = bottom_ticks(places, ticks)
-    {height, Enum.concat(tick_lines, [text])}
+    {height, Enum.concat(tick_lines, texts)}
   end
 
   # Labels left of the panel count their margins either side of them, as ggplot2's do: each at its
   # break, and across at its turned justification of their room left of the ticks.
   defp draw_axis(breaks, :left, _look, {%{margin: margin} = text_look, ticks}, installed_fonts) do
-    {places, labels} = Enum.unzip(breaks)
+    {places, labels} = unzipped(breaks)
     {labels_width, _height} = Parts.extent(labels, text_look, installed_fonts)
     room = margin.left + labels_width + margin.right
     width = room + reach(ticks)
     {{across, _up}, offset} = Parts.anchor(text_look, :across)
     label_places = Enum.map(places, fn place -> {across * room / width, place} end)
-    text = Parts.text(labels, label_places, offset, text_look, installed_fonts)
+    texts = Parts.text(labels, label_places, offset, text_look, installed_fonts)
 
-    {width, [text | left_ticks(places, ticks)]}
+    {width, Enum.concat(texts, left_ticks(places, ticks))}
+  end
+
+  # Breaks' places and their labels, each an expression where any is, as R holds them
+  # (`Giggly.Guide.Plotmath.expressions/1`).
+  defp unzipped(breaks) do
+    {places, labels} = Enum.unzip(breaks)
+    {places, Plotmath.expressions(labels)}
   end
 
   # The theme's elements an axis drawn in `look` is drawn with, ggplot2's for that axis on its side
@@ -295,7 +302,7 @@ defmodule Giggly.Guide.Axis do
     {place, offset} = Parts.anchor(title_look, :up)
 
     {margin.top + title_height + margin.bottom,
-     [Parts.text([text], [place], offset, title_look, installed_fonts)]}
+     Parts.text([text], [place], offset, title_look, installed_fonts)}
   end
 
   defp title(
@@ -308,6 +315,6 @@ defmodule Giggly.Guide.Axis do
     {place, offset} = Parts.anchor(title_look, :across)
 
     {margin.left + title_width + margin.right,
-     [Parts.text([text], [place], offset, title_look, installed_fonts)]}
+     Parts.text([text], [place], offset, title_look, installed_fonts)}
   end
 end

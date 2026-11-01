@@ -55,7 +55,8 @@ theme puts them".
   colour, opacity, `hjust` and offset**, as grid's `textGrob()` takes them per label, a colour of
   `:none` written in no colour, as svglite writes a label's of `NA`; its size, its
   `family` (`""` the default sans-serif, `"sans"`, `"serif"` and `"mono"` R's generic families,
-  any other a font's name), its `face` (`:plain`, `:bold`, `:italic`, `:bold_italic`), both of
+  any other a font's name), its `face` (`:plain`, `:bold`, `:italic`, `:bold_italic`, or
+  `:symbol`, the symbol font a plotmath sign is drawn in), both of
   which its widths were measured in (`Giggly.Font`), and its angle, any number of degrees, are
   the text's. **A text carries the outlines its labels are drawn with where its font gives them**
   (`glyphs`, a `Glyphs` of one scale, in points per font unit, and a run per label, each glyph's

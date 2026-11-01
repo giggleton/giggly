@@ -8,6 +8,7 @@ paths:
   - "test/scales/labels_arithmetic_test.exs"
   - "test/scales/labels_text_test.exs"
   - "test/scales/labels_width_test.exs"
+  - "test/scales/fixtures/r_widths_4.6.1.csv"
 ---
 
 # Labels
@@ -62,8 +63,10 @@ and "`wrap/2` takes"; why `dictionary/2` matches and takes what it does: "`dicti
   `Scales.DataRange.key/1`, where R matches its text, takes `""` as a key, which R refuses, and
   raises on an unmatched value that is not a string, which R hands back as text. **A character is
   as wide as R 4.6.1 counts it under `en_US.UTF-8`**, `nchar(type = "w")` measured for every
-  code point and held in `Labels.Width`, which matched R on all of them; a row that stops
-  matching is a bug, and the table moves only by measuring R again. `wrap/2` is modelled from
+  code point and held in `Labels.Width`, which matched R on all of them; its test pins both
+  ends of every run, and either side, against R's runs as R wrote them
+  (`test/scales/fixtures/r_widths_4.6.1.csv`), so a row that stops matching is a bug, and the
+  table and the fixture move only by measuring R again. `wrap/2` is modelled from
   `strwrap()`'s documentation and R's output, never ported from R's source; all of 16,000 random
   labels, of every width, whitespace, sentence end, wide, combining and zero-width character,
   matched R.

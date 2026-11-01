@@ -89,6 +89,13 @@ A text's `face:` asks for `:plain`, `:bold`, `:italic` or `:bold_italic`. Each f
 font: a face no font is registered or installed for is measured with the built-in metrics, never
 with another face's font.
 
+### The symbol font
+
+A power's sign, as `Scales.Labels.log/2` labels a negative break, is drawn in the symbol font, as
+R draws it. A font registered with Pica as `"symbol"` draws it, whatever the label's family;
+without one, it is measured with the built-in metrics of the Symbola font and written as text in
+the label's family. An installed font is never searched for it.
+
 ## Outlines or text
 
 `Giggly.to_svg/2`'s `text:` says how a label in a font Pica holds is written:

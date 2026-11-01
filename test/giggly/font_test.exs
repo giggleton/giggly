@@ -25,6 +25,37 @@ defmodule Giggly.FontTest do
     end
   end
 
+  # Golden: vdiffr 1.0.9's `glyph_dims.h`, the rows priv/fonts/liberation_sans.txt and
+  # priv/fonts/symbola.txt copy: "g" reaches 6.4440 above its baseline and 2.4912 below, "j"
+  # 8.6976 and 2.4912, "x" 6.3432 and none, codepoint 1 8.2584 and none, at 12 points.
+  describe "box/5 from the table" do
+    test "a string reaches as high and as deep as its highest and deepest characters" do
+      assert {Font.box("gjx", 12, "", :plain, false), Font.box("gjx", 6, "", :plain, false)} ===
+               {{8.6976, 2.4912}, {4.3488, 1.2456}}
+    end
+
+    test "a character the font lacks takes vdiffr's metrics for a missing glyph" do
+      assert Font.box("中", 12, "", :plain, false) === {8.2584, 0.0}
+    end
+
+    test "a box reaches no lower than its baseline nor below none, as plotmath's starts from none" do
+      # Symbola's minus sits 3.168 points above its baseline at 12 points.
+      assert {Font.box("−", 12, "", :symbol, false), Font.box("", 12, "", :plain, false)} ===
+               {{3.6504, 0.0}, {0.0, 0.0}}
+    end
+  end
+
+  # Golden: vdiffr 1.0.9's Symbola table, which it measures R's symbol font with: "−" 9.3240 wide,
+  # "+" 7.0776 high and 0.2592 deep, "M" 7.8696 high, at 12 points, where Liberation Sans's "−" is
+  # 7.0128 wide.
+  describe "the symbol face from the table" do
+    test "is measured from Symbola's metrics, whatever the family" do
+      assert {Font.width("−", 12, "", :symbol, false), Font.width("−", 12, "", :plain, false),
+              Font.box("+", 12, "Lobster", :symbol, false), Font.ascent(12, "", :symbol, false)} ===
+               {9.324, 7.0128, {7.0776, 0.2592}, 7.8696}
+    end
+  end
+
   # Golden: svglite 2.2.2's measurements of the files test/test_helper.exs registers under "Lato",
   # Lato 2.015 Regular and Bold, given to it as `user_fonts` (R 4.6.1, systemfonts 1.3.2,
   # textshaping 1.0.5): `stringWidth()`, and `grobHeight()` of "M" and `grobDescent()` of
@@ -84,6 +115,21 @@ defmodule Giggly.FontTest do
     test "a family no font is registered under is measured from the table" do
       assert Font.width("AV", 12, "Lobster", :plain, false) ===
                Font.width("AV", 12, "", :plain, false)
+    end
+
+    # Golden: svglite's `grobAscent()` and `grobDescent()` of a plotmath string, `textGrob(
+    # expression("10"))` in the family at each size, in big points; at 12 points "gjx" and at 13.2
+    # "10" reach a pixel higher there, as svglite's FreeType sizes the font.
+    test "a string's box is its glyphs' boxes, each rounded outward to a pixel" do
+      assert {Font.box("10", 12, "Lato", :plain, false),
+              Font.box("gjx", 13.2, "Lato", :plain, false),
+              Font.box(" ", 12, "Lato", :plain, false)} ===
+               {{8.6976, 0.0936}, {9.6264, 2.412}, {0.0, 0.0}}
+    end
+
+    test "the symbol face is measured from the table where no font is registered as symbol" do
+      assert Font.width("−", 12, "Lato", :symbol, false) ===
+               Font.width("−", 12, "", :symbol, false)
     end
 
     # The tests below read the glyphs a font gives, which the build without Pica, where
