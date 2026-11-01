@@ -111,6 +111,15 @@ defmodule Scales.PaletteTest do
 
     # R's `pal_gradient_n(c("red", "blue"))`, with `values = c(0, 0.25)` too, on `c(-Inf, Inf,
     # NaN)`: no colour, `NA` each.
+    # Built as the test runs: a literal the guard refuses fails the type checker.
+    test "a place that is not a double is refused" do
+      place = Enum.at(["a"], 0)
+
+      assert_raise FunctionClauseError, fn ->
+        Palette.continuous({:gradient, ["#FF0000", "#0000FF"]}, [place])
+      end
+    end
+
     test "a gradient gives no colour at an infinity or NaN" do
       assert {Palette.continuous({:gradient, ["#FF0000", "#0000FF"]}, [
                 :neg_infinity,

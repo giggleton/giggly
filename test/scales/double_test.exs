@@ -132,5 +132,14 @@ defmodule Scales.DoubleTest do
               Double.less?(:infinity, :infinity), Double.less?(:neg_infinity, :infinity),
               Double.less?(1, 2)} === {true, true, false, false, false, true, true}
     end
+
+    # Its callers set NaN aside first; one handed in is refused, never ranked. Built as the test
+    # runs: a literal the guard refuses fails the type checker.
+    test "NaN is refused" do
+      nan = Enum.at([:nan], 0)
+
+      assert_raise FunctionClauseError, fn -> Double.less?(nan, :infinity) end
+      assert_raise FunctionClauseError, fn -> Double.less?(:neg_infinity, nan) end
+    end
   end
 end

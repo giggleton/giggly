@@ -35,9 +35,20 @@ defmodule Scales.BoundsTest do
                [1.0000000000000004, 1.0000000000000004, 1.0000000000000004, nil]
     end
 
-    # Where every value goes to the middle, none is read, so only the check refuses one.
+    # Where every value goes to the middle, none is read, so only the check refuses one; elsewhere
+    # the check refuses it before the arithmetic does.
     test "a value that is not a double is refused, even onto a range's middle" do
       assert_raise FunctionClauseError, fn -> Bounds.rescale(["a"], {3, 3}, {0, 1}) end
+      assert_raise FunctionClauseError, fn -> Bounds.rescale(["a"], {0, 1}, {0, 1}) end
+    end
+
+    # R's `rescale()` fails on an `NA` end, as `zero_range()` gives `NA`. The end is built as the
+    # test runs: a literal the guard refuses fails the type checker.
+    test "an end that is not a number or an infinity is refused" do
+      nan = Enum.at([:nan], 0)
+
+      assert_raise FunctionClauseError, fn -> Bounds.rescale([], {0, nan}, {0, 1}) end
+      assert_raise FunctionClauseError, fn -> Bounds.rescale([], {0, 1}, {nan, 1}) end
     end
 
     # R's `rescale(x, c(0, 1), c(0, 1))` and `rescale(x, c(0, 10), c(0, 2))`.
@@ -121,6 +132,21 @@ defmodule Scales.BoundsTest do
 
     # R's `rescale_mid(c(1, 3), c(1e308, 1.7e308), c(1, 3), 2)`: the middle of `to` is R's
     # long-double mean, `0x1.807e25b31820bp+1023`, where the doubles' sum is past the largest.
+    # R's `rescale_mid(c(0, 1, 3), c(0, 1), c(3, 0), 2)`: the further end is the low one, 0, two
+    # from the midpoint, as `abs()` measures it.
+    test "the end further from the midpoint is found by distance, a range given high to low too" do
+      assert Bounds.rescale_mid([0, 1, 3], {3, 0}, {0, 1}, 2) === [0.0, 0.25, 0.75]
+    end
+
+    # The midpoint is built as the test runs: a literal the guard refuses fails the type checker.
+    # R's `rescale_mid()` with an `NA` midpoint gives `NA` for every value; here it is refused, as
+    # an end is.
+    test "a midpoint that is not a number or an infinity is refused" do
+      nan = Enum.at([:nan], 0)
+
+      assert_raise FunctionClauseError, fn -> Bounds.rescale_mid([1], {0, 2}, {0, 1}, nan) end
+    end
+
     test "the middle of a range whose ends sum past the largest double is still found" do
       assert Bounds.rescale_mid([1, 2, 3], {1, 3}, {1.0e308, 1.7e308}, 2) ===
                [1.0e308, 1.35e308, 1.7e308]
@@ -168,9 +194,27 @@ defmodule Scales.BoundsTest do
     end
   end
 
+  describe "rescale_max/3's ends" do
+    # The ends are built as the test runs: a literal the guard refuses fails the type checker.
+    test "a high end that is not a number or an infinity is refused, the low ends unread" do
+      nan = Enum.at([:nan], 0)
+
+      assert_raise FunctionClauseError, fn -> Bounds.rescale_max([1], {0, nan}, {0, 1}) end
+      assert_raise FunctionClauseError, fn -> Bounds.rescale_max([1], {0, 2}, {0, nan}) end
+      assert Bounds.rescale_max([1], {nan, 2}, {nan, 1}) === [0.5]
+    end
+  end
+
   describe "rescale_none/1" do
     test "every value is given back as it is" do
       assert Bounds.rescale_none(@doubles) === @doubles
+    end
+
+    # Built as the test runs: a literal the guard refuses fails the type checker.
+    test "values that are not a list are refused" do
+      values = Enum.at(["not a list"], 0)
+
+      assert_raise FunctionClauseError, fn -> Bounds.rescale_none(values) end
     end
   end
 
@@ -237,8 +281,8 @@ defmodule Scales.BoundsTest do
     test "an end that is not a number, an infinity or nil is refused" do
       nan = Enum.at([:nan], 0)
 
-      assert_raise FunctionClauseError, fn -> Bounds.censor([2, 8], {2, nan}) end
-      assert_raise FunctionClauseError, fn -> Bounds.censor([2, 8], {nan, 8}) end
+      assert_raise FunctionClauseError, fn -> Bounds.censor([], {2, nan}) end
+      assert_raise FunctionClauseError, fn -> Bounds.censor([], {nan, 8}) end
     end
   end
 
@@ -262,8 +306,8 @@ defmodule Scales.BoundsTest do
     test "an end that is not a number, an infinity or nil is refused" do
       nan = Enum.at([:nan], 0)
 
-      assert_raise FunctionClauseError, fn -> Bounds.censor_any([2, 8], {2, nan}) end
-      assert_raise FunctionClauseError, fn -> Bounds.censor_any([2, 8], {nan, 8}) end
+      assert_raise FunctionClauseError, fn -> Bounds.censor_any([], {2, nan}) end
+      assert_raise FunctionClauseError, fn -> Bounds.censor_any([], {nan, 8}) end
     end
   end
 
@@ -315,8 +359,8 @@ defmodule Scales.BoundsTest do
     test "an end that is not a number, an infinity or nil is refused" do
       nan = Enum.at([:nan], 0)
 
-      assert_raise FunctionClauseError, fn -> Bounds.squish([2, 8], {2, nan}) end
-      assert_raise FunctionClauseError, fn -> Bounds.squish([2, 8], {nan, 8}) end
+      assert_raise FunctionClauseError, fn -> Bounds.squish([], {2, nan}) end
+      assert_raise FunctionClauseError, fn -> Bounds.squish([], {nan, 8}) end
     end
   end
 
@@ -349,8 +393,8 @@ defmodule Scales.BoundsTest do
     test "an end that is not a number, an infinity or nil is refused" do
       nan = Enum.at([:nan], 0)
 
-      assert_raise FunctionClauseError, fn -> Bounds.squish_any([2, 8], {2, nan}) end
-      assert_raise FunctionClauseError, fn -> Bounds.squish_any([2, 8], {nan, 8}) end
+      assert_raise FunctionClauseError, fn -> Bounds.squish_any([], {2, nan}) end
+      assert_raise FunctionClauseError, fn -> Bounds.squish_any([], {nan, 8}) end
     end
   end
 
@@ -381,8 +425,8 @@ defmodule Scales.BoundsTest do
     test "an end that is not a number, an infinity or nil is refused" do
       nan = Enum.at([:nan], 0)
 
-      assert_raise FunctionClauseError, fn -> Bounds.squish_infinite([2, 8], {2, nan}) end
-      assert_raise FunctionClauseError, fn -> Bounds.squish_infinite([2, 8], {nan, 8}) end
+      assert_raise FunctionClauseError, fn -> Bounds.squish_infinite([], {2, nan}) end
+      assert_raise FunctionClauseError, fn -> Bounds.squish_infinite([], {nan, 8}) end
     end
   end
 
@@ -420,8 +464,8 @@ defmodule Scales.BoundsTest do
     test "an end that is not a number, an infinity or nil is refused" do
       nan = Enum.at([:nan], 0)
 
-      assert_raise FunctionClauseError, fn -> Bounds.discard([2, 8], {2, nan}) end
-      assert_raise FunctionClauseError, fn -> Bounds.discard([2, 8], {nan, 8}) end
+      assert_raise FunctionClauseError, fn -> Bounds.discard([], {2, nan}) end
+      assert_raise FunctionClauseError, fn -> Bounds.discard([], {nan, 8}) end
     end
   end
 
@@ -433,8 +477,8 @@ defmodule Scales.BoundsTest do
     test "an end that is not a number, an infinity or nil is refused" do
       nan = Enum.at([:nan], 0)
 
-      assert_raise FunctionClauseError, fn -> Bounds.keep([2, 8], {2, nan}) end
-      assert_raise FunctionClauseError, fn -> Bounds.keep([2, 8], {nan, 8}) end
+      assert_raise FunctionClauseError, fn -> Bounds.keep([], {2, nan}) end
+      assert_raise FunctionClauseError, fn -> Bounds.keep([], {nan, 8}) end
     end
   end
 end

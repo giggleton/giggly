@@ -3798,6 +3798,10 @@ tells the story (`git show <hash>`). Until 2026-10-15 each milestone also had a 
 `git log -S "<title>" -- notes/design-log.md` finds it in this file's history. The phases are
 §1's roadmap.
 
+- 2026-11-01 — Complete R's out-of-range family, with infinities and NaN as R gives them
+  (transforms, step 1) (`189efe5`); §4: "A NaN is `:nan` throughout `Scales.Bounds`", "The
+  scales package carries every transformation", "`oob:` takes a name or a function",
+  "`transform:` reaches the continuous non-position scales"
 - 2026-10-31 — Break axis and legend labels over lines, draw missing labels NA, and draw powers as
   plotmath draws them (labels, step 6) (`def4123`, fixes `c6726c6`, `66602bb`); §4: "Every text a
   guide draws breaks", "A guide drawing its labels together", "A missing label among powers", "A
