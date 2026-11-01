@@ -4635,7 +4635,7 @@ defmodule GigglyTest do
       dodged = paired_boxes(position: :dodge)
 
       padded =
-        paired_boxes(varwidth: true, position: Plot.position_dodge2(padding: 0.3))
+        paired_boxes(varwidth: true, position: {:dodge2, padding: 0.3})
 
       assert DataFrame.pull(clusters, :x) === [0.8125, 1.1875, 1.8125, 2.1875]
 
@@ -5906,7 +5906,7 @@ defmodule GigglyTest do
     # then `position_dodge2(preserve = "single")`.
     test "the bars at an x share its width with a gap; with :single each takes its share alone" do
       total = counted_cylinders(:dodge2)
-      single = counted_cylinders(Plot.position_dodge2(preserve: :single))
+      single = counted_cylinders({:dodge2, preserve: :single})
 
       assert DataFrame.pull(total, :x) === [
                0.77500000000000002,
@@ -5937,9 +5937,9 @@ defmodule GigglyTest do
 
     # The same with `position_dodge2(reverse = TRUE)`, `padding = 0` and `padding = 0.5`.
     test "reverse: puts the highest group first, and padding: is the gap each bar leaves" do
-      reversed = counted_cylinders(Plot.position_dodge2(reverse: true))
-      unpadded = counted_cylinders(Plot.position_dodge2(padding: 0))
-      half = counted_cylinders(Plot.position_dodge2(padding: 0.5))
+      reversed = counted_cylinders({:dodge2, reverse: true})
+      unpadded = counted_cylinders({:dodge2, padding: 0})
+      half = counted_cylinders({:dodge2, padding: 0.5})
 
       assert {DataFrame.pull(reversed, :group), DataFrame.pull(reversed, :xmin)} ===
                {[2, 1, 4, 3, 5],
@@ -6006,7 +6006,7 @@ defmodule GigglyTest do
 
       mapped = %{x: :x, y: :y, fill: :g, width: :w}
       total = dodged_columns(rows, mapped, position: :dodge2)
-      single = dodged_columns(rows, mapped, position: Plot.position_dodge2(preserve: :single))
+      single = dodged_columns(rows, mapped, position: {:dodge2, preserve: :single})
       set = dodged_columns(rows, %{x: :x, y: :y, fill: :g}, width: 0.5, position: :dodge2)
 
       precise =
@@ -6093,7 +6093,7 @@ defmodule GigglyTest do
             "g" => ["p", "p", "q", "p", "q", "r"]
           },
           %{x: :x, y: :y, fill: :g},
-          position: Plot.position_dodge2(preserve: :single)
+          position: {:dodge2, preserve: :single}
         )
 
       assert {DataFrame.pull(missing, :y), DataFrame.pull(missing, :x)} ===
@@ -6169,7 +6169,7 @@ defmodule GigglyTest do
           "y" => [1, 2, 3, 4, 3]
         }
         |> Plot.new(%{x: {:constant, "x"}, y: :y, fill: :g2})
-        |> Plot.geom_col(position: Plot.position_dodge2(preserve: :single))
+        |> Plot.geom_col(position: {:dodge2, preserve: :single})
         |> Plot.facet_wrap(:g1)
         |> Giggly.layer_data()
 
@@ -12379,7 +12379,7 @@ defmodule GigglyTest do
 
       filled = Plot.new(table, %{x: :trt, y: :resp, fill: :group})
       range = %{ymin: :lower, ymax: :upper}
-      dodge = Plot.position_dodge(width: 0.9)
+      dodge = {:dodge, width: 0.9}
 
       plots = [
         dodge_errorbar:
@@ -12397,7 +12397,7 @@ defmodule GigglyTest do
           table
           |> Plot.new(%{x: :resp, y: :trt, color: :group})
           |> Plot.geom_pointrange(%{xmin: :lower, xmax: :upper},
-            position: Plot.position_dodge(width: 0.5)
+            position: {:dodge, width: 0.5}
           )
       ]
 

@@ -29,13 +29,13 @@ what remains.
 `geom_jitter()` is a shortcut for `geom_point(position = "jitter")`: it moves each point by a small
 random amount, so that points which would sit on one another, as discrete values make them do, can
 be told apart. Giggly has both, `Giggly.Plot.geom_jitter/3`, with `width:` and `height:`, and
-`Giggly.Plot.position_jitter/1`, which `Giggly.Plot.geom_point/3`'s `position:` takes.
+`Giggly.Plot.geom_point/3`'s `position: :jitter`, or `{:jitter, options}` with its options.
 
 Giggly's jitter draws Erlang's random numbers, not R's, so its points land elsewhere than ggplot2's,
 each within the same distance of its place, and an axis that widens to hold them can end a little
 elsewhere too, by no more than about twice that distance; everything else in a drawing is ggplot2's.
 Where ggplot2 draws new numbers each time a plot is drawn unless its position is given a `seed`,
-Giggly draws the same points every time, from a seed of 0 unless `position_jitter/1`'s `seed:` gives
+Giggly draws the same points every time, from a seed of 0 unless `{:jitter, seed: seed}` gives
 another.
 
 A plot is described with `Giggly.Plot` and drawn with `Giggly.to_svg/2`, which returns an SVG

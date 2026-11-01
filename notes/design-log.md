@@ -79,6 +79,20 @@ stops the question being reopened from scratch. A new entry is about 150 words: 
 sentence or two of why, and one line per rejected alternative. What a later decision replaces is
 deleted from the entry it was in, never marked superseded; git history keeps every version.
 
+- **A position is an option value, `position: :name | {:name, options}`, and no function builds
+  one (2026-11-01, Steve: "Sounds good").** R's `position = "fill"` is `:fill`, and
+  `position_dodge(width = 0.9)` is `{:dodge, width: 0.9}`; a name alone is the position with no
+  options given. One check (`Options.validate_position/2`) reads each position's options against
+  a schema of its own and refuses an option named twice; `Plot` records the kind's struct as
+  before, and the "Positions" section of `Plot`'s moduledoc documents every position once, from
+  those schemas. A value is shared between layers by binding it. *Rejected: functions on `Plot`*
+  (`position_dodge/1` and its kin, now gone) — R's shape, which needs a constructor because it
+  passes objects, and `plot.ex` grows by one per position. *Rejected: `new/1` on each kind's
+  module* — the kinds become API and `Position` lists NimbleOptions, both to build what is an
+  option's value. *Rejected: a position's options among the layer's* (ggity's `position_vjust:`)
+  — they collide with the layer's own (`width:`). *Follows, its own decision:* `guide_legend/1`
+  as `guide: {:legend, ...}`.
+
 - **A bootstrap example states its departure once, in its notebook's About (2026-11-01, Steve:
   "Your recommendation").** stat_summary's About says that ggplot2's examples set no seed, so R
   draws its `mean_cl_boot` intervals differently on every run, that Giggly draws them from
@@ -254,7 +268,7 @@ deleted from the entry it was in, never marked superseded; git history keeps eve
   wrappers called on a vector, as their reference pages' examples do, wait. *Rejected: exporting
   them* — an API of list statistics beside the plot's, which nothing but those examples calls.
 
-- **`position_dodge/1` takes `width:` alone (2026-10-31, Steve: "go with this").** Any number,
+- **Dodging takes `width:` alone (2026-10-31, Steve: "go with this").** Any number,
   kept as a float, `:none` when not given, the range layers dodging within it. *Rejected: R's
   `preserve`, `orientation` and `reverse` now* — they arrive with the positions increment, which
   needs them for every dodging layer; the range layers needed only the width.
@@ -1076,14 +1090,14 @@ deleted from the entry it was in, never marked superseded; git history keeps eve
   notebook sweep (2026-10-26, Steve; checked against ggplot2 4.0.3's source and R).**
   `geom_jitter/3` takes a point's options with `width:` and `height:` or `position:`, refused
   together as R refuses them, and no `seed:`, as R's takes none;
-  `position_jitter/1` takes `width:`, `height:` (0 or more, where R moves nothing for a negative)
-  and `seed:`; `geom_point/3`'s `position:` is `:identity`, `:jitter` or that struct. An amount
+  jittering takes `width:`, `height:` (0 or more, where R moves nothing for a negative) and
+  `seed:`; `geom_point/3`'s `position:` is `:identity` or `:jitter`, alone or with them. An amount
   not given is 0.4 of each panel's spacing, as R's. A plot given no seed draws from seed 0
   (Steve: "A"): the same points on every render, and layers of the same rows jitter alike, the
   point-and-label case R needs a seed for. *Rejected: the layer's index as the default seed* —
   layers would differ as R's do, but adding a layer underneath would move every point. *Rejected:
   `Nx.Random`* — jitter is noise, not an analysis result, and Nx would put `Giggly.Tensor` in
-  `Position`'s deps. *Deferred:* `position_jitterdodge()`, with `position_dodge/1`'s `width:`
+  `Position`'s deps. *Deferred:* `position_jitterdodge()`, with dodging's `width:`
   for marks without edges (Steve); jitter on other geoms.
 
 - **A jitter's distances are Erlang's random numbers, and a drawing is checked by R drawing them
@@ -1997,15 +2011,15 @@ deleted from the entry it was in, never marked superseded; git history keeps eve
 
 - **A box layer dodges by clusters unless told otherwise, and `varwidth:` switches its dodging to
   `preserve: :single` silently (2026-10-22, Steve, scoping distributions' step 6).**
-  `geom_boxplot/3` takes `position:` `:dodge2`, its default, `:dodge`, or `position_dodge2/1`'s
-  struct; `:stack` is refused, as R fails stacking boxes ("replacement has 0 rows"), and
-  `:identity` waits, as it does for bars. With `varwidth: true`, either atom records
-  `position_dodge2(preserve: :single)`, as R replaces any position string, `"identity"` included,
-  and a struct records `preserve: :single` with its `padding` and `reverse` kept, where R warns
-  "Can't preserve total widths when `varwidth = TRUE`" and switches, so every call draws what R
-  draws. *Rejected: raising for a struct* — `position_dodge2/1` records `:total` unless told
-  otherwise, as R's does, so it would refuse the default struct, a setting nobody wrote, where R
-  only warns.
+  `geom_boxplot/3` takes `position:` `:dodge2`, its default, alone or with its options, or
+  `:dodge`; `:stack` is refused, as R fails stacking boxes ("replacement has 0 rows"), and
+  `:identity` waits, as it does for bars. With `varwidth: true`, either name records
+  `{:dodge2, preserve: :single}`, as R replaces any position string, `"identity"` included, and
+  dodging by clusters with options records `preserve: :single` with its `padding` and `reverse`
+  kept, where R warns "Can't preserve total widths when `varwidth = TRUE`" and switches, so every
+  call draws what R draws. *Rejected: raising for dodging by clusters with options* — it records
+  `:total` unless told otherwise, as R's does, so it would refuse the default, a setting nobody
+  wrote, where R only warns.
 
 - **A box plot's orientation is R's, an ambiguous one chosen silently, and a contrary
   `orientation:` raises where one axis is mapped (2026-10-22, Steve, scoping distributions' step
@@ -2072,11 +2086,10 @@ deleted from the entry it was in, never marked superseded; git history keeps eve
   with an engine that runs the operators' captures (the entry beginning "A mapping names a
   function only as a shortcut").
 
-- **`Plot.position_dodge2/1` arrives with dodging by clusters, taking `preserve:`, `padding:` and
-  `reverse:` (2026-10-22, Steve, scoping distributions' step 5).** It returns `%Position.Dodge2{}`,
-  which `position:` takes beside the `:dodge2` atom on `geom_bar/3`, `geom_col/3`,
-  `geom_histogram/3` and `stat_bin/3`, as the entry beginning "A layer chooses its position by an
-  atom now" foresaw: `preserve:` `:total` or `:single`, R's strings as atoms; `padding:` 0 to 1, as
+- **Dodging by clusters takes `preserve:`, `padding:` and `reverse:` (2026-10-22, Steve, scoping
+  distributions' step 5).** `{:dodge2, options}` takes them on `geom_bar/3`, `geom_col/3`,
+  `geom_histogram/3` and `stat_bin/3`, beside the name alone: `preserve:` `:total` or `:single`,
+  R's strings as atoms; `padding:` 0 to 1, as
   `just:` is, where R takes any number and its code widens bars into their neighbours below 0 and
   turns them inside out above 1; `reverse:` a boolean. Step 6's `varwidth` sets the same
   `preserve`. `width:` is left out: R reads it only for a geom without edges, none of which takes a
@@ -2769,14 +2782,6 @@ deleted from the entry it was in, never marked superseded; git history keeps eve
   and positions read the `flipped_aes` column. *Rejected: an `orientation:` option instead* — a
   departure for every horizontal `geom_col()`; *`geom_bar` alone this step* — `geom_col` with a
   discrete y drawn wrongly meanwhile.
-
-- **A layer chooses its position by an atom now, a constructor later (2026-10-15, Steve).**
-  `geom_bar` and `geom_col` take `position: :stack | :dodge`, ggplot2's string shorthand,
-  validated by NimbleOptions, `:stack` by default. When a position's parameters arrive,
-  `Plot.position_dodge/1` returns its struct and the same option takes it, as ggplot2's
-  `position = position_dodge()` does; a position's parameters never become the geom's options,
-  ggity's mistake (`position_vjust:`). *Rejected: constructors from the start* — two public
-  functions taking nothing yet, more to write for the common case.
 
 - **ggplot2's `resolution()` is a boundary of its own, `Giggly.Resolution` (2026-10-15,
   Steve).** A mark with a width in data units takes it from the closest spacing of its positions:
@@ -3870,6 +3875,8 @@ tells the story (`git show <hash>`). Until 2026-10-15 each milestone also had a 
 `git log -S "<title>" -- notes/design-log.md` finds it in this file's history. The phases are
 §1's roadmap.
 
+- 2026-11-01 — Give a layer's position as an option value, :name or {:name, options}, and remove
+  the position functions (positions, step 1); §4: "A position is an option value"
 - 2026-11-01 — Draw the notebook examples the summaries unlock, and narrow every verdict to what
   still waits (summaries, step 6, the notebook sweep); §4: "A bootstrap example states its
   departure once", "The summaries are not public functions"

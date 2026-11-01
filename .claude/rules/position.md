@@ -30,7 +30,7 @@ the entry beginning "Each facet, coordinate system, geom, stat and position is a
   `panel` column itself and reads no scale. A position's own
   parameters (a dodge's width, stacking's `vjust` and `reverse`) arrive with the option that sets
   them, as dodging by clusters' `preserve`, `padding` and `reverse` arrived with
-  `Plot.position_dodge2/1` and dodging's `width` with `Plot.position_dodge/1`, the first reader
+  `{:dodge2, options}` and dodging's `width` with `{:dodge, width: width}`, the first reader
   a line range, which has no edges; dodging by clusters' `width` waits, and the panel's scales
   with the first position that reads one.
 - **Stacking is ggplot2's `position_stack()`, `vjust = 1`**: nothing moves unless two rows of

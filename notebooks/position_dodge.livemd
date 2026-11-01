@@ -34,9 +34,10 @@ each mark by its own extent and leaving a little padding between them, which sui
 different widths. `width` gives the width to dodge within, for marks narrower than the bars they sit
 beside, and `preserve` keeps either the total width at each position or the width of each mark.
 Giggly dodges bars, histograms and the range geoms as `position_dodge()` does, with
-`position: :dodge` or `Giggly.Plot.position_dodge/1` and its `width:`, and bars, histograms and box
-plots as `position_dodge2()` does, with `position: :dodge2` or `Giggly.Plot.position_dodge2/1` and
-its `preserve:`, `padding:` and `reverse:`. Not in Giggly yet: `position_dodge()`'s `preserve`,
+`position: :dodge` or `{:dodge, width: width}`, and bars, histograms and box plots as
+`position_dodge2()` does, with `position: :dodge2` or `{:dodge2, options}` and its `preserve:`,
+`padding:` and `reverse:`, a position's options given in a tuple with its name where ggplot2 calls
+its function. Not in Giggly yet: `position_dodge()`'s `preserve`,
 `orientation` and `reverse` options, and `position_dodge2()`'s `width` option. The setup cell binds R's
 `mtcars` and ggplot2's `mpg` and `diamonds`, `Giggly.Datasets.mtcars/0`, `Giggly.Datasets.mpg/0` and
 `Giggly.Datasets.diamonds/0`, to their names in R.
@@ -66,11 +67,11 @@ ggplot(mtcars, aes(factor(cyl), fill = factor(vs))) +
   geom_bar(position = position_dodge2(preserve = "single"))
 ```
 
-`Giggly.Plot.position_dodge2/1` takes ggplot2's options, a word as an atom.
+`{:dodge2, options}` takes ggplot2's options, a word as an atom.
 
 ```elixir
 Plot.new(mtcars, %{x: {:factor, [:cyl]}, fill: {:factor, [:vs]}})
-|> Plot.geom_bar(position: Plot.position_dodge2(preserve: :single))
+|> Plot.geom_bar(position: {:dodge2, preserve: :single})
 |> render.()
 ```
 
@@ -170,7 +171,7 @@ Dodged within 0.9, the width the columns take, each line range sits on its colum
 
 ```elixir
 p
-|> Plot.geom_linerange(range, position: Plot.position_dodge(width: 0.9))
+|> Plot.geom_linerange(range, position: {:dodge, width: 0.9})
 |> render.()
 ```
 
@@ -202,7 +203,7 @@ p
 
 ```elixir
 p
-|> Plot.geom_errorbar(range, width: 0.2, position: Plot.position_dodge(width: 0.9))
+|> Plot.geom_errorbar(range, width: 0.2, position: {:dodge, width: 0.9})
 |> render.()
 ```
 
@@ -254,12 +255,12 @@ Every 8-cylinder car has `vs` 0, so that `x` has one bar: as wide as one bar of 
 
 ```elixir
 Plot.new(mtcars, %{x: {:factor, [:cyl]}, fill: {:factor, [:vs]}})
-|> Plot.geom_bar(position: Plot.position_dodge2(preserve: :single))
+|> Plot.geom_bar(position: {:dodge2, preserve: :single})
 |> render.()
 ```
 
 ```elixir
 Plot.new(mtcars, %{x: {:factor, [:cyl]}, fill: {:factor, [:vs]}})
-|> Plot.geom_bar(position: Plot.position_dodge2(preserve: :total))
+|> Plot.geom_bar(position: {:dodge2, preserve: :total})
 |> render.()
 ```

@@ -32,7 +32,7 @@ and `geom_crossbar()` as a box with a line across it at `y`. `geom_errorbarh()` 
 favour of `geom_errorbar(orientation = "y")`. Giggly has `Giggly.Plot.geom_linerange/3`,
 `Giggly.Plot.geom_pointrange/3`, `Giggly.Plot.geom_errorbar/3` and `Giggly.Plot.geom_crossbar/3`,
 turned on their side by mapping `xmin` and `xmax` or by `orientation:`, and dodged with
-`position: :dodge` or `Giggly.Plot.position_dodge/1` and its `width:`; it has no
+`position: :dodge` or `{:dodge, width: width}`; it has no
 `geom_errorbarh()`. A plot is described with `Giggly.Plot` and drawn with `Giggly.to_svg/2`, which
 returns an SVG document. The setup cell aliases `Giggly.Plot`, so the cells write `Plot.new/2`,
 and defines `render`, which draws a plot and shows it below the cell with `Kino.Image`.
@@ -160,11 +160,11 @@ p +
   geom_errorbar(aes(ymin = lower, ymax = upper), position = dodge, width = 0.25)
 ```
 
-`Giggly.Plot.position_dodge/1` takes the width to dodge within, so both layers are dodged within
-0.9 and each error bar sits on its bar.
+`{:dodge, width: 0.9}` gives the width to dodge within, so both layers are dodged within 0.9 and
+each error bar sits on its bar.
 
 ```elixir
-dodge = Plot.position_dodge(width: 0.9)
+dodge = {:dodge, width: 0.9}
 
 p
 |> Plot.geom_col(position: dodge)
@@ -186,6 +186,6 @@ geom_errorbar(
 ```
 
 R ignores `width = 0.5` here: the error bars have widths of their own, which `position_dodge2()`
-dodges by. `Giggly.Plot.position_dodge2/1` takes `padding:` but not `width:`.
+dodges by. Giggly's `{:dodge2, options}` takes `padding:` but not `width:`.
 
 Not in Giggly yet: `position_dodge2()`'s `width` option.

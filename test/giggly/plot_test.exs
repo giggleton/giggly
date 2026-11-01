@@ -274,19 +274,18 @@ defmodule Giggly.PlotTest do
 
     test "points are jittered by name, with the defaults, or as told" do
       plot = Plot.new(@rows, %{x: :wt, y: :mpg})
-      told = Plot.position_jitter(width: 0.1, seed: 3)
 
       assert [%Plot.Layer{position: %Position.Jitter{width: :none, height: :none, seed: 0}}] =
                Plot.geom_point(plot, position: :jitter).reversed_layers
 
-      assert [%Plot.Layer{position: ^told}] =
-               Plot.geom_point(plot, position: told).reversed_layers
+      assert [%Plot.Layer{position: %Position.Jitter{width: 0.1, height: :none, seed: 3}}] =
+               Plot.geom_point(plot, position: {:jitter, width: 0.1, seed: 3}).reversed_layers
     end
 
     test "a position points do not take is refused by the option's validation, naming those they do" do
       plot = Plot.new(@rows, %{x: :wt, y: :mpg})
 
-      for position <- [:stack, Plot.position_dodge2()] do
+      for position <- [:stack, {:dodge2, padding: 0.2}] do
         error =
           assert_raise NimbleOptions.ValidationError, fn ->
             Plot.geom_point(plot, position: position)
@@ -295,7 +294,8 @@ defmodule Giggly.PlotTest do
         assert error.key == :position
 
         assert error.message =~
-                 "expected :identity, :jitter or a position Plot.position_jitter/1 makes, got: "
+                 "expected :identity or :jitter, alone or in a tuple with a keyword list of its " <>
+                   "options, got: "
       end
     end
 
@@ -760,17 +760,17 @@ defmodule Giggly.PlotTest do
 
     test "every bar function dodges by clusters by name, with the defaults, or as told" do
       plot = Plot.new(@rows, %{x: :wt})
-      told = Plot.position_dodge2(preserve: :single, padding: 0, reverse: true)
+      told = {:dodge2, preserve: :single, padding: 0, reverse: true}
 
       for add <- [&Plot.geom_bar/2, &Plot.geom_histogram/2, &Plot.stat_bin/2] do
         assert [%Plot.Layer{position: by_name}] = add.(plot, position: :dodge2).reversed_layers
         assert by_name == %Position.Dodge2{preserve: :total, padding: 0.1, reverse: false}
       end
 
-      assert [%Plot.Layer{position: ^told}] =
+      assert [%Plot.Layer{position: position}] =
                Plot.geom_col(plot, %{y: :mpg}, position: told).reversed_layers
 
-      assert told == %Position.Dodge2{preserve: :single, padding: 0.0, reverse: true}
+      assert position === %Position.Dodge2{preserve: :single, padding: 0.0, reverse: true}
     end
 
     test "counted bars accept a mapped alpha, which the bar geom draws though counting ignores it" do
@@ -818,15 +818,15 @@ defmodule Giggly.PlotTest do
       plot = Plot.new(@rows, %{x: :cyl})
 
       for add <- [&Plot.geom_bar/2, &Plot.geom_col/2, &Plot.geom_histogram/2, &Plot.stat_bin/2],
-          position <- [:jitter, Plot.position_jitter()] do
+          position <- [:jitter, {:jitter, seed: 1}] do
         error =
           assert_raise NimbleOptions.ValidationError, fn -> add.(plot, position: position) end
 
         assert error.key == :position
 
         assert error.message =~
-                 ":stack, :dodge, :dodge2 or a position Plot.position_dodge/1 or " <>
-                   "Plot.position_dodge2/1 makes"
+                 "expected :stack, :dodge or :dodge2, alone or in a tuple with a keyword list of " <>
+                   "its options"
       end
     end
 
@@ -919,12 +919,14 @@ defmodule Giggly.PlotTest do
       assert {wide.fixed, flat.fixed} == {%{}, %{}}
     end
 
-    test "a position says how the points move" do
+    test "a position says how the points move, by name with the defaults or as told" do
       plot = Plot.new(@rows, %{x: :wt, y: :mpg})
-      told = Plot.position_jitter(height: 0.1, seed: -4)
 
-      assert [%Plot.Layer{position: ^told}] =
-               Plot.geom_jitter(plot, position: told).reversed_layers
+      assert [%Plot.Layer{position: %Position.Jitter{width: :none, height: :none, seed: 0}}] =
+               Plot.geom_jitter(plot, position: :jitter).reversed_layers
+
+      assert [%Plot.Layer{position: %Position.Jitter{width: :none, height: 0.1, seed: -4}}] =
+               Plot.geom_jitter(plot, position: {:jitter, height: 0.1, seed: -4}).reversed_layers
     end
 
     # ggplot2's `geom_jitter()` aborts: "Both `position` and `width`/`height` were supplied."
@@ -934,7 +936,7 @@ defmodule Giggly.PlotTest do
       for amounts <- [[width: 0.1], [height: 0.1], [width: 0.1, height: 0.1]] do
         error =
           assert_raise ArgumentError, fn ->
-            Plot.geom_jitter(plot, [position: Plot.position_jitter()] ++ amounts)
+            Plot.geom_jitter(plot, [position: :jitter] ++ amounts)
           end
 
         assert error.message =~ "Plot.geom_jitter/3"
@@ -943,14 +945,17 @@ defmodule Giggly.PlotTest do
     end
 
     # ggplot2's `geom_jitter()` takes no seed, which only its position takes.
-    test "a negative distance, a position by name and a seed are refused" do
+    test "a negative distance, a position or seed it cannot use, and a seed of its own are refused" do
       plot = Plot.new(@rows, %{x: :wt, y: :mpg})
 
       for {options, key, message} <- [
             {[width: -0.1], :width, "expected a distance, a number 0 or more, got: -0.1"},
             {[height: "1"], :height, ~s(expected a distance, a number 0 or more, got: "1")},
-            {[position: :jitter], :position,
-             "expected a position Plot.position_jitter/1 makes, got: :jitter"},
+            {[position: {:jitter, seed: 1.5}], :position,
+             "in :jitter's options, invalid value for :seed option: expected integer, got: 1.5"},
+            {[position: :stack], :position,
+             "expected :jitter, alone or in a tuple with a keyword list of its options, got: " <>
+               ":stack"},
             {[seed: 1], [:seed], "unknown options [:seed]"}
           ] do
         error =
@@ -1490,7 +1495,7 @@ defmodule Giggly.PlotTest do
                  Plot.geom_boxplot(plot, position: position, varwidth: true).reversed_layers
       end
 
-      told = Plot.position_dodge2(padding: 0.3, reverse: true)
+      told = {:dodge2, padding: 0.3, reverse: true}
 
       assert [%Plot.Layer{position: kept}] =
                Plot.geom_boxplot(plot, position: told, varwidth: true).reversed_layers
@@ -1501,16 +1506,24 @@ defmodule Giggly.PlotTest do
                Plot.geom_boxplot(plot, position: :dodge).reversed_layers
     end
 
-    test "boxes are not stacked" do
-      error =
-        assert_raise NimbleOptions.ValidationError, fn ->
-          @rows
-          |> Plot.new(%{x: :cyl, y: :mpg})
-          |> Plot.geom_boxplot(position: :stack)
-        end
+    test "boxes are not stacked, nor dodged within a width given" do
+      plot = Plot.new(@rows, %{x: :cyl, y: :mpg})
 
-      assert error.message =~
-               "expected :dodge2, :dodge or a position Plot.position_dodge2/1 makes, got: :stack"
+      for {position, message} <- [
+            {:stack,
+             "expected :dodge2 or :dodge, alone or in a tuple with a keyword list of its " <>
+               "options, got: :stack"},
+            {{:dodge, width: 0.5},
+             "expected :dodge alone, whose options a box plot does not take, got: " <>
+               "{:dodge, [width: 0.5]}"}
+          ] do
+        error =
+          assert_raise NimbleOptions.ValidationError, fn ->
+            Plot.geom_boxplot(plot, position: position)
+          end
+
+        assert error.message =~ message
+      end
     end
 
     test "a weight the plot maps is refused, and one the layer maps cannot be used" do
@@ -2290,7 +2303,7 @@ defmodule Giggly.PlotTest do
       across = Plot.new(@rows, %{x: :wt})
       both = Plot.new(@rows, %{x: :wt, y: :mpg})
 
-      for position <- [:jitter, Plot.position_jitter(seed: 3)] do
+      for position <- [:jitter, {:jitter, seed: 3}] do
         error = assert_raise ArgumentError, fn -> Plot.geom_rug(across, position: position) end
         assert error.message =~ "Plot.geom_rug/3 needs :y, but neither its mapping"
         assert error.message =~ "its rugs are jittered"
@@ -2655,16 +2668,26 @@ defmodule Giggly.PlotTest do
     end
   end
 
-  describe "position_dodge/1 and a range layer's position:" do
-    test "position_dodge/1 records the width given, as a float, or :none" do
-      assert Plot.position_dodge(width: 1) == %Position.Dodge{width: 1.0}
-      assert Plot.position_dodge() == %Position.Dodge{width: :none}
+  describe "a range layer's position:" do
+    test "dodging records the width given, as a float, or :none" do
+      plot = Plot.new(@ranges, %{x: :trt, ymin: :lower, ymax: :upper})
 
-      assert_raise NimbleOptions.ValidationError, fn -> Plot.position_dodge(width: "wide") end
-      assert_raise NimbleOptions.ValidationError, fn -> Plot.position_dodge(preserve: :single) end
+      for {position, width} <- [{{:dodge, width: 1}, 1.0}, {{:dodge, []}, :none}] do
+        assert [%Plot.Layer{position: %Position.Dodge{width: ^width}}] =
+                 Plot.geom_linerange(plot, position: position).reversed_layers
+      end
+
+      for {position, message} <- [
+            {{:dodge, width: "wide"}, ~s(in :dodge's options, invalid value for :width option)},
+            {{:dodge, preserve: :single}, "in :dodge's options, unknown options [:preserve]"}
+          ] do
+        assert_raise NimbleOptions.ValidationError, ~r/#{Regex.escape(message)}/, fn ->
+          Plot.geom_linerange(plot, position: position)
+        end
+      end
     end
 
-    test "a range layer is drawn where it is unless position: dodges it, by name or by a struct" do
+    test "a range layer is drawn where it is unless position: dodges it, by name or with options" do
       plot =
         Plot.new(@ranges, %{x: :trt, y: :resp, ymin: :lower, ymax: :upper, xmin: :lower})
 
@@ -2685,28 +2708,27 @@ defmodule Giggly.PlotTest do
         assert [%Plot.Layer{position: %Position.Dodge2{preserve: :total}}] =
                  layer.(plot, %{}, position: :dodge2).reversed_layers
 
-        dodge = Plot.position_dodge(width: 0.9)
-
-        assert [%Plot.Layer{position: ^dodge}] =
-                 layer.(plot, %{}, position: dodge).reversed_layers
+        assert [%Plot.Layer{position: %Position.Dodge{width: 0.9}}] =
+                 layer.(plot, %{}, position: {:dodge, width: 0.9}).reversed_layers
 
         assert_raise NimbleOptions.ValidationError, fn -> layer.(plot, %{}, position: :stack) end
 
-        assert_raise NimbleOptions.ValidationError, ~r/expected :identity, :dodge, :dodge2/, fn ->
-          layer.(plot, %{}, position: Plot.position_jitter())
-        end
+        assert_raise NimbleOptions.ValidationError,
+                     ~r/expected :identity, :dodge or :dodge2/,
+                     fn ->
+                       layer.(plot, %{}, position: {:jitter, seed: 1})
+                     end
       end
     end
 
-    test "a bar layer takes position_dodge/1's struct; a box plot does not" do
+    test "a bar layer takes dodging within a width given; a box plot does not" do
       plot = Plot.new(@rows, %{x: :cyl, y: :mpg})
-      dodge = Plot.position_dodge(width: 0.5)
 
-      assert [%Plot.Layer{position: ^dodge}] =
-               Plot.geom_col(plot, position: dodge).reversed_layers
+      assert [%Plot.Layer{position: %Position.Dodge{width: 0.5}}] =
+               Plot.geom_col(plot, position: {:dodge, width: 0.5}).reversed_layers
 
       assert_raise NimbleOptions.ValidationError, fn ->
-        Plot.geom_boxplot(plot, position: dodge)
+        Plot.geom_boxplot(plot, position: {:dodge, width: 0.5})
       end
     end
   end
@@ -5332,50 +5354,115 @@ defmodule Giggly.PlotTest do
     end
   end
 
-  describe "position_dodge2/1" do
-    test "a padding outside 0 to 1, a preserve it does not know and a width are refused" do
-      for {options, key, message} <- [
-            {[padding: 1.5], :padding, "expected a fraction from 0 to 1, got: 1.5"},
-            {[padding: -0.1], :padding, "expected a fraction from 0 to 1, got: -0.1"},
-            {[padding: "0.1"], :padding, ~s(expected a fraction from 0 to 1, got: "0.1")},
-            {[preserve: :both], :preserve, "expected one of [:total, :single], got: :both"},
-            {[width: 0.5], [:width], "unknown options [:width]"}
+  describe "a layer's position: given with its options" do
+    test "a name alone and the name with no options record the same position, its defaults" do
+      plot = Plot.new(@rows, %{x: :cyl, y: :mpg})
+
+      for {named, struct} <- [
+            {:stack, %Position.Stack{}},
+            {:dodge, %Position.Dodge{width: :none}},
+            {:dodge2, %Position.Dodge2{preserve: :total, padding: 0.1, reverse: false}}
+          ],
+          position <- [named, {named, []}] do
+        assert [%Plot.Layer{position: ^struct}] =
+                 Plot.geom_col(plot, position: position).reversed_layers
+      end
+    end
+
+    test "options that are no keyword list, an option given twice, and options for a position " <>
+           "that takes none are refused, naming the position" do
+      plot = Plot.new(@rows, %{x: :cyl, y: :mpg})
+
+      for {position, message} <- [
+            {{:dodge, [0.5]},
+             "expected :dodge's options to be a keyword list naming each at most once, got: " <>
+               "[0.5]"},
+            {{:dodge, width: 0.5, width: 0.9},
+             "expected :dodge's options to be a keyword list naming each at most once, got: " <>
+               "[width: 0.5, width: 0.9]"},
+            {{:stack, reverse: true}, "in :stack's options, unknown options [:reverse]"},
+            {{:dodge, :wide},
+             "expected :stack, :dodge or :dodge2, alone or in a tuple with a keyword list of " <>
+               "its options, got: {:dodge, :wide}"},
+            {{"dodge", []}, "got: {\"dodge\", []}"}
           ] do
         error =
-          assert_raise NimbleOptions.ValidationError, fn -> Plot.position_dodge2(options) end
+          assert_raise NimbleOptions.ValidationError, fn ->
+            Plot.geom_col(plot, position: position)
+          end
 
-        assert error.key == key
+        assert error.key == :position
         assert error.message =~ message
       end
     end
 
-    test "a padding is kept as a float, 0 and 1 included" do
-      assert Enum.map([0, 1], fn padding -> Plot.position_dodge2(padding: padding).padding end) ===
-               [0.0, 1.0]
+    test "dodging by clusters refuses a padding outside 0 to 1, a preserve it does not know " <>
+           "and a width" do
+      plot = Plot.new(@rows, %{x: :cyl, y: :mpg})
+
+      for {options, message} <- [
+            {[padding: 1.5],
+             "invalid value for :padding option: expected a fraction from 0 to 1"},
+            {[padding: -0.1], "expected a fraction from 0 to 1, got: -0.1"},
+            {[padding: "0.1"], ~s(expected a fraction from 0 to 1, got: "0.1")},
+            {[preserve: :both], "expected one of [:total, :single], got: :both"},
+            {[width: 0.5], "unknown options [:width]"}
+          ] do
+        error =
+          assert_raise NimbleOptions.ValidationError, fn ->
+            Plot.geom_col(plot, position: {:dodge2, options})
+          end
+
+        assert error.key == :position
+        assert error.message =~ "in :dodge2's options, "
+        assert error.message =~ message
+      end
     end
-  end
 
-  describe "position_jitter/1" do
-    test "a distance not given is left to the data, and the seed is 0 unless given" do
-      assert Plot.position_jitter() === %Position.Jitter{width: :none, height: :none, seed: 0}
+    test "dodging by clusters keeps a padding as a float, 0 and 1 included" do
+      plot = Plot.new(@rows, %{x: :cyl, y: :mpg})
 
-      assert Plot.position_jitter(width: 0, height: 2, seed: 12) ===
-               %Position.Jitter{width: 0.0, height: 2.0, seed: 12}
+      paddings =
+        for padding <- [0, 1] do
+          [layer] = Plot.geom_col(plot, position: {:dodge2, padding: padding}).reversed_layers
+          layer.position.padding
+        end
+
+      assert paddings === [0.0, 1.0]
+    end
+
+    test "jittering leaves a distance not given to the data, and its seed is 0 unless given" do
+      plot = Plot.new(@rows, %{x: :wt, y: :mpg})
+
+      for {options, struct} <- [
+            {[], %Position.Jitter{width: :none, height: :none, seed: 0}},
+            {[width: 0, height: 2, seed: 12], %Position.Jitter{width: 0.0, height: 2.0, seed: 12}}
+          ] do
+        assert [%Plot.Layer{position: position}] =
+                 Plot.geom_point(plot, position: {:jitter, options}).reversed_layers
+
+        assert position === struct
+      end
     end
 
     # ggplot2 takes a negative distance and moves nothing by it, a seed of 1.5 as 1, and one
     # written as text with a warning.
-    test "a negative distance and a seed that is not an integer are refused" do
-      for {options, key, message} <- [
-            {[width: -1], :width, "expected a distance, a number 0 or more, got: -1"},
-            {[height: -0.5], :height, "expected a distance, a number 0 or more, got: -0.5"},
-            {[seed: 1.5], :seed, "invalid value for :seed option: expected integer, got: 1.5"},
-            {[seed: nil], :seed, "expected integer, got: nil"}
+    test "jittering refuses a negative distance and a seed that is not an integer" do
+      plot = Plot.new(@rows, %{x: :wt, y: :mpg})
+
+      for {options, message} <- [
+            {[width: -1], "expected a distance, a number 0 or more, got: -1"},
+            {[height: -0.5], "expected a distance, a number 0 or more, got: -0.5"},
+            {[seed: 1.5], "invalid value for :seed option: expected integer, got: 1.5"},
+            {[seed: nil], "expected integer, got: nil"}
           ] do
         error =
-          assert_raise NimbleOptions.ValidationError, fn -> Plot.position_jitter(options) end
+          assert_raise NimbleOptions.ValidationError, fn ->
+            Plot.geom_point(plot, position: {:jitter, options})
+          end
 
-        assert error.key == key
+        assert error.key == :position
+        assert error.message =~ "in :jitter's options, "
         assert error.message =~ message
       end
     end

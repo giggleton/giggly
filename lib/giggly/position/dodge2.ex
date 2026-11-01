@@ -5,7 +5,8 @@ defmodule Giggly.Position.Dodge2 do
   # each its share of their widths, with a gap between them, as `geom_bar(position = "dodge2")`
   # sets them. Its fields are R's parameters but `width`, which R reads only for a mark without
   # edges: `preserve`, `:total` or `:single`; `padding`, from 0 to 1; and `reverse`, each given by
-  # `Giggly.Plot.position_dodge2/1`, whose defaults are R's. Run it through `Giggly.Position`.
+  # a layer's `position: {:dodge2, options}`, whose defaults are R's. Run it through
+  # `Giggly.Position`.
   #
   # It works on the layer's rows as lists, since they are its marks, a row each (design-log §4, the
   # entry beginning "Dodging by clusters computes on lists"), in R's order and R's arithmetic

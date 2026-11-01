@@ -366,8 +366,8 @@ defmodule Giggly.PositionTest do
   end
 
   describe "compute_layer/3 for jittering, given what Plot never gives" do
-    # `Plot.position_jitter/1` keeps every amount as a float, so an integer is a programmer error,
-    # refused rather than drawn from.
+    # A layer's `position: {:jitter, options}` keeps every amount as a float, so an integer is a
+    # programmer error, refused rather than drawn from.
     test "an amount that is not a float is refused" do
       frame = DataFrame.new(panel: [1], x: [1.0], y: [1.0])
 

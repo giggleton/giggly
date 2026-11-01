@@ -31,7 +31,7 @@ list of what remains.
 easier to read when at least one of its positions is discrete: points that would sit on top of one
 another spread apart. The noise goes both ways, by up to 40% of the data's resolution unless `width`
 and `height` say otherwise, and a `seed` makes it the same every time. Giggly has
-`Giggly.Plot.position_jitter/1`, with `width:`, `height:` and `seed:`, which
+`position: :jitter`, or `{:jitter, options}` with `width:`, `height:` and `seed:`, which
 `Giggly.Plot.geom_point/3`'s `position:` takes, and `Giggly.Plot.geom_jitter/3`, which jitters its
 points with it.
 
@@ -111,7 +111,7 @@ mtcars
 ```elixir
 mtcars
 |> Plot.new(%{x: :am, y: :vs})
-|> Plot.geom_jitter(position: Plot.position_jitter(width: 0.1, height: 0.1))
+|> Plot.geom_jitter(position: {:jitter, width: 0.1, height: 0.1})
 |> render.()
 ```
 
@@ -129,7 +129,7 @@ With a `seed`, the position jitters both layers the same way, so each red point 
 and to the right of its black one. Giggly writes `am + 0.2` as `{&Kernel.+/2, [:am, 0.2]}`.
 
 ```elixir
-jitter = Plot.position_jitter(width: 0.1, height: 0.1, seed: 0)
+jitter = {:jitter, width: 0.1, height: 0.1, seed: 0}
 
 mtcars
 |> Plot.new(%{x: :am, y: :vs})
