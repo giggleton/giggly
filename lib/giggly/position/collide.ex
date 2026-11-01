@@ -9,14 +9,13 @@ defmodule Giggly.Position.Collide do
   alias Giggly.DataFrame
   alias Giggly.DataFrame.Arithmetic
 
-  # `frame` with each mark's x the middle of its sides where it has sides and no x, a rectangle,
-  # as ggplot2's `PositionDodge$setup_data()` gives one, and as it is otherwise.
+  # `frame` with each mark's x the middle of its sides where it has no x, a rectangle, as ggplot2's
+  # `PositionDodge$setup_data()` gives one, and as it is otherwise. Every mark a layer stacks or
+  # dodges has an x or both sides.
   @doc false
   @spec with_middle(DataFrame.t()) :: DataFrame.t()
   def with_middle(frame) do
-    names = DataFrame.names(frame)
-
-    if :x in names or not Enum.all?([:xmin, :xmax], fn side -> side in names end),
+    if :x in DataFrame.names(frame),
       do: frame,
       else: DataFrame.put(frame, :x, middles(frame))
   end
@@ -31,13 +30,13 @@ defmodule Giggly.Position.Collide do
     end)
   end
 
-  # `frame` with each mark's sides its x less and plus half `width` where it has no `xmin` and
-  # `xmax`, a line range or a point, or its x on both where `width` is `:none`, as ggplot2's
-  # `collide_setup()` gives them, and as it is otherwise.
+  # `frame` with each mark's sides its x less and plus half `width` where it has none, a line range
+  # or a point, or its x on both where `width` is `:none`, as ggplot2's `collide_setup()` gives
+  # them, and as it is otherwise. A mark has both sides or neither.
   @doc false
   @spec with_sides(DataFrame.t(), :none | float()) :: DataFrame.t()
   def with_sides(frame, width) do
-    if Enum.all?([:xmin, :xmax], fn side -> side in DataFrame.names(frame) end) do
+    if :xmin in DataFrame.names(frame) do
       frame
     else
       x_positions = DataFrame.pull(frame, :x)
