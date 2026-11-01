@@ -311,9 +311,15 @@ defmodule Giggly.PositionTest do
       end
     end
 
-    test "reversed, the lowest group is at the bottom of the pile" do
+    test "reversed, the lowest group is at the bottom of the pile, in whatever order the rows " <>
+           "arrive" do
       assert stacked_columns(%Position.Stack{reverse: true}, bar_rows([1.0, 3.0, 2.0, 2.0])) ===
                [[1.0, 4.0, 2.0, 4.0], [0.0, 1.0, 0.0, 2.0], [1.0, 4.0, 2.0, 4.0]]
+
+      highest_first = bar_rows([1.0, 1.0, 2.0, 2.0], [2, 1, 2, 1], [1.0, 3.0, 2.0, 2.0])
+
+      assert stacked_columns(%Position.Stack{reverse: true}, highest_first) ===
+               [[4.0, 3.0, 4.0, 2.0], [3.0, 0.0, 2.0, 0.0], [4.0, 3.0, 4.0, 2.0]]
     end
 
     test "filled, each pile reaches 1, and its options move it as stacking's do" do
