@@ -108,8 +108,9 @@ and "`wrap/2` takes"; why `dictionary/2` matches and takes what it does: "`dicti
   raises `NimbleOptions.ValidationError` and each formatter's option docs are generated from its
   schema; its boundary lists NimbleOptions and nothing else. The package's transformations call
   `plain/1` for their default labels, or `plain_round_tripped/1`, 14 significant digits first,
-  where their inverse does not give a break back exactly (`scales.md`); a user hands the others to
-  a scale's labels.
+  where their inverse does not give a break back exactly, but Box-Cox, modulus and Yeo-Johnson
+  `plain/1` of their breaks in data units, and a span of time `timespan/2` (`scales.md`); a user
+  hands the others to a scale's labels.
 - **Only what R offers, and only where R's answer is sound**: no superseded name (`currency`,
   not `dollar`), and a `scale_cut:` list without a zero threshold is refused, the one shape where
   R misaligns its steps; `scientific/2` takes no `trim:`, which `label_scientific()` drops;

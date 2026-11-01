@@ -182,6 +182,45 @@ defmodule Scales.DoubleTest do
               Double.exponential(800.0), Double.exponential(:infinity), Double.exponential(:nan)} ===
                {0.0, 7.3890560989306504, :infinity, :infinity, :nan}
     end
+
+    # Golden: R 4.6.1's `x^y` for each base and the exponents -Inf, -3, -0.5, 0, 0.5, 2, 3, Inf
+    # and NaN, and five powers past the largest double or below the smallest (`inc4/step5/pow.R`).
+    test "a power of any base is R's: 1 and 0 decide first, a negative base's fraction is NaN" do
+      exponents = [:neg_infinity, -3.0, -0.5, 0.0, 0.5, 2.0, 3.0, :infinity, :nan]
+
+      for {base, expected} <- [
+            {:neg_infinity, [:nan, 0.0, :nan, 1.0, :nan, :infinity, :neg_infinity, :nan, :nan]},
+            {-2.0, [:nan, -0.125, :nan, 1.0, :nan, 4.0, -8.0, :nan, :nan]},
+            {-0.5, [:nan, -8.0, :nan, 1.0, :nan, 0.25, -0.125, :nan, :nan]},
+            {-0.0, [:infinity, :infinity, :infinity, 1.0, 0.0, 0.0, 0.0, 0.0, :nan]},
+            {0.0, [:infinity, :infinity, :infinity, 1.0, 0.0, 0.0, 0.0, 0.0, :nan]},
+            {0.5,
+             [
+               :infinity,
+               8.0,
+               1.4142135623730951,
+               1.0,
+               0.70710678118654757,
+               0.25,
+               0.125,
+               0.0,
+               :nan
+             ]},
+            {1.0, [1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0]},
+            {2.0,
+             [0.0, 0.125, 0.70710678118654757, 1.0, 1.4142135623730951, 4.0, 8.0, :infinity, :nan]},
+            {:infinity, [0.0, 0.0, 0.0, 1.0, :infinity, :infinity, :infinity, :infinity, :nan]},
+            {:nan, [:nan, :nan, :nan, 1.0, :nan, :nan, :nan, :nan, :nan]}
+          ] do
+        assert Enum.map(exponents, fn exponent -> Double.power(base, exponent) end) === expected,
+               inspect(base)
+      end
+
+      assert {Double.power(-2.0, 1075.0), Double.power(-0.5, 1075.0), Double.power(2.0, 1075.0),
+              Double.power(-2.0, 1.0e300), Double.power(:neg_infinity, 1.0e300),
+              Double.power(-1.0, :infinity), Double.power(10, 2)} ===
+               {:neg_infinity, -0.0, :infinity, :infinity, :infinity, :nan, 100.0}
+    end
   end
 
   describe "logarithm_of_one_plus/1 and exponential_minus_one/1" do

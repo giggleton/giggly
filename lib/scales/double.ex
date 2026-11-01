@@ -108,17 +108,69 @@ defmodule Scales.Double do
   defp positive_logarithm(value, base) when base == 10, do: :math.log10(value)
   defp positive_logarithm(value, base), do: :math.log(value) / :math.log(base)
 
-  # `base` to the power `exponent`, `base` a number above 1, as R's `base^x`: minus infinity's
-  # zero, and a power past the largest double plus infinity.
+  # `base` to the power `exponent`, as R's `^` gives it: a square is `base * base`; 1 to any
+  # power and anything to the power 0 are 1, NaN's too; zero to a positive power is 0 and to a
+  # negative one plus infinity, whatever its sign; an infinite base or exponent goes where the
+  # power tends, but a negative base to an infinite or fractional power is NaN, and minus infinity
+  # to a whole power has that power's sign; past the largest double it is the infinity of its
+  # sign. Each case as R 4.6.1 gives it.
   @doc false
-  @spec power(number(), operand()) :: operand()
-  def power(_base, :neg_infinity), do: 0.0
-  def power(_base, exponent) when exponent in [:infinity, :nan], do: exponent
+  @spec power(operand(), operand()) :: operand()
+  def power(base, exponent) when is_number(base) and is_number(exponent) and exponent == 2,
+    do: multiply(base / 1, base / 1)
+
+  def power(base, exponent) when is_number(exponent) and exponent == 2,
+    do: multiply(base, base)
+
+  def power(base, exponent)
+      when (is_number(base) and base == 1) or (is_number(exponent) and exponent == 0),
+      do: 1.0
+
+  def power(base, exponent) when base == :nan or exponent == :nan, do: :nan
+
+  def power(base, exponent) when is_number(base) and base == 0,
+    do: if(positive?(exponent), do: 0.0, else: :infinity)
+
+  def power(:infinity, exponent), do: if(positive?(exponent), do: :infinity, else: 0.0)
+
+  def power(:neg_infinity, exponent) when is_number(exponent) and exponent < 0,
+    do: if(whole?(exponent), do: 0.0, else: :nan)
+
+  def power(:neg_infinity, exponent) when is_number(exponent),
+    do: if(whole?(exponent), do: odd_power(:neg_infinity, exponent), else: :nan)
+
+  def power(base, exponent) when base == :neg_infinity or exponent in @infinities,
+    do: infinite_power(base, exponent)
 
   def power(base, exponent) do
-    :math.pow(base, exponent)
+    :math.pow(base / 1, exponent / 1)
   rescue
-    ArithmeticError -> :infinity
+    ArithmeticError -> finite_power_beyond(base, exponent)
+  end
+
+  defp positive?(exponent), do: exponent == :infinity or (is_number(exponent) and exponent > 0)
+
+  defp whole?(exponent), do: exponent == Float.floor(exponent / 1)
+
+  # Minus infinity, or a negative base past the largest double, to a whole power: its sign the
+  # base's when the power is odd.
+  defp odd_power(_base, exponent) when rem(trunc(exponent), 2) == 0, do: :infinity
+  defp odd_power(_base, _exponent), do: :neg_infinity
+
+  # A finite base to an infinite power, or minus infinity to one: NaN below zero, else the
+  # infinity or zero the power tends to.
+  defp infinite_power(base, _exponent) when base == :neg_infinity or base < 0, do: :nan
+  defp infinite_power(base, :infinity), do: if(base > 1, do: :infinity, else: 0.0)
+  defp infinite_power(base, :neg_infinity), do: if(base < 1, do: :infinity, else: 0.0)
+
+  # What Erlang refuses: a negative base to a fractional power, NaN, and a power past the largest
+  # double, the infinity of its sign. A power below the smallest double is Erlang's zero.
+  defp finite_power_beyond(base, exponent) do
+    cond do
+      base < 0 and not whole?(exponent) -> :nan
+      base < 0 -> odd_power(base, exponent)
+      true -> :infinity
+    end
   end
 
   # e to the power `value`, as R's `exp()`: minus infinity's zero, and a power past the largest

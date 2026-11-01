@@ -28,7 +28,7 @@ defmodule Scales.Transform do
   # inverse, its domain, and its axis's default breaks, minor breaks and labels (R's `breaks`,
   # `minor_breaks` and `format`): a log axis wants powers of ten, a date axis calendar dates. One
   # of numbers carries its derivatives too (R's `d_transform` and `d_inverse`), which the date,
-  # date-time and time transformations have none of, as R's have none.
+  # date-time, time and span of time transformations have none of, as R's have none.
   #
   # Each is a module implementing this behaviour: the identity (`Transform.Identity`), which a
   # continuous scale of numbers records, as ggplot2's continuous scales default to
@@ -42,9 +42,12 @@ defmodule Scales.Transform do
   # the pseudo-logarithm, square root, reverse and reciprocal (`Transform.Log1p`,
   # `Transform.Asinh`, `Transform.PseudoLog`, `Transform.Sqrt`, `Transform.Reverse`,
   # `Transform.Reciprocal`), the arcsine square root and inverse hyperbolic tangent
-  # (`Transform.Asn`, `Transform.Atanh`), and a distribution's quantile (`Transform.Probability`:
-  # `:logit`, `:probit`, `{:probability, distribution, options}`), which a plot's scale names. A
-  # name holding a base, a sigma or a distribution's parameters is refused where it is resolved
+  # (`Transform.Asn`, `Transform.Atanh`), a distribution's quantile (`Transform.Probability`:
+  # `:logit`, `:probit`, `{:probability, distribution, options}`), the Box-Cox, modulus and
+  # Yeo-Johnson transformations (`Transform.BoxCox`, `Transform.Modulus`, `Transform.YeoJohnson`,
+  # built on `Transform.Power`), and a span of time in seconds (`Transform.Timespan`), which a
+  # plot's scale names. A name holding a base, a sigma, a distribution's parameters, an exponent,
+  # an offset or a unit is refused where it is resolved
   # unless each is a number in range, so every callback reads them unchecked. Every callback is
   # handed the transformation as the scale records it, so one that holds more than its name reads
   # it, as R's object's functions close over theirs. Each finds its
@@ -62,7 +65,8 @@ defmodule Scales.Transform do
                       type: :non_neg_integer,
                       doc:
                         "The number of breaks wanted, five when not given, for every " <>
-                          "transformation but `:time`: from 1 for the logarithms in a base " <>
+                          "transformation but `:time` and a span of time's: from 1 for the " <>
+                          "logarithms in a base " <>
                           "(`:log`, `:log2`, `:log10`, `{:log, base}`), from 0 for dates and " <>
                           "date-times, and from 2 for the rest, as R's own breaks take it."
                     ]
@@ -80,17 +84,23 @@ defmodule Scales.Transform do
   `transform_logit()` and `transform_probit()`; `{:probability, :normal, mean: mean, sd: sd}` and
   `{:probability, :logistic, location: location, scale: scale}`, either or both, R's
   `transform_probability("norm", mean = 0, sd = 1)` and `transform_probability("logis",
-  location = 0, scale = 1)`; `:date`,
+  location = 0, scale = 1)`; `{:boxcox, exponent}` and `{:boxcox, exponent, offset: offset}`,
+  R's `transform_boxcox(p, offset = 0)`; `{:modulus, exponent}` and `{:modulus, exponent, offset:
+  offset}`, R's `transform_modulus(p, offset = 1)`; `{:yj, exponent}`, the Yeo-Johnson
+  transformation, R's `transform_yj(p)`; `:timespan` and `{:timespan, unit}`, a number counted in
+  `unit`, `:second` to `:week`, as its seconds, R's `transform_timespan(unit = "secs")`; `:date`,
   a `Date` as its days since 1970-01-01, R's `transform_date()`; `{:datetime, zone, database}`, a
   `DateTime` or `NaiveDateTime` as its seconds since 1970-01-01 00:00 UTC, its breaks laid on
   the clock of `zone`, read by the time zone database `database`, R's `transform_time(tz)`, the
   zone `:default` until a column settles it and `:naive` for naive date-times; and `:time`, a
   `Time` as its seconds since midnight, R's `transform_hms()`.
 
-  A base is a number above 1, a sigma, a standard deviation or a scale a number above 0, and a
-  mean or a location a number, and a name holding any other raises `FunctionClauseError`
-  wherever it is handed, where R also takes a base below 1, falling, and gives no axis at 1 or
-  a scale of 0. A falling axis is the transformation in a base above 1 reversed.
+  A base is a number above 1, a sigma, a standard deviation or a scale a number above 0, a
+  mean, a location or an exponent a number, a Box-Cox offset a number from 0 up and a modulus
+  offset one from 1 up, and a name holding any other raises `FunctionClauseError` wherever it is
+  handed, where R also takes a base below 1, falling, and gives no axis at 1 or a scale of 0, and a
+  modulus offset below 1, which no longer rises. A falling axis is the transformation in a base
+  above 1 reversed.
   """
   @type name ::
           :identity
@@ -116,6 +126,13 @@ defmodule Scales.Transform do
           | :probit
           | {:probability, :normal, [mean: number(), sd: number()]}
           | {:probability, :logistic, [location: number(), scale: number()]}
+          | {:boxcox, number()}
+          | {:boxcox, number(), [offset: number()]}
+          | {:modulus, number()}
+          | {:modulus, number(), [offset: number()]}
+          | {:yj, number()}
+          | :timespan
+          | {:timespan, Scales.Breaks.timespan_unit()}
 
   @typedoc "A break in transformed space: a number, or an infinity or NaN where R's lands one."
   @type break :: float() | :infinity | :neg_infinity | :nan
@@ -124,10 +141,21 @@ defmodule Scales.Transform do
   defguardp is_temporal(name)
             when name in [:date, :time] or (is_tuple(name) and elem(name, 0) == :datetime)
 
+  # The span of time transformation, of numbers but with no derivatives, as R's has none.
+  defguardp is_timespan(name)
+            when name == :timespan or (is_tuple(name) and elem(name, 0) == :timespan)
+
+  # A span of time's unit, as `Scales.Breaks.timespan/2` names them.
+  defguardp is_unit(unit) when unit in [:second, :minute, :hour, :day, :week]
+
   # A base a logarithm, an exponential or a pseudo-logarithm takes, and a pseudo-logarithm's sigma
   # or a distribution's spread.
   defguardp is_base(base) when is_number(base) and base > 1
   defguardp is_positive(value) when is_number(value) and value > 0
+
+  # A Box-Cox offset, from 0 up, and a modulus offset, from 1 up, where the modulus rises.
+  defguardp is_boxcox_offset(offset) when is_number(offset) and offset >= 0
+  defguardp is_modulus_offset(offset) when is_number(offset) and offset >= 1
 
   # A distribution's parameter by name: a mean or location a number, a standard deviation or a
   # scale a number above 0.
@@ -155,7 +183,7 @@ defmodule Scales.Transform do
   # The breaks of an axis showing `extent`, in transformed space, in the transformation's order;
   # some may fall outside it, a break at an end of a domain the transformation takes to an
   # infinity, logit's 0 and 1, there, as R's. `options` are `breaks/3`'s, validated, and always
-  # `[]` for the time transformation, which counts no breaks.
+  # `[]` for the time and span of time transformations, which count no breaks.
   @doc false
   @callback breaks(transformation :: name(), extent :: {float(), float()}, options :: keyword()) ::
               [break()]
@@ -219,13 +247,16 @@ defmodule Scales.Transform do
   def inverse(name, positions), do: module(name).inverse(name, positions)
 
   # As ggplot2's `get_breaks()` squishes its limits with `oob_squish()` into the domain
-  # transformed. A domain that bounds nothing squishes nothing: transformed, its ends are the
-  # infinities or, the reciprocal's, two zeros, a domain of no width, which R leaves unsquished.
-  # Every transformation with a bounded domain rises, so its transformed ends need no sorting.
+  # transformed, its ends sorted, a NaN among them dropped: so a transformation of every number
+  # whose values are bounded, yj's below 1 for a negative exponent, squishes there too, and a
+  # domain transformed to no width, the reciprocal's two zeros, or to one end squishes nothing, as
+  # R leaves it. A date's, date-time's or time's domain is every one, so it squishes nothing.
   @doc """
   The extent `{low, high}`, in transformed space, squished into the domain of the transformation
   `name`, transformed: each end outside it moved onto it, as R's `oob_squish()` moves it, so
-  log10's breaks are not sought below `-100`.
+  log10's breaks are not sought below `-100`, and onto a bound the values of a transformation of
+  every number never pass, the Yeo-Johnson transformation's 1 for an exponent of -1. A date's,
+  date-time's or time's is never squished.
 
   ## Examples
 
@@ -233,16 +264,32 @@ defmodule Scales.Transform do
       {-100.0, 2.0}
   """
   @spec squish(name(), {float(), float()}) :: {float(), float()}
+  def squish(name, extent) when is_temporal(name), do: extent
+
   def squish(name, extent) do
-    case module(name).domain(name) do
-      {:neg_infinity, :infinity} -> extent
-      domain -> squished(extent, transform(name, Tuple.to_list(domain)))
+    {domain_low, domain_high} = module(name).domain(name)
+
+    transformed =
+      name
+      |> transform([domain_low, domain_high])
+      |> Enum.reject(fn domain_end -> domain_end == :nan end)
+
+    case transformed do
+      [first, second] ->
+        squished(extent, {Double.minimum(first, second), Double.maximum(first, second)})
+
+      _one_end ->
+        extent
     end
   end
 
-  defp squished({low, high}, [domain_low, domain_high]) do
-    [squished_low, squished_high] = Bounds.squish([low, high], {domain_low, domain_high})
-    {squished_low, squished_high}
+  defp squished({low, high} = extent, domain) do
+    if Bounds.zero_range?(domain) do
+      extent
+    else
+      [squished_low, squished_high] = Bounds.squish([low, high], domain)
+      {squished_low, squished_high}
+    end
   end
 
   @doc """
@@ -294,7 +341,7 @@ defmodule Scales.Transform do
   @doc """
   The derivative of the transformation `name` at each of `values`, R's `d_transform`, each a
   double (`t:Scales.double/0`), its infinities and NaN as R's arithmetic gives them. Only a
-  transformation of numbers has one: a date's, date-time's or time's raises
+  transformation of numbers has one: a date's, date-time's, time's or span of time's raises
   `FunctionClauseError`.
 
   ## Examples
@@ -306,7 +353,7 @@ defmodule Scales.Transform do
       [1.0, 1.0]
   """
   @spec derivative(name(), [Scales.double()]) :: [Scales.double()]
-  def derivative(name, values) when not is_temporal(name),
+  def derivative(name, values) when not is_temporal(name) and not is_timespan(name),
     do: module(name).derivative(name, values)
 
   @doc """
@@ -319,7 +366,7 @@ defmodule Scales.Transform do
       [1.0, -4.0, :infinity]
   """
   @spec inverse_derivative(name(), [Scales.double()]) :: [Scales.double()]
-  def inverse_derivative(name, positions) when not is_temporal(name),
+  def inverse_derivative(name, positions) when not is_temporal(name) and not is_timespan(name),
     do: module(name).inverse_derivative(name, positions)
 
   @doc """
@@ -329,12 +376,15 @@ defmodule Scales.Transform do
   extended breaks (`Scales.Breaks`) on the extent in data units, powers of the base and their multiples under a logarithm in a base
   (`Scales.Breaks.log/2`, so powers of e under `:log`), calendar dates under the date
   transformation and clock times under the date-time one, as R's `pretty()` finds them, and
-  spans of time under the time one, as `Scales.Breaks.timespan/2` finds them.
+  spans of time under the time and span of time ones, as `Scales.Breaks.timespan/2` finds them.
+  Under the Box-Cox, modulus and Yeo-Johnson transformations an end of the extent that turns back
+  to an infinity, past a bound their values never reach, is set aside and the breaks found on the
+  other end alone, as R's sit there; none where both do.
 
   `n:` asks for that many: of `Scales.Breaks.log/2` under a logarithm in a base, of R's
   `pretty()` under the date and date-time transformations, and of `Scales.Breaks.extended/2`
-  under the rest. The time transformation counts no breaks, as R's takes no
-  number, and raises `ArgumentError` for it; `Scales.Breaks.timespan/2` takes one.
+  under the rest. The time and span of time transformations count no breaks, as R's take no
+  number, and raise `ArgumentError` for it; `Scales.Breaks.timespan/2` takes one.
 
   ## Options
 
@@ -360,16 +410,16 @@ defmodule Scales.Transform do
     module(name).breaks(name, extent, validated)
   end
 
-  # The options validated, but for the time transformation, which counts no breaks, as R's
-  # `transform_hms()` takes no number.
+  # The options validated, but for the time and span of time transformations, which count no
+  # breaks, as R's `transform_hms()` and `transform_timespan()` take no number.
   defp counted!(name, options) do
     case NimbleOptions.validate!(options, @breaks_options) do
       [] ->
         []
 
-      validated when name == :time ->
+      validated when name == :time or is_timespan(name) ->
         raise ArgumentError,
-              "the :time transformation counts no breaks, so it takes no " <>
+              "the #{inspect(name)} transformation counts no breaks, so it takes no " <>
                 "#{inspect(Keyword.keys(validated))}; Scales.Breaks.timespan/2 takes a number " <>
                 "of breaks between seconds"
 
@@ -393,8 +443,11 @@ defmodule Scales.Transform do
   @doc """
   The default labels of `breaks`, in transformed space, under the transformation `name`: its own
   breaks on an axis showing `extent`, found with `options`, `breaks/3`'s, or, for `:given`, breaks
-  it did not choose. A number's are `Scales.Labels.plain/1`'s, written from the breaks turned
-  back; a date's in the format of the step its breaks were chosen at, so a date's or date-time's
+  it did not choose, the extent squished into the domain as for `breaks/3`. A number's are
+  `Scales.Labels.plain/1`'s, written from the breaks turned back, but the Box-Cox, modulus and
+  Yeo-Johnson transformations write each of their own from the value in data units it was found
+  from, since the round trip can keep as few as three of its digits, and a span of time's are
+  `Scales.Labels.timespan/2`'s; a date's in the format of the step its breaks were chosen at, so a date's or date-time's
   breaks found with `n:` are labelled when given the same `n:`, and a given date written in full.
 
   ## Options
@@ -421,8 +474,13 @@ defmodule Scales.Transform do
   @spec format(name(), [float()], {float(), float()} | :given, keyword()) :: [String.t()]
   def format(name, breaks, extent, options \\ []) do
     validated = counted!(name, options)
-    module(name).format(name, breaks, extent, validated)
+    module(name).format(name, breaks, squished_extent(name, extent), validated)
   end
+
+  # The extent as `breaks/3` is handed it, squished into the domain, so a transformation can find
+  # its own breaks again.
+  defp squished_extent(_name, :given), do: :given
+  defp squished_extent(name, extent), do: squish(name, extent)
 
   @doc """
   The breaks a step lays, written as `Date.shift/2` takes one (`[week: 2]`), on an axis showing
@@ -484,4 +542,20 @@ defmodule Scales.Transform do
        when first != second and is_parameter(distribution, first, first_value) and
               is_parameter(distribution, second, second_value),
        do: Transform.Probability
+
+  defp module({:boxcox, exponent}) when is_number(exponent), do: Transform.BoxCox
+
+  defp module({:boxcox, exponent, [offset: offset]})
+       when is_number(exponent) and is_boxcox_offset(offset),
+       do: Transform.BoxCox
+
+  defp module({:modulus, exponent}) when is_number(exponent), do: Transform.Modulus
+
+  defp module({:modulus, exponent, [offset: offset]})
+       when is_number(exponent) and is_modulus_offset(offset),
+       do: Transform.Modulus
+
+  defp module({:yj, exponent}) when is_number(exponent), do: Transform.YeoJohnson
+  defp module(:timespan), do: Transform.Timespan
+  defp module({:timespan, unit}) when is_unit(unit), do: Transform.Timespan
 end

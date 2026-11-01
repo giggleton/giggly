@@ -194,6 +194,9 @@ defmodule Scales.Breaks do
   @clock_units [:second, :minute, :hour]
   @clock_seconds %{second: 1, minute: 60, hour: 3600}
 
+  @typedoc "A unit a span of time is counted in."
+  @type timespan_unit :: :second | :minute | :hour | :day | :week
+
   @typedoc "A value broken: a number, or a date, date-time or time of day."
   @type value :: number() | Date.t() | NaiveDateTime.t() | DateTime.t() | Time.t()
 
@@ -399,7 +402,7 @@ defmodule Scales.Breaks do
       |> NimbleOptions.validate!(@timespan_options)
       |> Map.new()
 
-    seconds = Map.fetch!(@unit_seconds, unit)
+    seconds = unit_seconds(unit)
     [low, high] = Enum.sort([low / 1 * seconds, high / 1 * seconds])
     scale = timespan_scale(high - low)
 
@@ -407,6 +410,12 @@ defmodule Scales.Breaks do
     |> extended(n: wanted, nice_numbers: @timespan_nice_numbers)
     |> Enum.map(fn break -> break * scale end)
   end
+
+  # The seconds in a unit a span of time is counted in, which the span of time transformation
+  # counts its values in too.
+  @doc false
+  @spec unit_seconds(timespan_unit()) :: pos_integer()
+  def unit_seconds(unit), do: Map.fetch!(@unit_seconds, unit)
 
   # The seconds in the unit a span of `span` seconds is broken in.
   defp timespan_scale(span) when span <= 2 * 60, do: 1

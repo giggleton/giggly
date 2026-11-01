@@ -1,0 +1,1881 @@
+"transformation","function","x","r"
+"boxcox -1","transform",-Inf,NaN
+"boxcox -1","transform",-2,NaN
+"boxcox -1","transform",-0,-Inf
+"boxcox -1","transform",0,-Inf
+"boxcox -1","transform",0.5,-1
+"boxcox -1","transform",2,0.5
+"boxcox -1","transform",Inf,1
+"boxcox -1","transform",NA,NA
+"boxcox -1","transform",NaN,NaN
+"boxcox -1","transform",-1,NaN
+"boxcox -1","transform",1,-0
+"boxcox -1","transform",-0.5,NaN
+"boxcox -1","transform",1e-300,-9.999999999999999e+299
+"boxcox -1","transform",-1e-300,NaN
+"boxcox -1","transform",9.9999999999999995e-21,-1e+20
+"boxcox -1","transform",1.0000000000000001e+300,1
+"boxcox -1","transform",-1.0000000000000001e+300,NaN
+"boxcox -1","transform",-3,NaN
+"boxcox -1","transform",3,0.66666666666666674
+"boxcox -1","transform",0.10000000000000001,-9
+"boxcox -1","inverse",-Inf,0
+"boxcox -1","inverse",-2,0.33333333333333331
+"boxcox -1","inverse",-0,1
+"boxcox -1","inverse",0,1
+"boxcox -1","inverse",0.5,2
+"boxcox -1","inverse",2,-1
+"boxcox -1","inverse",Inf,0
+"boxcox -1","inverse",NA,NA
+"boxcox -1","inverse",NaN,NaN
+"boxcox -1","inverse",-1,0.5
+"boxcox -1","inverse",1,Inf
+"boxcox -1","inverse",-0.5,0.66666666666666663
+"boxcox -1","inverse",1e-300,1
+"boxcox -1","inverse",-1e-300,1
+"boxcox -1","inverse",9.9999999999999995e-21,1
+"boxcox -1","inverse",1.0000000000000001e+300,-1e-300
+"boxcox -1","inverse",-1.0000000000000001e+300,1e-300
+"boxcox -1","inverse",-3,0.25
+"boxcox -1","inverse",3,-0.5
+"boxcox -1","inverse",0.10000000000000001,1.1111111111111112
+"boxcox -1","derivative",-Inf,0
+"boxcox -1","derivative",-2,0.25
+"boxcox -1","derivative",-0,Inf
+"boxcox -1","derivative",0,Inf
+"boxcox -1","derivative",0.5,4
+"boxcox -1","derivative",2,0.25
+"boxcox -1","derivative",Inf,0
+"boxcox -1","derivative",NA,NA
+"boxcox -1","derivative",NaN,NaN
+"boxcox -1","derivative",-1,1
+"boxcox -1","derivative",1,1
+"boxcox -1","derivative",-0.5,4
+"boxcox -1","derivative",1e-300,Inf
+"boxcox -1","derivative",-1e-300,Inf
+"boxcox -1","derivative",9.9999999999999995e-21,1.0000000000000002e+40
+"boxcox -1","derivative",1.0000000000000001e+300,0
+"boxcox -1","derivative",-1.0000000000000001e+300,0
+"boxcox -1","derivative",-3,0.1111111111111111
+"boxcox -1","derivative",3,0.1111111111111111
+"boxcox -1","derivative",0.10000000000000001,99.999999999999986
+"boxcox -1","inverse_derivative",-Inf,0
+"boxcox -1","inverse_derivative",-2,0.1111111111111111
+"boxcox -1","inverse_derivative",-0,1
+"boxcox -1","inverse_derivative",0,1
+"boxcox -1","inverse_derivative",0.5,4
+"boxcox -1","inverse_derivative",2,1
+"boxcox -1","inverse_derivative",Inf,0
+"boxcox -1","inverse_derivative",NA,NA
+"boxcox -1","inverse_derivative",NaN,NaN
+"boxcox -1","inverse_derivative",-1,0.25
+"boxcox -1","inverse_derivative",1,Inf
+"boxcox -1","inverse_derivative",-0.5,0.44444444444444442
+"boxcox -1","inverse_derivative",1e-300,1
+"boxcox -1","inverse_derivative",-1e-300,1
+"boxcox -1","inverse_derivative",9.9999999999999995e-21,1
+"boxcox -1","inverse_derivative",1.0000000000000001e+300,0
+"boxcox -1","inverse_derivative",-1.0000000000000001e+300,0
+"boxcox -1","inverse_derivative",-3,0.0625
+"boxcox -1","inverse_derivative",3,0.25
+"boxcox -1","inverse_derivative",0.10000000000000001,1.2345679012345678
+"boxcox 0","transform",-Inf,NaN
+"boxcox 0","transform",-2,NaN
+"boxcox 0","transform",-0,-Inf
+"boxcox 0","transform",0,-Inf
+"boxcox 0","transform",0.5,-0.69314718055994529
+"boxcox 0","transform",2,0.69314718055994529
+"boxcox 0","transform",Inf,Inf
+"boxcox 0","transform",NA,NA
+"boxcox 0","transform",NaN,NaN
+"boxcox 0","transform",-1,NaN
+"boxcox 0","transform",1,0
+"boxcox 0","transform",-0.5,NaN
+"boxcox 0","transform",1e-300,-690.77552789821368
+"boxcox 0","transform",-1e-300,NaN
+"boxcox 0","transform",9.9999999999999995e-21,-46.051701859880914
+"boxcox 0","transform",1.0000000000000001e+300,690.77552789821368
+"boxcox 0","transform",-1.0000000000000001e+300,NaN
+"boxcox 0","transform",-3,NaN
+"boxcox 0","transform",3,1.0986122886681098
+"boxcox 0","transform",0.10000000000000001,-2.3025850929940455
+"boxcox 0","inverse",-Inf,0
+"boxcox 0","inverse",-2,0.1353352832366127
+"boxcox 0","inverse",-0,1
+"boxcox 0","inverse",0,1
+"boxcox 0","inverse",0.5,1.6487212707001282
+"boxcox 0","inverse",2,7.3890560989306504
+"boxcox 0","inverse",Inf,Inf
+"boxcox 0","inverse",NA,NA
+"boxcox 0","inverse",NaN,NaN
+"boxcox 0","inverse",-1,0.36787944117144233
+"boxcox 0","inverse",1,2.7182818284590451
+"boxcox 0","inverse",-0.5,0.60653065971263342
+"boxcox 0","inverse",1e-300,1
+"boxcox 0","inverse",-1e-300,1
+"boxcox 0","inverse",9.9999999999999995e-21,1
+"boxcox 0","inverse",1.0000000000000001e+300,Inf
+"boxcox 0","inverse",-1.0000000000000001e+300,0
+"boxcox 0","inverse",-3,0.049787068367863944
+"boxcox 0","inverse",3,20.085536923187668
+"boxcox 0","inverse",0.10000000000000001,1.1051709180756477
+"boxcox 0","derivative",-Inf,-0
+"boxcox 0","derivative",-2,-0.5
+"boxcox 0","derivative",-0,Inf
+"boxcox 0","derivative",0,Inf
+"boxcox 0","derivative",0.5,2
+"boxcox 0","derivative",2,0.5
+"boxcox 0","derivative",Inf,0
+"boxcox 0","derivative",NA,NA
+"boxcox 0","derivative",NaN,NaN
+"boxcox 0","derivative",-1,-1
+"boxcox 0","derivative",1,1
+"boxcox 0","derivative",-0.5,-2
+"boxcox 0","derivative",1e-300,9.999999999999999e+299
+"boxcox 0","derivative",-1e-300,-9.999999999999999e+299
+"boxcox 0","derivative",9.9999999999999995e-21,1e+20
+"boxcox 0","derivative",1.0000000000000001e+300,1e-300
+"boxcox 0","derivative",-1.0000000000000001e+300,-1e-300
+"boxcox 0","derivative",-3,-0.33333333333333331
+"boxcox 0","derivative",3,0.33333333333333331
+"boxcox 0","derivative",0.10000000000000001,10
+"boxcox 0","inverse_derivative",-Inf,0
+"boxcox 0","inverse_derivative",-2,0.1353352832366127
+"boxcox 0","inverse_derivative",-0,1
+"boxcox 0","inverse_derivative",0,1
+"boxcox 0","inverse_derivative",0.5,1.6487212707001282
+"boxcox 0","inverse_derivative",2,7.3890560989306504
+"boxcox 0","inverse_derivative",Inf,Inf
+"boxcox 0","inverse_derivative",NA,NA
+"boxcox 0","inverse_derivative",NaN,NaN
+"boxcox 0","inverse_derivative",-1,0.36787944117144233
+"boxcox 0","inverse_derivative",1,2.7182818284590451
+"boxcox 0","inverse_derivative",-0.5,0.60653065971263342
+"boxcox 0","inverse_derivative",1e-300,1
+"boxcox 0","inverse_derivative",-1e-300,1
+"boxcox 0","inverse_derivative",9.9999999999999995e-21,1
+"boxcox 0","inverse_derivative",1.0000000000000001e+300,Inf
+"boxcox 0","inverse_derivative",-1.0000000000000001e+300,0
+"boxcox 0","inverse_derivative",-3,0.049787068367863944
+"boxcox 0","inverse_derivative",3,20.085536923187668
+"boxcox 0","inverse_derivative",0.10000000000000001,1.1051709180756477
+"boxcox 0.5","transform",-Inf,NaN
+"boxcox 0.5","transform",-2,NaN
+"boxcox 0.5","transform",-0,-2
+"boxcox 0.5","transform",0,-2
+"boxcox 0.5","transform",0.5,-0.58578643762690485
+"boxcox 0.5","transform",2,0.82842712474619029
+"boxcox 0.5","transform",Inf,Inf
+"boxcox 0.5","transform",NA,NA
+"boxcox 0.5","transform",NaN,NaN
+"boxcox 0.5","transform",-1,NaN
+"boxcox 0.5","transform",1,0
+"boxcox 0.5","transform",-0.5,NaN
+"boxcox 0.5","transform",1e-300,-2
+"boxcox 0.5","transform",-1e-300,NaN
+"boxcox 0.5","transform",9.9999999999999995e-21,-1.9999999998
+"boxcox 0.5","transform",1.0000000000000001e+300,2e+150
+"boxcox 0.5","transform",-1.0000000000000001e+300,NaN
+"boxcox 0.5","transform",-3,NaN
+"boxcox 0.5","transform",3,1.4641016151377544
+"boxcox 0.5","transform",0.10000000000000001,-1.367544467966324
+"boxcox 0.5","inverse",-Inf,Inf
+"boxcox 0.5","inverse",-2,0
+"boxcox 0.5","inverse",-0,1
+"boxcox 0.5","inverse",0,1
+"boxcox 0.5","inverse",0.5,1.5625
+"boxcox 0.5","inverse",2,4
+"boxcox 0.5","inverse",Inf,Inf
+"boxcox 0.5","inverse",NA,NA
+"boxcox 0.5","inverse",NaN,NaN
+"boxcox 0.5","inverse",-1,0.25
+"boxcox 0.5","inverse",1,2.25
+"boxcox 0.5","inverse",-0.5,0.5625
+"boxcox 0.5","inverse",1e-300,1
+"boxcox 0.5","inverse",-1e-300,1
+"boxcox 0.5","inverse",9.9999999999999995e-21,1
+"boxcox 0.5","inverse",1.0000000000000001e+300,Inf
+"boxcox 0.5","inverse",-1.0000000000000001e+300,Inf
+"boxcox 0.5","inverse",-3,0.25
+"boxcox 0.5","inverse",3,6.25
+"boxcox 0.5","inverse",0.10000000000000001,1.1025
+"boxcox 0.5","derivative",-Inf,NaN
+"boxcox 0.5","derivative",-2,NaN
+"boxcox 0.5","derivative",-0,Inf
+"boxcox 0.5","derivative",0,Inf
+"boxcox 0.5","derivative",0.5,1.4142135623730951
+"boxcox 0.5","derivative",2,0.70710678118654757
+"boxcox 0.5","derivative",Inf,0
+"boxcox 0.5","derivative",NA,NA
+"boxcox 0.5","derivative",NaN,NaN
+"boxcox 0.5","derivative",-1,NaN
+"boxcox 0.5","derivative",1,1
+"boxcox 0.5","derivative",-0.5,NaN
+"boxcox 0.5","derivative",1e-300,9.9999999999999998e+149
+"boxcox 0.5","derivative",-1e-300,NaN
+"boxcox 0.5","derivative",9.9999999999999995e-21,10000000000
+"boxcox 0.5","derivative",1.0000000000000001e+300,1e-150
+"boxcox 0.5","derivative",-1.0000000000000001e+300,NaN
+"boxcox 0.5","derivative",-3,NaN
+"boxcox 0.5","derivative",3,0.57735026918962573
+"boxcox 0.5","derivative",0.10000000000000001,3.1622776601683791
+"boxcox 0.5","inverse_derivative",-Inf,-Inf
+"boxcox 0.5","inverse_derivative",-2,0
+"boxcox 0.5","inverse_derivative",-0,1
+"boxcox 0.5","inverse_derivative",0,1
+"boxcox 0.5","inverse_derivative",0.5,1.25
+"boxcox 0.5","inverse_derivative",2,2
+"boxcox 0.5","inverse_derivative",Inf,Inf
+"boxcox 0.5","inverse_derivative",NA,NA
+"boxcox 0.5","inverse_derivative",NaN,NaN
+"boxcox 0.5","inverse_derivative",-1,0.5
+"boxcox 0.5","inverse_derivative",1,1.5
+"boxcox 0.5","inverse_derivative",-0.5,0.75
+"boxcox 0.5","inverse_derivative",1e-300,1
+"boxcox 0.5","inverse_derivative",-1e-300,1
+"boxcox 0.5","inverse_derivative",9.9999999999999995e-21,1
+"boxcox 0.5","inverse_derivative",1.0000000000000001e+300,5.0000000000000003e+299
+"boxcox 0.5","inverse_derivative",-1.0000000000000001e+300,-5.0000000000000003e+299
+"boxcox 0.5","inverse_derivative",-3,-0.5
+"boxcox 0.5","inverse_derivative",3,2.5
+"boxcox 0.5","inverse_derivative",0.10000000000000001,1.05
+"boxcox 1","transform",-Inf,NaN
+"boxcox 1","transform",-2,NaN
+"boxcox 1","transform",-0,-1
+"boxcox 1","transform",0,-1
+"boxcox 1","transform",0.5,-0.5
+"boxcox 1","transform",2,1
+"boxcox 1","transform",Inf,Inf
+"boxcox 1","transform",NA,NA
+"boxcox 1","transform",NaN,NaN
+"boxcox 1","transform",-1,NaN
+"boxcox 1","transform",1,0
+"boxcox 1","transform",-0.5,NaN
+"boxcox 1","transform",1e-300,-1
+"boxcox 1","transform",-1e-300,NaN
+"boxcox 1","transform",9.9999999999999995e-21,-1
+"boxcox 1","transform",1.0000000000000001e+300,1.0000000000000001e+300
+"boxcox 1","transform",-1.0000000000000001e+300,NaN
+"boxcox 1","transform",-3,NaN
+"boxcox 1","transform",3,2
+"boxcox 1","transform",0.10000000000000001,-0.90000000000000002
+"boxcox 1","inverse",-Inf,-Inf
+"boxcox 1","inverse",-2,-1
+"boxcox 1","inverse",-0,1
+"boxcox 1","inverse",0,1
+"boxcox 1","inverse",0.5,1.5
+"boxcox 1","inverse",2,3
+"boxcox 1","inverse",Inf,Inf
+"boxcox 1","inverse",NA,NA
+"boxcox 1","inverse",NaN,NaN
+"boxcox 1","inverse",-1,0
+"boxcox 1","inverse",1,2
+"boxcox 1","inverse",-0.5,0.5
+"boxcox 1","inverse",1e-300,1
+"boxcox 1","inverse",-1e-300,1
+"boxcox 1","inverse",9.9999999999999995e-21,1
+"boxcox 1","inverse",1.0000000000000001e+300,1.0000000000000001e+300
+"boxcox 1","inverse",-1.0000000000000001e+300,-1.0000000000000001e+300
+"boxcox 1","inverse",-3,-2
+"boxcox 1","inverse",3,4
+"boxcox 1","inverse",0.10000000000000001,1.1000000000000001
+"boxcox 1","derivative",-Inf,1
+"boxcox 1","derivative",-2,1
+"boxcox 1","derivative",-0,1
+"boxcox 1","derivative",0,1
+"boxcox 1","derivative",0.5,1
+"boxcox 1","derivative",2,1
+"boxcox 1","derivative",Inf,1
+"boxcox 1","derivative",NA,1
+"boxcox 1","derivative",NaN,1
+"boxcox 1","derivative",-1,1
+"boxcox 1","derivative",1,1
+"boxcox 1","derivative",-0.5,1
+"boxcox 1","derivative",1e-300,1
+"boxcox 1","derivative",-1e-300,1
+"boxcox 1","derivative",9.9999999999999995e-21,1
+"boxcox 1","derivative",1.0000000000000001e+300,1
+"boxcox 1","derivative",-1.0000000000000001e+300,1
+"boxcox 1","derivative",-3,1
+"boxcox 1","derivative",3,1
+"boxcox 1","derivative",0.10000000000000001,1
+"boxcox 1","inverse_derivative",-Inf,1
+"boxcox 1","inverse_derivative",-2,1
+"boxcox 1","inverse_derivative",-0,1
+"boxcox 1","inverse_derivative",0,1
+"boxcox 1","inverse_derivative",0.5,1
+"boxcox 1","inverse_derivative",2,1
+"boxcox 1","inverse_derivative",Inf,1
+"boxcox 1","inverse_derivative",NA,1
+"boxcox 1","inverse_derivative",NaN,1
+"boxcox 1","inverse_derivative",-1,1
+"boxcox 1","inverse_derivative",1,1
+"boxcox 1","inverse_derivative",-0.5,1
+"boxcox 1","inverse_derivative",1e-300,1
+"boxcox 1","inverse_derivative",-1e-300,1
+"boxcox 1","inverse_derivative",9.9999999999999995e-21,1
+"boxcox 1","inverse_derivative",1.0000000000000001e+300,1
+"boxcox 1","inverse_derivative",-1.0000000000000001e+300,1
+"boxcox 1","inverse_derivative",-3,1
+"boxcox 1","inverse_derivative",3,1
+"boxcox 1","inverse_derivative",0.10000000000000001,1
+"boxcox 2","transform",-Inf,NaN
+"boxcox 2","transform",-2,NaN
+"boxcox 2","transform",-0,-0.5
+"boxcox 2","transform",0,-0.5
+"boxcox 2","transform",0.5,-0.375
+"boxcox 2","transform",2,1.5
+"boxcox 2","transform",Inf,Inf
+"boxcox 2","transform",NA,NA
+"boxcox 2","transform",NaN,NaN
+"boxcox 2","transform",-1,NaN
+"boxcox 2","transform",1,0
+"boxcox 2","transform",-0.5,NaN
+"boxcox 2","transform",1e-300,-0.5
+"boxcox 2","transform",-1e-300,NaN
+"boxcox 2","transform",9.9999999999999995e-21,-0.5
+"boxcox 2","transform",1.0000000000000001e+300,Inf
+"boxcox 2","transform",-1.0000000000000001e+300,NaN
+"boxcox 2","transform",-3,NaN
+"boxcox 2","transform",3,4
+"boxcox 2","transform",0.10000000000000001,-0.495
+"boxcox 2","inverse",-Inf,NaN
+"boxcox 2","inverse",-2,NaN
+"boxcox 2","inverse",-0,1
+"boxcox 2","inverse",0,1
+"boxcox 2","inverse",0.5,1.4142135623730951
+"boxcox 2","inverse",2,2.2360679774997898
+"boxcox 2","inverse",Inf,Inf
+"boxcox 2","inverse",NA,NA
+"boxcox 2","inverse",NaN,NaN
+"boxcox 2","inverse",-1,NaN
+"boxcox 2","inverse",1,1.7320508075688772
+"boxcox 2","inverse",-0.5,0
+"boxcox 2","inverse",1e-300,1
+"boxcox 2","inverse",-1e-300,1
+"boxcox 2","inverse",9.9999999999999995e-21,1
+"boxcox 2","inverse",1.0000000000000001e+300,1.4142135623730951e+150
+"boxcox 2","inverse",-1.0000000000000001e+300,NaN
+"boxcox 2","inverse",-3,NaN
+"boxcox 2","inverse",3,2.6457513110645907
+"boxcox 2","inverse",0.10000000000000001,1.0954451150103321
+"boxcox 2","derivative",-Inf,-Inf
+"boxcox 2","derivative",-2,-2
+"boxcox 2","derivative",-0,0
+"boxcox 2","derivative",0,0
+"boxcox 2","derivative",0.5,0.5
+"boxcox 2","derivative",2,2
+"boxcox 2","derivative",Inf,Inf
+"boxcox 2","derivative",NA,NA
+"boxcox 2","derivative",NaN,NaN
+"boxcox 2","derivative",-1,-1
+"boxcox 2","derivative",1,1
+"boxcox 2","derivative",-0.5,-0.5
+"boxcox 2","derivative",1e-300,1e-300
+"boxcox 2","derivative",-1e-300,-1e-300
+"boxcox 2","derivative",9.9999999999999995e-21,9.9999999999999995e-21
+"boxcox 2","derivative",1.0000000000000001e+300,1.0000000000000001e+300
+"boxcox 2","derivative",-1.0000000000000001e+300,-1.0000000000000001e+300
+"boxcox 2","derivative",-3,-3
+"boxcox 2","derivative",3,3
+"boxcox 2","derivative",0.10000000000000001,0.10000000000000001
+"boxcox 2","inverse_derivative",-Inf,NaN
+"boxcox 2","inverse_derivative",-2,NaN
+"boxcox 2","inverse_derivative",-0,1
+"boxcox 2","inverse_derivative",0,1
+"boxcox 2","inverse_derivative",0.5,0.70710678118654757
+"boxcox 2","inverse_derivative",2,0.44721359549995793
+"boxcox 2","inverse_derivative",Inf,0
+"boxcox 2","inverse_derivative",NA,NA
+"boxcox 2","inverse_derivative",NaN,NaN
+"boxcox 2","inverse_derivative",-1,NaN
+"boxcox 2","inverse_derivative",1,0.57735026918962573
+"boxcox 2","inverse_derivative",-0.5,Inf
+"boxcox 2","inverse_derivative",1e-300,1
+"boxcox 2","inverse_derivative",-1e-300,1
+"boxcox 2","inverse_derivative",9.9999999999999995e-21,1
+"boxcox 2","inverse_derivative",1.0000000000000001e+300,7.0710678118654746e-151
+"boxcox 2","inverse_derivative",-1.0000000000000001e+300,NaN
+"boxcox 2","inverse_derivative",-3,NaN
+"boxcox 2","inverse_derivative",3,0.37796447300922725
+"boxcox 2","inverse_derivative",0.10000000000000001,0.9128709291752769
+"boxcox 1e-08","transform",-Inf,NaN
+"boxcox 1e-08","transform",-2,NaN
+"boxcox 1e-08","transform",-0,-Inf
+"boxcox 1e-08","transform",0,-Inf
+"boxcox 1e-08","transform",0.5,-0.69314718055994529
+"boxcox 1e-08","transform",2,0.69314718055994529
+"boxcox 1e-08","transform",Inf,Inf
+"boxcox 1e-08","transform",NA,NA
+"boxcox 1e-08","transform",NaN,NaN
+"boxcox 1e-08","transform",-1,NaN
+"boxcox 1e-08","transform",1,0
+"boxcox 1e-08","transform",-0.5,NaN
+"boxcox 1e-08","transform",1e-300,-690.77552789821368
+"boxcox 1e-08","transform",-1e-300,NaN
+"boxcox 1e-08","transform",9.9999999999999995e-21,-46.051701859880914
+"boxcox 1e-08","transform",1.0000000000000001e+300,690.77552789821368
+"boxcox 1e-08","transform",-1.0000000000000001e+300,NaN
+"boxcox 1e-08","transform",-3,NaN
+"boxcox 1e-08","transform",3,1.0986122886681098
+"boxcox 1e-08","transform",0.10000000000000001,-2.3025850929940455
+"boxcox 1e-08","inverse",-Inf,0
+"boxcox 1e-08","inverse",-2,0.1353352832366127
+"boxcox 1e-08","inverse",-0,1
+"boxcox 1e-08","inverse",0,1
+"boxcox 1e-08","inverse",0.5,1.6487212707001282
+"boxcox 1e-08","inverse",2,7.3890560989306504
+"boxcox 1e-08","inverse",Inf,Inf
+"boxcox 1e-08","inverse",NA,NA
+"boxcox 1e-08","inverse",NaN,NaN
+"boxcox 1e-08","inverse",-1,0.36787944117144233
+"boxcox 1e-08","inverse",1,2.7182818284590451
+"boxcox 1e-08","inverse",-0.5,0.60653065971263342
+"boxcox 1e-08","inverse",1e-300,1
+"boxcox 1e-08","inverse",-1e-300,1
+"boxcox 1e-08","inverse",9.9999999999999995e-21,1
+"boxcox 1e-08","inverse",1.0000000000000001e+300,Inf
+"boxcox 1e-08","inverse",-1.0000000000000001e+300,0
+"boxcox 1e-08","inverse",-3,0.049787068367863944
+"boxcox 1e-08","inverse",3,20.085536923187668
+"boxcox 1e-08","inverse",0.10000000000000001,1.1051709180756477
+"boxcox 1e-08","derivative",-Inf,-0
+"boxcox 1e-08","derivative",-2,-0.5
+"boxcox 1e-08","derivative",-0,Inf
+"boxcox 1e-08","derivative",0,Inf
+"boxcox 1e-08","derivative",0.5,2
+"boxcox 1e-08","derivative",2,0.5
+"boxcox 1e-08","derivative",Inf,0
+"boxcox 1e-08","derivative",NA,NA
+"boxcox 1e-08","derivative",NaN,NaN
+"boxcox 1e-08","derivative",-1,-1
+"boxcox 1e-08","derivative",1,1
+"boxcox 1e-08","derivative",-0.5,-2
+"boxcox 1e-08","derivative",1e-300,9.999999999999999e+299
+"boxcox 1e-08","derivative",-1e-300,-9.999999999999999e+299
+"boxcox 1e-08","derivative",9.9999999999999995e-21,1e+20
+"boxcox 1e-08","derivative",1.0000000000000001e+300,1e-300
+"boxcox 1e-08","derivative",-1.0000000000000001e+300,-1e-300
+"boxcox 1e-08","derivative",-3,-0.33333333333333331
+"boxcox 1e-08","derivative",3,0.33333333333333331
+"boxcox 1e-08","derivative",0.10000000000000001,10
+"boxcox 1e-08","inverse_derivative",-Inf,0
+"boxcox 1e-08","inverse_derivative",-2,0.1353352832366127
+"boxcox 1e-08","inverse_derivative",-0,1
+"boxcox 1e-08","inverse_derivative",0,1
+"boxcox 1e-08","inverse_derivative",0.5,1.6487212707001282
+"boxcox 1e-08","inverse_derivative",2,7.3890560989306504
+"boxcox 1e-08","inverse_derivative",Inf,Inf
+"boxcox 1e-08","inverse_derivative",NA,NA
+"boxcox 1e-08","inverse_derivative",NaN,NaN
+"boxcox 1e-08","inverse_derivative",-1,0.36787944117144233
+"boxcox 1e-08","inverse_derivative",1,2.7182818284590451
+"boxcox 1e-08","inverse_derivative",-0.5,0.60653065971263342
+"boxcox 1e-08","inverse_derivative",1e-300,1
+"boxcox 1e-08","inverse_derivative",-1e-300,1
+"boxcox 1e-08","inverse_derivative",9.9999999999999995e-21,1
+"boxcox 1e-08","inverse_derivative",1.0000000000000001e+300,Inf
+"boxcox 1e-08","inverse_derivative",-1.0000000000000001e+300,0
+"boxcox 1e-08","inverse_derivative",-3,0.049787068367863944
+"boxcox 1e-08","inverse_derivative",3,20.085536923187668
+"boxcox 1e-08","inverse_derivative",0.10000000000000001,1.1051709180756477
+"boxcox 0.5 offset 3","transform",-Inf,NaN
+"boxcox 0.5 offset 3","transform",-2,0
+"boxcox 0.5 offset 3","transform",-0,1.4641016151377544
+"boxcox 0.5 offset 3","transform",0,1.4641016151377544
+"boxcox 0.5 offset 3","transform",0.5,1.7416573867739413
+"boxcox 0.5 offset 3","transform",2,2.4721359549995796
+"boxcox 0.5 offset 3","transform",Inf,Inf
+"boxcox 0.5 offset 3","transform",NA,NA
+"boxcox 0.5 offset 3","transform",NaN,NaN
+"boxcox 0.5 offset 3","transform",-1,0.82842712474619029
+"boxcox 0.5 offset 3","transform",1,2
+"boxcox 0.5 offset 3","transform",-0.5,1.1622776601683795
+"boxcox 0.5 offset 3","transform",1e-300,1.4641016151377544
+"boxcox 0.5 offset 3","transform",-1e-300,1.4641016151377544
+"boxcox 0.5 offset 3","transform",9.9999999999999995e-21,1.4641016151377544
+"boxcox 0.5 offset 3","transform",1.0000000000000001e+300,2e+150
+"boxcox 0.5 offset 3","transform",-1.0000000000000001e+300,NaN
+"boxcox 0.5 offset 3","transform",-3,-2
+"boxcox 0.5 offset 3","transform",3,2.8989794855663558
+"boxcox 0.5 offset 3","transform",0.10000000000000001,1.5213633723318019
+"boxcox 0.5 offset 3","inverse",-Inf,Inf
+"boxcox 0.5 offset 3","inverse",-2,-3
+"boxcox 0.5 offset 3","inverse",-0,-2
+"boxcox 0.5 offset 3","inverse",0,-2
+"boxcox 0.5 offset 3","inverse",0.5,-1.4375
+"boxcox 0.5 offset 3","inverse",2,1
+"boxcox 0.5 offset 3","inverse",Inf,Inf
+"boxcox 0.5 offset 3","inverse",NA,NA
+"boxcox 0.5 offset 3","inverse",NaN,NaN
+"boxcox 0.5 offset 3","inverse",-1,-2.75
+"boxcox 0.5 offset 3","inverse",1,-0.75
+"boxcox 0.5 offset 3","inverse",-0.5,-2.4375
+"boxcox 0.5 offset 3","inverse",1e-300,-2
+"boxcox 0.5 offset 3","inverse",-1e-300,-2
+"boxcox 0.5 offset 3","inverse",9.9999999999999995e-21,-2
+"boxcox 0.5 offset 3","inverse",1.0000000000000001e+300,Inf
+"boxcox 0.5 offset 3","inverse",-1.0000000000000001e+300,Inf
+"boxcox 0.5 offset 3","inverse",-3,-2.75
+"boxcox 0.5 offset 3","inverse",3,3.25
+"boxcox 0.5 offset 3","inverse",0.10000000000000001,-1.8975
+"boxcox 0.5 offset 3","derivative",-Inf,NaN
+"boxcox 0.5 offset 3","derivative",-2,1
+"boxcox 0.5 offset 3","derivative",-0,0.57735026918962573
+"boxcox 0.5 offset 3","derivative",0,0.57735026918962573
+"boxcox 0.5 offset 3","derivative",0.5,0.53452248382484879
+"boxcox 0.5 offset 3","derivative",2,0.44721359549995793
+"boxcox 0.5 offset 3","derivative",Inf,0
+"boxcox 0.5 offset 3","derivative",NA,NA
+"boxcox 0.5 offset 3","derivative",NaN,NaN
+"boxcox 0.5 offset 3","derivative",-1,0.70710678118654757
+"boxcox 0.5 offset 3","derivative",1,0.5
+"boxcox 0.5 offset 3","derivative",-0.5,0.63245553203367588
+"boxcox 0.5 offset 3","derivative",1e-300,0.57735026918962573
+"boxcox 0.5 offset 3","derivative",-1e-300,0.57735026918962573
+"boxcox 0.5 offset 3","derivative",9.9999999999999995e-21,0.57735026918962573
+"boxcox 0.5 offset 3","derivative",1.0000000000000001e+300,1e-150
+"boxcox 0.5 offset 3","derivative",-1.0000000000000001e+300,NaN
+"boxcox 0.5 offset 3","derivative",-3,Inf
+"boxcox 0.5 offset 3","derivative",3,0.40824829046386302
+"boxcox 0.5 offset 3","derivative",0.10000000000000001,0.56796183424706481
+"boxcox 0.5 offset 3","inverse_derivative",-Inf,-Inf
+"boxcox 0.5 offset 3","inverse_derivative",-2,0
+"boxcox 0.5 offset 3","inverse_derivative",-0,1
+"boxcox 0.5 offset 3","inverse_derivative",0,1
+"boxcox 0.5 offset 3","inverse_derivative",0.5,1.25
+"boxcox 0.5 offset 3","inverse_derivative",2,2
+"boxcox 0.5 offset 3","inverse_derivative",Inf,Inf
+"boxcox 0.5 offset 3","inverse_derivative",NA,NA
+"boxcox 0.5 offset 3","inverse_derivative",NaN,NaN
+"boxcox 0.5 offset 3","inverse_derivative",-1,0.5
+"boxcox 0.5 offset 3","inverse_derivative",1,1.5
+"boxcox 0.5 offset 3","inverse_derivative",-0.5,0.75
+"boxcox 0.5 offset 3","inverse_derivative",1e-300,1
+"boxcox 0.5 offset 3","inverse_derivative",-1e-300,1
+"boxcox 0.5 offset 3","inverse_derivative",9.9999999999999995e-21,1
+"boxcox 0.5 offset 3","inverse_derivative",1.0000000000000001e+300,5.0000000000000003e+299
+"boxcox 0.5 offset 3","inverse_derivative",-1.0000000000000001e+300,-5.0000000000000003e+299
+"boxcox 0.5 offset 3","inverse_derivative",-3,-0.5
+"boxcox 0.5 offset 3","inverse_derivative",3,2.5
+"boxcox 0.5 offset 3","inverse_derivative",0.10000000000000001,1.05
+"boxcox 0 offset 3","transform",-Inf,NaN
+"boxcox 0 offset 3","transform",-2,0
+"boxcox 0 offset 3","transform",-0,1.0986122886681098
+"boxcox 0 offset 3","transform",0,1.0986122886681098
+"boxcox 0 offset 3","transform",0.5,1.2527629684953681
+"boxcox 0 offset 3","transform",2,1.6094379124341003
+"boxcox 0 offset 3","transform",Inf,Inf
+"boxcox 0 offset 3","transform",NA,NA
+"boxcox 0 offset 3","transform",NaN,NaN
+"boxcox 0 offset 3","transform",-1,0.69314718055994529
+"boxcox 0 offset 3","transform",1,1.3862943611198906
+"boxcox 0 offset 3","transform",-0.5,0.91629073187415511
+"boxcox 0 offset 3","transform",1e-300,1.0986122886681098
+"boxcox 0 offset 3","transform",-1e-300,1.0986122886681098
+"boxcox 0 offset 3","transform",9.9999999999999995e-21,1.0986122886681098
+"boxcox 0 offset 3","transform",1.0000000000000001e+300,690.77552789821368
+"boxcox 0 offset 3","transform",-1.0000000000000001e+300,NaN
+"boxcox 0 offset 3","transform",-3,-Inf
+"boxcox 0 offset 3","transform",3,1.791759469228055
+"boxcox 0 offset 3","transform",0.10000000000000001,1.1314021114911006
+"boxcox 0 offset 3","inverse",-Inf,-3
+"boxcox 0 offset 3","inverse",-2,-2.8646647167633872
+"boxcox 0 offset 3","inverse",-0,-2
+"boxcox 0 offset 3","inverse",0,-2
+"boxcox 0 offset 3","inverse",0.5,-1.3512787292998718
+"boxcox 0 offset 3","inverse",2,4.3890560989306504
+"boxcox 0 offset 3","inverse",Inf,Inf
+"boxcox 0 offset 3","inverse",NA,NA
+"boxcox 0 offset 3","inverse",NaN,NaN
+"boxcox 0 offset 3","inverse",-1,-2.6321205588285577
+"boxcox 0 offset 3","inverse",1,-0.28171817154095491
+"boxcox 0 offset 3","inverse",-0.5,-2.3934693402873668
+"boxcox 0 offset 3","inverse",1e-300,-2
+"boxcox 0 offset 3","inverse",-1e-300,-2
+"boxcox 0 offset 3","inverse",9.9999999999999995e-21,-2
+"boxcox 0 offset 3","inverse",1.0000000000000001e+300,Inf
+"boxcox 0 offset 3","inverse",-1.0000000000000001e+300,-3
+"boxcox 0 offset 3","inverse",-3,-2.9502129316321359
+"boxcox 0 offset 3","inverse",3,17.085536923187668
+"boxcox 0 offset 3","inverse",0.10000000000000001,-1.8948290819243523
+"boxcox 0 offset 3","derivative",-Inf,-0
+"boxcox 0 offset 3","derivative",-2,1
+"boxcox 0 offset 3","derivative",-0,0.33333333333333331
+"boxcox 0 offset 3","derivative",0,0.33333333333333331
+"boxcox 0 offset 3","derivative",0.5,0.2857142857142857
+"boxcox 0 offset 3","derivative",2,0.20000000000000001
+"boxcox 0 offset 3","derivative",Inf,0
+"boxcox 0 offset 3","derivative",NA,NA
+"boxcox 0 offset 3","derivative",NaN,NaN
+"boxcox 0 offset 3","derivative",-1,0.5
+"boxcox 0 offset 3","derivative",1,0.25
+"boxcox 0 offset 3","derivative",-0.5,0.40000000000000002
+"boxcox 0 offset 3","derivative",1e-300,0.33333333333333331
+"boxcox 0 offset 3","derivative",-1e-300,0.33333333333333331
+"boxcox 0 offset 3","derivative",9.9999999999999995e-21,0.33333333333333331
+"boxcox 0 offset 3","derivative",1.0000000000000001e+300,1e-300
+"boxcox 0 offset 3","derivative",-1.0000000000000001e+300,-1e-300
+"boxcox 0 offset 3","derivative",-3,Inf
+"boxcox 0 offset 3","derivative",3,0.16666666666666666
+"boxcox 0 offset 3","derivative",0.10000000000000001,0.32258064516129031
+"boxcox 0 offset 3","inverse_derivative",-Inf,0
+"boxcox 0 offset 3","inverse_derivative",-2,0.1353352832366127
+"boxcox 0 offset 3","inverse_derivative",-0,1
+"boxcox 0 offset 3","inverse_derivative",0,1
+"boxcox 0 offset 3","inverse_derivative",0.5,1.6487212707001282
+"boxcox 0 offset 3","inverse_derivative",2,7.3890560989306504
+"boxcox 0 offset 3","inverse_derivative",Inf,Inf
+"boxcox 0 offset 3","inverse_derivative",NA,NA
+"boxcox 0 offset 3","inverse_derivative",NaN,NaN
+"boxcox 0 offset 3","inverse_derivative",-1,0.36787944117144233
+"boxcox 0 offset 3","inverse_derivative",1,2.7182818284590451
+"boxcox 0 offset 3","inverse_derivative",-0.5,0.60653065971263342
+"boxcox 0 offset 3","inverse_derivative",1e-300,1
+"boxcox 0 offset 3","inverse_derivative",-1e-300,1
+"boxcox 0 offset 3","inverse_derivative",9.9999999999999995e-21,1
+"boxcox 0 offset 3","inverse_derivative",1.0000000000000001e+300,Inf
+"boxcox 0 offset 3","inverse_derivative",-1.0000000000000001e+300,0
+"boxcox 0 offset 3","inverse_derivative",-3,0.049787068367863944
+"boxcox 0 offset 3","inverse_derivative",3,20.085536923187668
+"boxcox 0 offset 3","inverse_derivative",0.10000000000000001,1.1051709180756477
+"modulus -1","transform",-Inf,-1
+"modulus -1","transform",-2,-0.66666666666666674
+"modulus -1","transform",-0,-0
+"modulus -1","transform",0,-0
+"modulus -1","transform",0.5,0.33333333333333337
+"modulus -1","transform",2,0.66666666666666674
+"modulus -1","transform",Inf,1
+"modulus -1","transform",NA,NA
+"modulus -1","transform",NaN,NaN
+"modulus -1","transform",-1,-0.5
+"modulus -1","transform",1,0.5
+"modulus -1","transform",-0.5,-0.33333333333333337
+"modulus -1","transform",1e-300,-0
+"modulus -1","transform",-1e-300,0
+"modulus -1","transform",9.9999999999999995e-21,-0
+"modulus -1","transform",1.0000000000000001e+300,1
+"modulus -1","transform",-1.0000000000000001e+300,-1
+"modulus -1","transform",-3,-0.75
+"modulus -1","transform",3,0.75
+"modulus -1","transform",0.10000000000000001,0.090909090909090939
+"modulus -1","inverse",-Inf,1
+"modulus -1","inverse",-2,2
+"modulus -1","inverse",-0,0
+"modulus -1","inverse",0,0
+"modulus -1","inverse",0.5,1
+"modulus -1","inverse",2,-2
+"modulus -1","inverse",Inf,-1
+"modulus -1","inverse",NA,NA
+"modulus -1","inverse",NaN,NaN
+"modulus -1","inverse",-1,-Inf
+"modulus -1","inverse",1,Inf
+"modulus -1","inverse",-0.5,-1
+"modulus -1","inverse",1e-300,0
+"modulus -1","inverse",-1e-300,-0
+"modulus -1","inverse",9.9999999999999995e-21,0
+"modulus -1","inverse",1.0000000000000001e+300,-1
+"modulus -1","inverse",-1.0000000000000001e+300,1
+"modulus -1","inverse",-3,1.5
+"modulus -1","inverse",3,-1.5
+"modulus -1","inverse",0.10000000000000001,0.11111111111111116
+"modulus -1","derivative",-Inf,0
+"modulus -1","derivative",-2,0.1111111111111111
+"modulus -1","derivative",-0,1
+"modulus -1","derivative",0,1
+"modulus -1","derivative",0.5,0.44444444444444442
+"modulus -1","derivative",2,0.1111111111111111
+"modulus -1","derivative",Inf,0
+"modulus -1","derivative",NA,NA
+"modulus -1","derivative",NaN,NaN
+"modulus -1","derivative",-1,0.25
+"modulus -1","derivative",1,0.25
+"modulus -1","derivative",-0.5,0.44444444444444442
+"modulus -1","derivative",1e-300,1
+"modulus -1","derivative",-1e-300,1
+"modulus -1","derivative",9.9999999999999995e-21,1
+"modulus -1","derivative",1.0000000000000001e+300,0
+"modulus -1","derivative",-1.0000000000000001e+300,0
+"modulus -1","derivative",-3,0.0625
+"modulus -1","derivative",3,0.0625
+"modulus -1","derivative",0.10000000000000001,0.82644628099173545
+"modulus -1","inverse_derivative",-Inf,0
+"modulus -1","inverse_derivative",-2,1
+"modulus -1","inverse_derivative",-0,1
+"modulus -1","inverse_derivative",0,1
+"modulus -1","inverse_derivative",0.5,4
+"modulus -1","inverse_derivative",2,1
+"modulus -1","inverse_derivative",Inf,0
+"modulus -1","inverse_derivative",NA,NA
+"modulus -1","inverse_derivative",NaN,NaN
+"modulus -1","inverse_derivative",-1,Inf
+"modulus -1","inverse_derivative",1,Inf
+"modulus -1","inverse_derivative",-0.5,4
+"modulus -1","inverse_derivative",1e-300,1
+"modulus -1","inverse_derivative",-1e-300,1
+"modulus -1","inverse_derivative",9.9999999999999995e-21,1
+"modulus -1","inverse_derivative",1.0000000000000001e+300,0
+"modulus -1","inverse_derivative",-1.0000000000000001e+300,0
+"modulus -1","inverse_derivative",-3,0.25
+"modulus -1","inverse_derivative",3,0.25
+"modulus -1","inverse_derivative",0.10000000000000001,1.2345679012345678
+"modulus 0","transform",-Inf,-Inf
+"modulus 0","transform",-2,-1.0986122886681098
+"modulus 0","transform",-0,0
+"modulus 0","transform",0,0
+"modulus 0","transform",0.5,0.40546510810816438
+"modulus 0","transform",2,1.0986122886681098
+"modulus 0","transform",Inf,Inf
+"modulus 0","transform",NA,NA
+"modulus 0","transform",NaN,NaN
+"modulus 0","transform",-1,-0.69314718055994529
+"modulus 0","transform",1,0.69314718055994529
+"modulus 0","transform",-0.5,-0.40546510810816438
+"modulus 0","transform",1e-300,0
+"modulus 0","transform",-1e-300,-0
+"modulus 0","transform",9.9999999999999995e-21,0
+"modulus 0","transform",1.0000000000000001e+300,690.77552789821368
+"modulus 0","transform",-1.0000000000000001e+300,-690.77552789821368
+"modulus 0","transform",-3,-1.3862943611198906
+"modulus 0","transform",3,1.3862943611198906
+"modulus 0","transform",0.10000000000000001,0.095310179804324935
+"modulus 0","inverse",-Inf,-Inf
+"modulus 0","inverse",-2,-6.3890560989306504
+"modulus 0","inverse",-0,0
+"modulus 0","inverse",0,0
+"modulus 0","inverse",0.5,0.64872127070012819
+"modulus 0","inverse",2,6.3890560989306504
+"modulus 0","inverse",Inf,Inf
+"modulus 0","inverse",NA,NA
+"modulus 0","inverse",NaN,NaN
+"modulus 0","inverse",-1,-1.7182818284590451
+"modulus 0","inverse",1,1.7182818284590451
+"modulus 0","inverse",-0.5,-0.64872127070012819
+"modulus 0","inverse",1e-300,0
+"modulus 0","inverse",-1e-300,-0
+"modulus 0","inverse",9.9999999999999995e-21,0
+"modulus 0","inverse",1.0000000000000001e+300,Inf
+"modulus 0","inverse",-1.0000000000000001e+300,-Inf
+"modulus 0","inverse",-3,-19.085536923187668
+"modulus 0","inverse",3,19.085536923187668
+"modulus 0","inverse",0.10000000000000001,0.10517091807564771
+"modulus 0","derivative",-Inf,0
+"modulus 0","derivative",-2,0.33333333333333331
+"modulus 0","derivative",-0,1
+"modulus 0","derivative",0,1
+"modulus 0","derivative",0.5,0.66666666666666663
+"modulus 0","derivative",2,0.33333333333333331
+"modulus 0","derivative",Inf,0
+"modulus 0","derivative",NA,NA
+"modulus 0","derivative",NaN,NaN
+"modulus 0","derivative",-1,0.5
+"modulus 0","derivative",1,0.5
+"modulus 0","derivative",-0.5,0.66666666666666663
+"modulus 0","derivative",1e-300,1
+"modulus 0","derivative",-1e-300,1
+"modulus 0","derivative",9.9999999999999995e-21,1
+"modulus 0","derivative",1.0000000000000001e+300,1e-300
+"modulus 0","derivative",-1.0000000000000001e+300,1e-300
+"modulus 0","derivative",-3,0.25
+"modulus 0","derivative",3,0.25
+"modulus 0","derivative",0.10000000000000001,0.90909090909090906
+"modulus 0","inverse_derivative",-Inf,Inf
+"modulus 0","inverse_derivative",-2,7.3890560989306504
+"modulus 0","inverse_derivative",-0,1
+"modulus 0","inverse_derivative",0,1
+"modulus 0","inverse_derivative",0.5,1.6487212707001282
+"modulus 0","inverse_derivative",2,7.3890560989306504
+"modulus 0","inverse_derivative",Inf,Inf
+"modulus 0","inverse_derivative",NA,NA
+"modulus 0","inverse_derivative",NaN,NaN
+"modulus 0","inverse_derivative",-1,2.7182818284590451
+"modulus 0","inverse_derivative",1,2.7182818284590451
+"modulus 0","inverse_derivative",-0.5,1.6487212707001282
+"modulus 0","inverse_derivative",1e-300,1
+"modulus 0","inverse_derivative",-1e-300,1
+"modulus 0","inverse_derivative",9.9999999999999995e-21,1
+"modulus 0","inverse_derivative",1.0000000000000001e+300,Inf
+"modulus 0","inverse_derivative",-1.0000000000000001e+300,Inf
+"modulus 0","inverse_derivative",-3,20.085536923187668
+"modulus 0","inverse_derivative",3,20.085536923187668
+"modulus 0","inverse_derivative",0.10000000000000001,1.1051709180756477
+"modulus 0.5","transform",-Inf,-Inf
+"modulus 0.5","transform",-2,-1.4641016151377544
+"modulus 0.5","transform",-0,0
+"modulus 0.5","transform",0,0
+"modulus 0.5","transform",0.5,0.44948974278317788
+"modulus 0.5","transform",2,1.4641016151377544
+"modulus 0.5","transform",Inf,Inf
+"modulus 0.5","transform",NA,NA
+"modulus 0.5","transform",NaN,NaN
+"modulus 0.5","transform",-1,-0.82842712474619029
+"modulus 0.5","transform",1,0.82842712474619029
+"modulus 0.5","transform",-0.5,-0.44948974278317788
+"modulus 0.5","transform",1e-300,0
+"modulus 0.5","transform",-1e-300,-0
+"modulus 0.5","transform",9.9999999999999995e-21,0
+"modulus 0.5","transform",1.0000000000000001e+300,2e+150
+"modulus 0.5","transform",-1.0000000000000001e+300,-2e+150
+"modulus 0.5","transform",-3,-2
+"modulus 0.5","transform",3,2
+"modulus 0.5","transform",0.10000000000000001,0.097617696340303262
+"modulus 0.5","inverse",-Inf,-Inf
+"modulus 0.5","inverse",-2,-3
+"modulus 0.5","inverse",-0,0
+"modulus 0.5","inverse",0,0
+"modulus 0.5","inverse",0.5,0.5625
+"modulus 0.5","inverse",2,3
+"modulus 0.5","inverse",Inf,Inf
+"modulus 0.5","inverse",NA,NA
+"modulus 0.5","inverse",NaN,NaN
+"modulus 0.5","inverse",-1,-1.25
+"modulus 0.5","inverse",1,1.25
+"modulus 0.5","inverse",-0.5,-0.5625
+"modulus 0.5","inverse",1e-300,0
+"modulus 0.5","inverse",-1e-300,-0
+"modulus 0.5","inverse",9.9999999999999995e-21,0
+"modulus 0.5","inverse",1.0000000000000001e+300,Inf
+"modulus 0.5","inverse",-1.0000000000000001e+300,-Inf
+"modulus 0.5","inverse",-3,-5.25
+"modulus 0.5","inverse",3,5.25
+"modulus 0.5","inverse",0.10000000000000001,0.10250000000000004
+"modulus 0.5","derivative",-Inf,0
+"modulus 0.5","derivative",-2,0.57735026918962573
+"modulus 0.5","derivative",-0,1
+"modulus 0.5","derivative",0,1
+"modulus 0.5","derivative",0.5,0.81649658092772603
+"modulus 0.5","derivative",2,0.57735026918962573
+"modulus 0.5","derivative",Inf,0
+"modulus 0.5","derivative",NA,NA
+"modulus 0.5","derivative",NaN,NaN
+"modulus 0.5","derivative",-1,0.70710678118654757
+"modulus 0.5","derivative",1,0.70710678118654757
+"modulus 0.5","derivative",-0.5,0.81649658092772603
+"modulus 0.5","derivative",1e-300,1
+"modulus 0.5","derivative",-1e-300,1
+"modulus 0.5","derivative",9.9999999999999995e-21,1
+"modulus 0.5","derivative",1.0000000000000001e+300,1e-150
+"modulus 0.5","derivative",-1.0000000000000001e+300,1e-150
+"modulus 0.5","derivative",-3,0.5
+"modulus 0.5","derivative",3,0.5
+"modulus 0.5","derivative",0.10000000000000001,0.95346258924559224
+"modulus 0.5","inverse_derivative",-Inf,Inf
+"modulus 0.5","inverse_derivative",-2,2
+"modulus 0.5","inverse_derivative",-0,1
+"modulus 0.5","inverse_derivative",0,1
+"modulus 0.5","inverse_derivative",0.5,1.25
+"modulus 0.5","inverse_derivative",2,2
+"modulus 0.5","inverse_derivative",Inf,Inf
+"modulus 0.5","inverse_derivative",NA,NA
+"modulus 0.5","inverse_derivative",NaN,NaN
+"modulus 0.5","inverse_derivative",-1,1.5
+"modulus 0.5","inverse_derivative",1,1.5
+"modulus 0.5","inverse_derivative",-0.5,1.25
+"modulus 0.5","inverse_derivative",1e-300,1
+"modulus 0.5","inverse_derivative",-1e-300,1
+"modulus 0.5","inverse_derivative",9.9999999999999995e-21,1
+"modulus 0.5","inverse_derivative",1.0000000000000001e+300,5.0000000000000003e+299
+"modulus 0.5","inverse_derivative",-1.0000000000000001e+300,5.0000000000000003e+299
+"modulus 0.5","inverse_derivative",-3,2.5
+"modulus 0.5","inverse_derivative",3,2.5
+"modulus 0.5","inverse_derivative",0.10000000000000001,1.05
+"modulus 1","transform",-Inf,-Inf
+"modulus 1","transform",-2,-2
+"modulus 1","transform",-0,0
+"modulus 1","transform",0,0
+"modulus 1","transform",0.5,0.5
+"modulus 1","transform",2,2
+"modulus 1","transform",Inf,Inf
+"modulus 1","transform",NA,NA
+"modulus 1","transform",NaN,NaN
+"modulus 1","transform",-1,-1
+"modulus 1","transform",1,1
+"modulus 1","transform",-0.5,-0.5
+"modulus 1","transform",1e-300,0
+"modulus 1","transform",-1e-300,-0
+"modulus 1","transform",9.9999999999999995e-21,0
+"modulus 1","transform",1.0000000000000001e+300,1.0000000000000001e+300
+"modulus 1","transform",-1.0000000000000001e+300,-1.0000000000000001e+300
+"modulus 1","transform",-3,-3
+"modulus 1","transform",3,3
+"modulus 1","transform",0.10000000000000001,0.10000000000000009
+"modulus 1","inverse",-Inf,-Inf
+"modulus 1","inverse",-2,-2
+"modulus 1","inverse",-0,0
+"modulus 1","inverse",0,0
+"modulus 1","inverse",0.5,0.5
+"modulus 1","inverse",2,2
+"modulus 1","inverse",Inf,Inf
+"modulus 1","inverse",NA,NA
+"modulus 1","inverse",NaN,NaN
+"modulus 1","inverse",-1,-1
+"modulus 1","inverse",1,1
+"modulus 1","inverse",-0.5,-0.5
+"modulus 1","inverse",1e-300,0
+"modulus 1","inverse",-1e-300,-0
+"modulus 1","inverse",9.9999999999999995e-21,0
+"modulus 1","inverse",1.0000000000000001e+300,1.0000000000000001e+300
+"modulus 1","inverse",-1.0000000000000001e+300,-1.0000000000000001e+300
+"modulus 1","inverse",-3,-3
+"modulus 1","inverse",3,3
+"modulus 1","inverse",0.10000000000000001,0.10000000000000009
+"modulus 1","derivative",-Inf,1
+"modulus 1","derivative",-2,1
+"modulus 1","derivative",-0,1
+"modulus 1","derivative",0,1
+"modulus 1","derivative",0.5,1
+"modulus 1","derivative",2,1
+"modulus 1","derivative",Inf,1
+"modulus 1","derivative",NA,1
+"modulus 1","derivative",NaN,1
+"modulus 1","derivative",-1,1
+"modulus 1","derivative",1,1
+"modulus 1","derivative",-0.5,1
+"modulus 1","derivative",1e-300,1
+"modulus 1","derivative",-1e-300,1
+"modulus 1","derivative",9.9999999999999995e-21,1
+"modulus 1","derivative",1.0000000000000001e+300,1
+"modulus 1","derivative",-1.0000000000000001e+300,1
+"modulus 1","derivative",-3,1
+"modulus 1","derivative",3,1
+"modulus 1","derivative",0.10000000000000001,1
+"modulus 1","inverse_derivative",-Inf,1
+"modulus 1","inverse_derivative",-2,1
+"modulus 1","inverse_derivative",-0,1
+"modulus 1","inverse_derivative",0,1
+"modulus 1","inverse_derivative",0.5,1
+"modulus 1","inverse_derivative",2,1
+"modulus 1","inverse_derivative",Inf,1
+"modulus 1","inverse_derivative",NA,1
+"modulus 1","inverse_derivative",NaN,1
+"modulus 1","inverse_derivative",-1,1
+"modulus 1","inverse_derivative",1,1
+"modulus 1","inverse_derivative",-0.5,1
+"modulus 1","inverse_derivative",1e-300,1
+"modulus 1","inverse_derivative",-1e-300,1
+"modulus 1","inverse_derivative",9.9999999999999995e-21,1
+"modulus 1","inverse_derivative",1.0000000000000001e+300,1
+"modulus 1","inverse_derivative",-1.0000000000000001e+300,1
+"modulus 1","inverse_derivative",-3,1
+"modulus 1","inverse_derivative",3,1
+"modulus 1","inverse_derivative",0.10000000000000001,1
+"modulus 2","transform",-Inf,-Inf
+"modulus 2","transform",-2,-4
+"modulus 2","transform",-0,0
+"modulus 2","transform",0,0
+"modulus 2","transform",0.5,0.625
+"modulus 2","transform",2,4
+"modulus 2","transform",Inf,Inf
+"modulus 2","transform",NA,NA
+"modulus 2","transform",NaN,NaN
+"modulus 2","transform",-1,-1.5
+"modulus 2","transform",1,1.5
+"modulus 2","transform",-0.5,-0.625
+"modulus 2","transform",1e-300,0
+"modulus 2","transform",-1e-300,-0
+"modulus 2","transform",9.9999999999999995e-21,0
+"modulus 2","transform",1.0000000000000001e+300,Inf
+"modulus 2","transform",-1.0000000000000001e+300,-Inf
+"modulus 2","transform",-3,-7.5
+"modulus 2","transform",3,7.5
+"modulus 2","transform",0.10000000000000001,0.10500000000000009
+"modulus 2","inverse",-Inf,-Inf
+"modulus 2","inverse",-2,-1.2360679774997898
+"modulus 2","inverse",-0,0
+"modulus 2","inverse",0,0
+"modulus 2","inverse",0.5,0.41421356237309515
+"modulus 2","inverse",2,1.2360679774997898
+"modulus 2","inverse",Inf,Inf
+"modulus 2","inverse",NA,NA
+"modulus 2","inverse",NaN,NaN
+"modulus 2","inverse",-1,-0.73205080756887719
+"modulus 2","inverse",1,0.73205080756887719
+"modulus 2","inverse",-0.5,-0.41421356237309515
+"modulus 2","inverse",1e-300,0
+"modulus 2","inverse",-1e-300,-0
+"modulus 2","inverse",9.9999999999999995e-21,0
+"modulus 2","inverse",1.0000000000000001e+300,1.4142135623730951e+150
+"modulus 2","inverse",-1.0000000000000001e+300,-1.4142135623730951e+150
+"modulus 2","inverse",-3,-1.6457513110645907
+"modulus 2","inverse",3,1.6457513110645907
+"modulus 2","inverse",0.10000000000000001,0.095445115010332149
+"modulus 2","derivative",-Inf,Inf
+"modulus 2","derivative",-2,3
+"modulus 2","derivative",-0,1
+"modulus 2","derivative",0,1
+"modulus 2","derivative",0.5,1.5
+"modulus 2","derivative",2,3
+"modulus 2","derivative",Inf,Inf
+"modulus 2","derivative",NA,NA
+"modulus 2","derivative",NaN,NaN
+"modulus 2","derivative",-1,2
+"modulus 2","derivative",1,2
+"modulus 2","derivative",-0.5,1.5
+"modulus 2","derivative",1e-300,1
+"modulus 2","derivative",-1e-300,1
+"modulus 2","derivative",9.9999999999999995e-21,1
+"modulus 2","derivative",1.0000000000000001e+300,1.0000000000000001e+300
+"modulus 2","derivative",-1.0000000000000001e+300,1.0000000000000001e+300
+"modulus 2","derivative",-3,4
+"modulus 2","derivative",3,4
+"modulus 2","derivative",0.10000000000000001,1.1000000000000001
+"modulus 2","inverse_derivative",-Inf,0
+"modulus 2","inverse_derivative",-2,0.44721359549995793
+"modulus 2","inverse_derivative",-0,1
+"modulus 2","inverse_derivative",0,1
+"modulus 2","inverse_derivative",0.5,0.70710678118654757
+"modulus 2","inverse_derivative",2,0.44721359549995793
+"modulus 2","inverse_derivative",Inf,0
+"modulus 2","inverse_derivative",NA,NA
+"modulus 2","inverse_derivative",NaN,NaN
+"modulus 2","inverse_derivative",-1,0.57735026918962573
+"modulus 2","inverse_derivative",1,0.57735026918962573
+"modulus 2","inverse_derivative",-0.5,0.70710678118654757
+"modulus 2","inverse_derivative",1e-300,1
+"modulus 2","inverse_derivative",-1e-300,1
+"modulus 2","inverse_derivative",9.9999999999999995e-21,1
+"modulus 2","inverse_derivative",1.0000000000000001e+300,7.0710678118654746e-151
+"modulus 2","inverse_derivative",-1.0000000000000001e+300,7.0710678118654746e-151
+"modulus 2","inverse_derivative",-3,0.37796447300922725
+"modulus 2","inverse_derivative",3,0.37796447300922725
+"modulus 2","inverse_derivative",0.10000000000000001,0.9128709291752769
+"modulus 0.5 offset 3","transform",-Inf,-Inf
+"modulus 0.5 offset 3","transform",-2,-2.4721359549995796
+"modulus 0.5 offset 3","transform",-0,0
+"modulus 0.5 offset 3","transform",0,0
+"modulus 0.5 offset 3","transform",0.5,1.7416573867739413
+"modulus 0.5 offset 3","transform",2,2.4721359549995796
+"modulus 0.5 offset 3","transform",Inf,Inf
+"modulus 0.5 offset 3","transform",NA,NA
+"modulus 0.5 offset 3","transform",NaN,NaN
+"modulus 0.5 offset 3","transform",-1,-2
+"modulus 0.5 offset 3","transform",1,2
+"modulus 0.5 offset 3","transform",-0.5,-1.7416573867739413
+"modulus 0.5 offset 3","transform",1e-300,1.4641016151377544
+"modulus 0.5 offset 3","transform",-1e-300,-1.4641016151377544
+"modulus 0.5 offset 3","transform",9.9999999999999995e-21,1.4641016151377544
+"modulus 0.5 offset 3","transform",1.0000000000000001e+300,2e+150
+"modulus 0.5 offset 3","transform",-1.0000000000000001e+300,-2e+150
+"modulus 0.5 offset 3","transform",-3,-2.8989794855663558
+"modulus 0.5 offset 3","transform",3,2.8989794855663558
+"modulus 0.5 offset 3","transform",0.10000000000000001,1.5213633723318019
+"modulus 0.5 offset 3","inverse",-Inf,-Inf
+"modulus 0.5 offset 3","inverse",-2,-1
+"modulus 0.5 offset 3","inverse",-0,-0
+"modulus 0.5 offset 3","inverse",0,-0
+"modulus 0.5 offset 3","inverse",0.5,-1.4375
+"modulus 0.5 offset 3","inverse",2,1
+"modulus 0.5 offset 3","inverse",Inf,Inf
+"modulus 0.5 offset 3","inverse",NA,NA
+"modulus 0.5 offset 3","inverse",NaN,NaN
+"modulus 0.5 offset 3","inverse",-1,0.75
+"modulus 0.5 offset 3","inverse",1,-0.75
+"modulus 0.5 offset 3","inverse",-0.5,1.4375
+"modulus 0.5 offset 3","inverse",1e-300,-2
+"modulus 0.5 offset 3","inverse",-1e-300,2
+"modulus 0.5 offset 3","inverse",9.9999999999999995e-21,-2
+"modulus 0.5 offset 3","inverse",1.0000000000000001e+300,Inf
+"modulus 0.5 offset 3","inverse",-1.0000000000000001e+300,-Inf
+"modulus 0.5 offset 3","inverse",-3,-3.25
+"modulus 0.5 offset 3","inverse",3,3.25
+"modulus 0.5 offset 3","inverse",0.10000000000000001,-1.8975
+"modulus 0.5 offset 3","derivative",-Inf,0
+"modulus 0.5 offset 3","derivative",-2,0.44721359549995793
+"modulus 0.5 offset 3","derivative",-0,0.57735026918962573
+"modulus 0.5 offset 3","derivative",0,0.57735026918962573
+"modulus 0.5 offset 3","derivative",0.5,0.53452248382484879
+"modulus 0.5 offset 3","derivative",2,0.44721359549995793
+"modulus 0.5 offset 3","derivative",Inf,0
+"modulus 0.5 offset 3","derivative",NA,NA
+"modulus 0.5 offset 3","derivative",NaN,NaN
+"modulus 0.5 offset 3","derivative",-1,0.5
+"modulus 0.5 offset 3","derivative",1,0.5
+"modulus 0.5 offset 3","derivative",-0.5,0.53452248382484879
+"modulus 0.5 offset 3","derivative",1e-300,0.57735026918962573
+"modulus 0.5 offset 3","derivative",-1e-300,0.57735026918962573
+"modulus 0.5 offset 3","derivative",9.9999999999999995e-21,0.57735026918962573
+"modulus 0.5 offset 3","derivative",1.0000000000000001e+300,1e-150
+"modulus 0.5 offset 3","derivative",-1.0000000000000001e+300,1e-150
+"modulus 0.5 offset 3","derivative",-3,0.40824829046386302
+"modulus 0.5 offset 3","derivative",3,0.40824829046386302
+"modulus 0.5 offset 3","derivative",0.10000000000000001,0.56796183424706481
+"modulus 0.5 offset 3","inverse_derivative",-Inf,Inf
+"modulus 0.5 offset 3","inverse_derivative",-2,2
+"modulus 0.5 offset 3","inverse_derivative",-0,1
+"modulus 0.5 offset 3","inverse_derivative",0,1
+"modulus 0.5 offset 3","inverse_derivative",0.5,1.25
+"modulus 0.5 offset 3","inverse_derivative",2,2
+"modulus 0.5 offset 3","inverse_derivative",Inf,Inf
+"modulus 0.5 offset 3","inverse_derivative",NA,NA
+"modulus 0.5 offset 3","inverse_derivative",NaN,NaN
+"modulus 0.5 offset 3","inverse_derivative",-1,1.5
+"modulus 0.5 offset 3","inverse_derivative",1,1.5
+"modulus 0.5 offset 3","inverse_derivative",-0.5,1.25
+"modulus 0.5 offset 3","inverse_derivative",1e-300,1
+"modulus 0.5 offset 3","inverse_derivative",-1e-300,1
+"modulus 0.5 offset 3","inverse_derivative",9.9999999999999995e-21,1
+"modulus 0.5 offset 3","inverse_derivative",1.0000000000000001e+300,5.0000000000000003e+299
+"modulus 0.5 offset 3","inverse_derivative",-1.0000000000000001e+300,5.0000000000000003e+299
+"modulus 0.5 offset 3","inverse_derivative",-3,2.5
+"modulus 0.5 offset 3","inverse_derivative",3,2.5
+"modulus 0.5 offset 3","inverse_derivative",0.10000000000000001,1.05
+"yj -1","transform",-Inf,-Inf
+"yj -1","transform",-2,-8.6666666666666661
+"yj -1","transform",-0,0
+"yj -1","transform",0,0
+"yj -1","transform",0.5,0.33333333333333337
+"yj -1","transform",2,0.66666666666666674
+"yj -1","transform",Inf,1
+"yj -1","transform",NA,NA
+"yj -1","transform",NaN,NA
+"yj -1","transform",-1,-2.3333333333333335
+"yj -1","transform",1,0.5
+"yj -1","transform",-0.5,-0.79166666666666663
+"yj -1","transform",1e-300,-0
+"yj -1","transform",-1e-300,-0
+"yj -1","transform",9.9999999999999995e-21,-0
+"yj -1","transform",1.0000000000000001e+300,1
+"yj -1","transform",-1.0000000000000001e+300,-Inf
+"yj -1","transform",-3,-21
+"yj -1","transform",3,0.75
+"yj -1","transform",0.10000000000000001,0.090909090909090939
+"yj -1","inverse",-Inf,-Inf
+"yj -1","inverse",-2,-0.91293118277238894
+"yj -1","inverse",-0,0
+"yj -1","inverse",0,0
+"yj -1","inverse",0.5,1
+"yj -1","inverse",2,-2
+"yj -1","inverse",Inf,-1
+"yj -1","inverse",NA,NA
+"yj -1","inverse",NaN,NA
+"yj -1","inverse",-1,-0.58740105196819936
+"yj -1","inverse",1,Inf
+"yj -1","inverse",-0.5,-0.35720880829745316
+"yj -1","inverse",1e-300,0
+"yj -1","inverse",-1e-300,0
+"yj -1","inverse",9.9999999999999995e-21,0
+"yj -1","inverse",1.0000000000000001e+300,-1
+"yj -1","inverse",-1.0000000000000001e+300,-1.44224957030739e+100
+"yj -1","inverse",-3,-1.1544346900318838
+"yj -1","inverse",3,-1.5
+"yj -1","inverse",0.10000000000000001,0.11111111111111116
+"yj -1","derivative",-Inf,Inf
+"yj -1","derivative",-2,9
+"yj -1","derivative",-0,1
+"yj -1","derivative",0,1
+"yj -1","derivative",0.5,0.44444444444444442
+"yj -1","derivative",2,0.1111111111111111
+"yj -1","derivative",Inf,0
+"yj -1","derivative",NA,NA
+"yj -1","derivative",NaN,NA
+"yj -1","derivative",-1,4
+"yj -1","derivative",1,0.25
+"yj -1","derivative",-0.5,2.25
+"yj -1","derivative",1e-300,1
+"yj -1","derivative",-1e-300,1
+"yj -1","derivative",9.9999999999999995e-21,1
+"yj -1","derivative",1.0000000000000001e+300,0
+"yj -1","derivative",-1.0000000000000001e+300,Inf
+"yj -1","derivative",-3,16
+"yj -1","derivative",3,0.0625
+"yj -1","derivative",0.10000000000000001,0.82644628099173545
+"yj -1","inverse_derivative",-Inf,0
+"yj -1","inverse_derivative",-2,0.2732758832531984
+"yj -1","inverse_derivative",-0,1
+"yj -1","inverse_derivative",0,1
+"yj -1","inverse_derivative",0.5,4
+"yj -1","inverse_derivative",2,1
+"yj -1","inverse_derivative",Inf,0
+"yj -1","inverse_derivative",NA,NA
+"yj -1","inverse_derivative",NaN,NA
+"yj -1","inverse_derivative",-1,0.39685026299204984
+"yj -1","inverse_derivative",1,Inf
+"yj -1","inverse_derivative",-0.5,0.54288352331898126
+"yj -1","inverse_derivative",1e-300,1
+"yj -1","inverse_derivative",-1e-300,1
+"yj -1","inverse_derivative",9.9999999999999995e-21,1
+"yj -1","inverse_derivative",1.0000000000000001e+300,0
+"yj -1","inverse_derivative",-1.0000000000000001e+300,4.8074985676911148e-201
+"yj -1","inverse_derivative",-3,0.21544346900318834
+"yj -1","inverse_derivative",3,0.25
+"yj -1","inverse_derivative",0.10000000000000001,1.2345679012345678
+"yj 0","transform",-Inf,-Inf
+"yj 0","transform",-2,-4
+"yj 0","transform",-0,0
+"yj 0","transform",0,0
+"yj 0","transform",0.5,0.40546510810816438
+"yj 0","transform",2,1.0986122886681096
+"yj 0","transform",Inf,Inf
+"yj 0","transform",NA,NA
+"yj 0","transform",NaN,NA
+"yj 0","transform",-1,-1.5
+"yj 0","transform",1,0.69314718055994529
+"yj 0","transform",-0.5,-0.625
+"yj 0","transform",1e-300,1e-300
+"yj 0","transform",-1e-300,-0
+"yj 0","transform",9.9999999999999995e-21,9.9999999999999995e-21
+"yj 0","transform",1.0000000000000001e+300,690.77552789821368
+"yj 0","transform",-1.0000000000000001e+300,-Inf
+"yj 0","transform",-3,-7.5
+"yj 0","transform",3,1.3862943611198906
+"yj 0","transform",0.10000000000000001,0.095310179804324865
+"yj 0","inverse",-Inf,-Inf
+"yj 0","inverse",-2,-1.2360679774997898
+"yj 0","inverse",-0,0
+"yj 0","inverse",0,0
+"yj 0","inverse",0.5,0.64872127070012819
+"yj 0","inverse",2,6.3890560989306504
+"yj 0","inverse",Inf,Inf
+"yj 0","inverse",NA,NA
+"yj 0","inverse",NaN,NA
+"yj 0","inverse",-1,-0.73205080756887719
+"yj 0","inverse",1,1.7182818284590451
+"yj 0","inverse",-0.5,-0.41421356237309515
+"yj 0","inverse",1e-300,1e-300
+"yj 0","inverse",-1e-300,0
+"yj 0","inverse",9.9999999999999995e-21,9.9999999999999995e-21
+"yj 0","inverse",1.0000000000000001e+300,Inf
+"yj 0","inverse",-1.0000000000000001e+300,-1.4142135623730951e+150
+"yj 0","inverse",-3,-1.6457513110645907
+"yj 0","inverse",3,19.085536923187668
+"yj 0","inverse",0.10000000000000001,0.10517091807564763
+"yj 0","derivative",-Inf,Inf
+"yj 0","derivative",-2,3
+"yj 0","derivative",-0,1
+"yj 0","derivative",0,1
+"yj 0","derivative",0.5,0.66666666666666663
+"yj 0","derivative",2,0.33333333333333331
+"yj 0","derivative",Inf,0
+"yj 0","derivative",NA,NA
+"yj 0","derivative",NaN,NA
+"yj 0","derivative",-1,2
+"yj 0","derivative",1,0.5
+"yj 0","derivative",-0.5,1.5
+"yj 0","derivative",1e-300,1
+"yj 0","derivative",-1e-300,1
+"yj 0","derivative",9.9999999999999995e-21,1
+"yj 0","derivative",1.0000000000000001e+300,1e-300
+"yj 0","derivative",-1.0000000000000001e+300,1.0000000000000001e+300
+"yj 0","derivative",-3,4
+"yj 0","derivative",3,0.25
+"yj 0","derivative",0.10000000000000001,0.90909090909090906
+"yj 0","inverse_derivative",-Inf,0
+"yj 0","inverse_derivative",-2,0.44721359549995793
+"yj 0","inverse_derivative",-0,1
+"yj 0","inverse_derivative",0,1
+"yj 0","inverse_derivative",0.5,1.6487212707001282
+"yj 0","inverse_derivative",2,7.3890560989306504
+"yj 0","inverse_derivative",Inf,Inf
+"yj 0","inverse_derivative",NA,NA
+"yj 0","inverse_derivative",NaN,NA
+"yj 0","inverse_derivative",-1,0.57735026918962573
+"yj 0","inverse_derivative",1,2.7182818284590451
+"yj 0","inverse_derivative",-0.5,0.70710678118654757
+"yj 0","inverse_derivative",1e-300,1
+"yj 0","inverse_derivative",-1e-300,1
+"yj 0","inverse_derivative",9.9999999999999995e-21,1
+"yj 0","inverse_derivative",1.0000000000000001e+300,Inf
+"yj 0","inverse_derivative",-1.0000000000000001e+300,7.0710678118654746e-151
+"yj 0","inverse_derivative",-3,0.37796447300922725
+"yj 0","inverse_derivative",3,20.085536923187668
+"yj 0","inverse_derivative",0.10000000000000001,1.1051709180756477
+"yj 0.5","transform",-Inf,-Inf
+"yj 0.5","transform",-2,-2.7974349484710879
+"yj 0.5","transform",-0,0
+"yj 0.5","transform",0,0
+"yj 0.5","transform",0.5,0.44948974278317788
+"yj 0.5","transform",2,1.4641016151377544
+"yj 0.5","transform",Inf,Inf
+"yj 0.5","transform",NA,NA
+"yj 0.5","transform",NaN,NA
+"yj 0.5","transform",-1,-1.2189514164974602
+"yj 0.5","transform",1,0.82842712474619029
+"yj 0.5","transform",-0.5,-0.55807820472492242
+"yj 0.5","transform",1e-300,0
+"yj 0.5","transform",-1e-300,-0
+"yj 0.5","transform",9.9999999999999995e-21,0
+"yj 0.5","transform",1.0000000000000001e+300,2e+150
+"yj 0.5","transform",-1.0000000000000001e+300,-Inf
+"yj 0.5","transform",-3,-4.666666666666667
+"yj 0.5","transform",3,2
+"yj 0.5","transform",0.10000000000000001,0.097617696340303262
+"yj 0.5","inverse",-Inf,-Inf
+"yj 0.5","inverse",-2,-1.5198420997897464
+"yj 0.5","inverse",-0,0
+"yj 0.5","inverse",0,0
+"yj 0.5","inverse",0.5,0.5625
+"yj 0.5","inverse",2,3
+"yj 0.5","inverse",Inf,Inf
+"yj 0.5","inverse",NA,NA
+"yj 0.5","inverse",NaN,NA
+"yj 0.5","inverse",-1,-0.84201574932019319
+"yj 0.5","inverse",1,1.25
+"yj 0.5","inverse",-0.5,-0.45219643339092608
+"yj 0.5","inverse",1e-300,0
+"yj 0.5","inverse",-1e-300,0
+"yj 0.5","inverse",9.9999999999999995e-21,0
+"yj 0.5","inverse",1.0000000000000001e+300,Inf
+"yj 0.5","inverse",-1.0000000000000001e+300,-1.3103706971044148e+200
+"yj 0.5","inverse",-3,-2.1158398421848759
+"yj 0.5","inverse",3,5.25
+"yj 0.5","inverse",0.10000000000000001,0.10250000000000004
+"yj 0.5","derivative",-Inf,Inf
+"yj 0.5","derivative",-2,1.7320508075688772
+"yj 0.5","derivative",-0,1
+"yj 0.5","derivative",0,1
+"yj 0.5","derivative",0.5,0.81649658092772603
+"yj 0.5","derivative",2,0.57735026918962573
+"yj 0.5","derivative",Inf,0
+"yj 0.5","derivative",NA,NA
+"yj 0.5","derivative",NaN,NA
+"yj 0.5","derivative",-1,1.4142135623730951
+"yj 0.5","derivative",1,0.70710678118654757
+"yj 0.5","derivative",-0.5,1.2247448713915889
+"yj 0.5","derivative",1e-300,1
+"yj 0.5","derivative",-1e-300,1
+"yj 0.5","derivative",9.9999999999999995e-21,1
+"yj 0.5","derivative",1.0000000000000001e+300,1e-150
+"yj 0.5","derivative",-1.0000000000000001e+300,9.9999999999999998e+149
+"yj 0.5","derivative",-3,2
+"yj 0.5","derivative",3,0.5
+"yj 0.5","derivative",0.10000000000000001,0.95346258924559224
+"yj 0.5","inverse_derivative",-Inf,0
+"yj 0.5","inverse_derivative",-2,0.6299605249474366
+"yj 0.5","inverse_derivative",-0,1
+"yj 0.5","inverse_derivative",0,1
+"yj 0.5","inverse_derivative",0.5,1.25
+"yj 0.5","inverse_derivative",2,2
+"yj 0.5","inverse_derivative",Inf,Inf
+"yj 0.5","inverse_derivative",NA,NA
+"yj 0.5","inverse_derivative",NaN,NA
+"yj 0.5","inverse_derivative",-1,0.73680629972807732
+"yj 0.5","inverse_derivative",1,1.5
+"yj 0.5","inverse_derivative",-0.5,0.82982653336624346
+"yj 0.5","inverse_derivative",1e-300,1
+"yj 0.5","inverse_derivative",-1e-300,1
+"yj 0.5","inverse_derivative",9.9999999999999995e-21,1
+"yj 0.5","inverse_derivative",1.0000000000000001e+300,5.0000000000000003e+299
+"yj 0.5","inverse_derivative",-1.0000000000000001e+300,8.7358046473627649e-101
+"yj 0.5","inverse_derivative",-3,0.5665163349427047
+"yj 0.5","inverse_derivative",3,2.5
+"yj 0.5","inverse_derivative",0.10000000000000001,1.05
+"yj 1","transform",-Inf,-Inf
+"yj 1","transform",-2,-2
+"yj 1","transform",-0,0
+"yj 1","transform",0,0
+"yj 1","transform",0.5,0.5
+"yj 1","transform",2,2
+"yj 1","transform",Inf,Inf
+"yj 1","transform",NA,NA
+"yj 1","transform",NaN,NA
+"yj 1","transform",-1,-1
+"yj 1","transform",1,1
+"yj 1","transform",-0.5,-0.5
+"yj 1","transform",1e-300,0
+"yj 1","transform",-1e-300,-0
+"yj 1","transform",9.9999999999999995e-21,0
+"yj 1","transform",1.0000000000000001e+300,1.0000000000000001e+300
+"yj 1","transform",-1.0000000000000001e+300,-1.0000000000000001e+300
+"yj 1","transform",-3,-3
+"yj 1","transform",3,3
+"yj 1","transform",0.10000000000000001,0.10000000000000009
+"yj 1","inverse",-Inf,-Inf
+"yj 1","inverse",-2,-2
+"yj 1","inverse",-0,0
+"yj 1","inverse",0,0
+"yj 1","inverse",0.5,0.5
+"yj 1","inverse",2,2
+"yj 1","inverse",Inf,Inf
+"yj 1","inverse",NA,NA
+"yj 1","inverse",NaN,NA
+"yj 1","inverse",-1,-1
+"yj 1","inverse",1,1
+"yj 1","inverse",-0.5,-0.5
+"yj 1","inverse",1e-300,0
+"yj 1","inverse",-1e-300,0
+"yj 1","inverse",9.9999999999999995e-21,0
+"yj 1","inverse",1.0000000000000001e+300,1.0000000000000001e+300
+"yj 1","inverse",-1.0000000000000001e+300,-1.0000000000000001e+300
+"yj 1","inverse",-3,-3
+"yj 1","inverse",3,3
+"yj 1","inverse",0.10000000000000001,0.10000000000000009
+"yj 1","derivative",-Inf,1
+"yj 1","derivative",-2,1
+"yj 1","derivative",-0,1
+"yj 1","derivative",0,1
+"yj 1","derivative",0.5,1
+"yj 1","derivative",2,1
+"yj 1","derivative",Inf,1
+"yj 1","derivative",NA,NA
+"yj 1","derivative",NaN,NA
+"yj 1","derivative",-1,1
+"yj 1","derivative",1,1
+"yj 1","derivative",-0.5,1
+"yj 1","derivative",1e-300,1
+"yj 1","derivative",-1e-300,1
+"yj 1","derivative",9.9999999999999995e-21,1
+"yj 1","derivative",1.0000000000000001e+300,1
+"yj 1","derivative",-1.0000000000000001e+300,1
+"yj 1","derivative",-3,1
+"yj 1","derivative",3,1
+"yj 1","derivative",0.10000000000000001,1
+"yj 1","inverse_derivative",-Inf,1
+"yj 1","inverse_derivative",-2,1
+"yj 1","inverse_derivative",-0,1
+"yj 1","inverse_derivative",0,1
+"yj 1","inverse_derivative",0.5,1
+"yj 1","inverse_derivative",2,1
+"yj 1","inverse_derivative",Inf,1
+"yj 1","inverse_derivative",NA,NA
+"yj 1","inverse_derivative",NaN,NA
+"yj 1","inverse_derivative",-1,1
+"yj 1","inverse_derivative",1,1
+"yj 1","inverse_derivative",-0.5,1
+"yj 1","inverse_derivative",1e-300,1
+"yj 1","inverse_derivative",-1e-300,1
+"yj 1","inverse_derivative",9.9999999999999995e-21,1
+"yj 1","inverse_derivative",1.0000000000000001e+300,1
+"yj 1","inverse_derivative",-1.0000000000000001e+300,1
+"yj 1","inverse_derivative",-3,1
+"yj 1","inverse_derivative",3,1
+"yj 1","inverse_derivative",0.10000000000000001,1
+"yj 2","transform",-Inf,-Inf
+"yj 2","transform",-2,-1.0986122886681096
+"yj 2","transform",-0,0
+"yj 2","transform",0,0
+"yj 2","transform",0.5,0.625
+"yj 2","transform",2,4
+"yj 2","transform",Inf,Inf
+"yj 2","transform",NA,NA
+"yj 2","transform",NaN,NA
+"yj 2","transform",-1,-0.69314718055994529
+"yj 2","transform",1,1.5
+"yj 2","transform",-0.5,-0.40546510810816438
+"yj 2","transform",1e-300,0
+"yj 2","transform",-1e-300,-1e-300
+"yj 2","transform",9.9999999999999995e-21,0
+"yj 2","transform",1.0000000000000001e+300,Inf
+"yj 2","transform",-1.0000000000000001e+300,-690.77552789821368
+"yj 2","transform",-3,-1.3862943611198906
+"yj 2","transform",3,7.5
+"yj 2","transform",0.10000000000000001,0.10500000000000009
+"yj 2","inverse",-Inf,-Inf
+"yj 2","inverse",-2,-6.3890560989306504
+"yj 2","inverse",-0,0
+"yj 2","inverse",0,0
+"yj 2","inverse",0.5,0.41421356237309515
+"yj 2","inverse",2,1.2360679774997898
+"yj 2","inverse",Inf,Inf
+"yj 2","inverse",NA,NA
+"yj 2","inverse",NaN,NA
+"yj 2","inverse",-1,-1.7182818284590451
+"yj 2","inverse",1,0.73205080756887719
+"yj 2","inverse",-0.5,-0.64872127070012819
+"yj 2","inverse",1e-300,0
+"yj 2","inverse",-1e-300,0
+"yj 2","inverse",9.9999999999999995e-21,0
+"yj 2","inverse",1.0000000000000001e+300,1.4142135623730951e+150
+"yj 2","inverse",-1.0000000000000001e+300,-Inf
+"yj 2","inverse",-3,-19.085536923187668
+"yj 2","inverse",3,1.6457513110645907
+"yj 2","inverse",0.10000000000000001,0.095445115010332149
+"yj 2","derivative",-Inf,0
+"yj 2","derivative",-2,0.33333333333333331
+"yj 2","derivative",-0,1
+"yj 2","derivative",0,1
+"yj 2","derivative",0.5,1.5
+"yj 2","derivative",2,3
+"yj 2","derivative",Inf,Inf
+"yj 2","derivative",NA,NA
+"yj 2","derivative",NaN,NA
+"yj 2","derivative",-1,0.5
+"yj 2","derivative",1,2
+"yj 2","derivative",-0.5,0.66666666666666663
+"yj 2","derivative",1e-300,1
+"yj 2","derivative",-1e-300,1
+"yj 2","derivative",9.9999999999999995e-21,1
+"yj 2","derivative",1.0000000000000001e+300,1.0000000000000001e+300
+"yj 2","derivative",-1.0000000000000001e+300,1e-300
+"yj 2","derivative",-3,0.25
+"yj 2","derivative",3,4
+"yj 2","derivative",0.10000000000000001,1.1000000000000001
+"yj 2","inverse_derivative",-Inf,Inf
+"yj 2","inverse_derivative",-2,7.3890560989306504
+"yj 2","inverse_derivative",-0,1
+"yj 2","inverse_derivative",0,1
+"yj 2","inverse_derivative",0.5,0.70710678118654757
+"yj 2","inverse_derivative",2,0.44721359549995793
+"yj 2","inverse_derivative",Inf,0
+"yj 2","inverse_derivative",NA,NA
+"yj 2","inverse_derivative",NaN,NA
+"yj 2","inverse_derivative",-1,2.7182818284590451
+"yj 2","inverse_derivative",1,0.57735026918962573
+"yj 2","inverse_derivative",-0.5,1.6487212707001282
+"yj 2","inverse_derivative",1e-300,1
+"yj 2","inverse_derivative",-1e-300,1
+"yj 2","inverse_derivative",9.9999999999999995e-21,1
+"yj 2","inverse_derivative",1.0000000000000001e+300,7.0710678118654746e-151
+"yj 2","inverse_derivative",-1.0000000000000001e+300,Inf
+"yj 2","inverse_derivative",-3,20.085536923187668
+"yj 2","inverse_derivative",3,0.37796447300922725
+"yj 2","inverse_derivative",0.10000000000000001,0.9128709291752769
+"yj 3","transform",-Inf,-1
+"yj 3","transform",-2,-0.66666666666666674
+"yj 3","transform",-0,0
+"yj 3","transform",0,0
+"yj 3","transform",0.5,0.79166666666666663
+"yj 3","transform",2,8.6666666666666661
+"yj 3","transform",Inf,Inf
+"yj 3","transform",NA,NA
+"yj 3","transform",NaN,NA
+"yj 3","transform",-1,-0.5
+"yj 3","transform",1,2.3333333333333335
+"yj 3","transform",-0.5,-0.33333333333333337
+"yj 3","transform",1e-300,0
+"yj 3","transform",-1e-300,0
+"yj 3","transform",9.9999999999999995e-21,0
+"yj 3","transform",1.0000000000000001e+300,Inf
+"yj 3","transform",-1.0000000000000001e+300,-1
+"yj 3","transform",-3,-0.75
+"yj 3","transform",3,21
+"yj 3","transform",0.10000000000000001,0.11033333333333346
+"yj 3","inverse",-Inf,1
+"yj 3","inverse",-2,2
+"yj 3","inverse",-0,0
+"yj 3","inverse",0,0
+"yj 3","inverse",0.5,0.35720880829745316
+"yj 3","inverse",2,0.91293118277238894
+"yj 3","inverse",Inf,Inf
+"yj 3","inverse",NA,NA
+"yj 3","inverse",NaN,NA
+"yj 3","inverse",-1,-Inf
+"yj 3","inverse",1,0.58740105196819936
+"yj 3","inverse",-0.5,-1
+"yj 3","inverse",1e-300,0
+"yj 3","inverse",-1e-300,0
+"yj 3","inverse",9.9999999999999995e-21,0
+"yj 3","inverse",1.0000000000000001e+300,1.44224957030739e+100
+"yj 3","inverse",-1.0000000000000001e+300,1
+"yj 3","inverse",-3,1.5
+"yj 3","inverse",3,1.1544346900318838
+"yj 3","inverse",0.10000000000000001,0.091392883061105934
+"yj 3","derivative",-Inf,0
+"yj 3","derivative",-2,0.1111111111111111
+"yj 3","derivative",-0,1
+"yj 3","derivative",0,1
+"yj 3","derivative",0.5,2.25
+"yj 3","derivative",2,9
+"yj 3","derivative",Inf,Inf
+"yj 3","derivative",NA,NA
+"yj 3","derivative",NaN,NA
+"yj 3","derivative",-1,0.25
+"yj 3","derivative",1,4
+"yj 3","derivative",-0.5,0.44444444444444442
+"yj 3","derivative",1e-300,1
+"yj 3","derivative",-1e-300,1
+"yj 3","derivative",9.9999999999999995e-21,1
+"yj 3","derivative",1.0000000000000001e+300,Inf
+"yj 3","derivative",-1.0000000000000001e+300,0
+"yj 3","derivative",-3,0.0625
+"yj 3","derivative",3,16
+"yj 3","derivative",0.10000000000000001,1.2100000000000002
+"yj 3","inverse_derivative",-Inf,0
+"yj 3","inverse_derivative",-2,1
+"yj 3","inverse_derivative",-0,1
+"yj 3","inverse_derivative",0,1
+"yj 3","inverse_derivative",0.5,0.54288352331898126
+"yj 3","inverse_derivative",2,0.2732758832531984
+"yj 3","inverse_derivative",Inf,0
+"yj 3","inverse_derivative",NA,NA
+"yj 3","inverse_derivative",NaN,NA
+"yj 3","inverse_derivative",-1,Inf
+"yj 3","inverse_derivative",1,0.39685026299204984
+"yj 3","inverse_derivative",-0.5,4
+"yj 3","inverse_derivative",1e-300,1
+"yj 3","inverse_derivative",-1e-300,1
+"yj 3","inverse_derivative",9.9999999999999995e-21,1
+"yj 3","inverse_derivative",1.0000000000000001e+300,4.8074985676911148e-201
+"yj 3","inverse_derivative",-1.0000000000000001e+300,0
+"yj 3","inverse_derivative",-3,0.25
+"yj 3","inverse_derivative",3,0.21544346900318834
+"yj 3","inverse_derivative",0.10000000000000001,0.83953298697008139
+"yj 1e-08","transform",-Inf,-Inf
+"yj 1e-08","transform",-2,-3.9999999705624472
+"yj 1e-08","transform",-0,0
+"yj 1e-08","transform",0,0
+"yj 1e-08","transform",0.5,0.40546510810816438
+"yj 1e-08","transform",2,1.0986122886681096
+"yj 1e-08","transform",Inf,Inf
+"yj 1e-08","transform",NA,NA
+"yj 1e-08","transform",NaN,NA
+"yj 1e-08","transform",-1,-1.4999999936370565
+"yj 1e-08","transform",1,0.69314718055994529
+"yj 1e-08","transform",-0.5,-0.6249999985635174
+"yj 1e-08","transform",1e-300,1e-300
+"yj 1e-08","transform",-1e-300,-0
+"yj 1e-08","transform",9.9999999999999995e-21,9.9999999999999995e-21
+"yj 1e-08","transform",1.0000000000000001e+300,690.77552789821368
+"yj 1e-08","transform",-1.0000000000000001e+300,-Inf
+"yj 1e-08","transform",-3,-7.4999999265964519
+"yj 1e-08","transform",3,1.3862943611198906
+"yj 1e-08","transform",0.10000000000000001,0.095310179804324865
+"yj 1e-08","inverse",-Inf,-Inf
+"yj 1e-08","inverse",-2,-1.2360679820246849
+"yj 1e-08","inverse",-0,0
+"yj 1e-08","inverse",0,0
+"yj 1e-08","inverse",0.5,0.64872127070012819
+"yj 1e-08","inverse",2,6.3890560989306504
+"yj 1e-08","inverse",Inf,Inf
+"yj 1e-08","inverse",NA,NA
+"yj 1e-08","inverse",NaN,NA
+"yj 1e-08","inverse",-1,-0.7320508094392566
+"yj 1e-08","inverse",1,1.7182818284590451
+"yj 1e-08","inverse",-0.5,-0.41421356305597334
+"yj 1e-08","inverse",1e-300,1e-300
+"yj 1e-08","inverse",-1e-300,0
+"yj 1e-08","inverse",9.9999999999999995e-21,9.9999999999999995e-21
+"yj 1e-08","inverse",1.0000000000000001e+300,Inf
+"yj 1e-08","inverse",-1.0000000000000001e+300,-1.414216003550599e+150
+"yj 1e-08","inverse",-3,-1.6457513182661092
+"yj 1e-08","inverse",3,19.085536923187668
+"yj 1e-08","inverse",0.10000000000000001,0.10517091807564763
+"yj 1e-08","derivative",-Inf,Inf
+"yj 1e-08","derivative",-2,2.9999999670416315
+"yj 1e-08","derivative",-0,1
+"yj 1e-08","derivative",0,1
+"yj 1e-08","derivative",0.5,0.66666666666666663
+"yj 1e-08","derivative",2,0.33333333333333331
+"yj 1e-08","derivative",Inf,0
+"yj 1e-08","derivative",NA,NA
+"yj 1e-08","derivative",NaN,NA
+"yj 1e-08","derivative",-1,1.9999999861370563
+"yj 1e-08","derivative",1,0.5
+"yj 1e-08","derivative",-0.5,1.4999999939180233
+"yj 1e-08","derivative",1e-300,1
+"yj 1e-08","derivative",-1e-300,1
+"yj 1e-08","derivative",9.9999999999999995e-21,1
+"yj 1e-08","derivative",1.0000000000000001e+300,1e-300
+"yj 1e-08","derivative",-1.0000000000000001e+300,9.9999309226854489e+299
+"yj 1e-08","derivative",-3,3.9999999445482257
+"yj 1e-08","derivative",3,0.25
+"yj 1e-08","derivative",0.10000000000000001,0.90909090909090906
+"yj 1e-08","inverse_derivative",-Inf,0
+"yj 1e-08","inverse_derivative",-2,0.44721359819379142
+"yj 1e-08","inverse_derivative",-0,1
+"yj 1e-08","inverse_derivative",0,1
+"yj 1e-08","inverse_derivative",0.5,1.6487212707001282
+"yj 1e-08","inverse_derivative",2,7.3890560989306504
+"yj 1e-08","inverse_derivative",Inf,Inf
+"yj 1e-08","inverse_derivative",NA,NA
+"yj 1e-08","inverse_derivative",NaN,NA
+"yj 1e-08","inverse_derivative",-1,0.57735027173758646
+"yj 1e-08","inverse_derivative",1,2.7182818284590451
+"yj 1e-08","inverse_derivative",-0.5,0.70710678329575372
+"yj 1e-08","inverse_derivative",1e-300,1
+"yj 1e-08","inverse_derivative",-1e-300,1
+"yj 1e-08","inverse_derivative",9.9999999999999995e-21,1
+"yj 1e-08","inverse_derivative",1.0000000000000001e+300,Inf
+"yj 1e-08","inverse_derivative",-1.0000000000000001e+300,7.0710800531083937e-151
+"yj 1e-08","inverse_derivative",-3,0.37796447565786334
+"yj 1e-08","inverse_derivative",3,20.085536923187668
+"yj 1e-08","inverse_derivative",0.10000000000000001,1.1051709180756477
+"yj 1.99999999","transform",-Inf,-Inf
+"yj 1.99999999","transform",-2,-1.0986122886681096
+"yj 1.99999999","transform",-0,0
+"yj 1.99999999","transform",0,0
+"yj 1.99999999","transform",0.5,0.6249999985635174
+"yj 1.99999999","transform",2,3.9999999705624472
+"yj 1.99999999","transform",Inf,Inf
+"yj 1.99999999","transform",NA,NA
+"yj 1.99999999","transform",NaN,NA
+"yj 1.99999999","transform",-1,-0.69314718055994529
+"yj 1.99999999","transform",1,1.4999999936370565
+"yj 1.99999999","transform",-0.5,-0.40546510810816438
+"yj 1.99999999","transform",1e-300,0
+"yj 1.99999999","transform",-1e-300,-1e-300
+"yj 1.99999999","transform",9.9999999999999995e-21,0
+"yj 1.99999999","transform",1.0000000000000001e+300,Inf
+"yj 1.99999999","transform",-1.0000000000000001e+300,-690.77552789821368
+"yj 1.99999999","transform",-3,-1.3862943611198906
+"yj 1.99999999","transform",3,7.4999999265964519
+"yj 1.99999999","transform",0.10000000000000001,0.10499999994837357
+"yj 1.99999999","inverse",-Inf,-Inf
+"yj 1.99999999","inverse",-2,-6.3890560989306504
+"yj 1.99999999","inverse",-0,0
+"yj 1.99999999","inverse",0,0
+"yj 1.99999999","inverse",0.5,0.41421356305597334
+"yj 1.99999999","inverse",2,1.2360679820246849
+"yj 1.99999999","inverse",Inf,Inf
+"yj 1.99999999","inverse",NA,NA
+"yj 1.99999999","inverse",NaN,NA
+"yj 1.99999999","inverse",-1,-1.7182818284590451
+"yj 1.99999999","inverse",1,0.7320508094392566
+"yj 1.99999999","inverse",-0.5,-0.64872127070012819
+"yj 1.99999999","inverse",1e-300,0
+"yj 1.99999999","inverse",-1e-300,0
+"yj 1.99999999","inverse",9.9999999999999995e-21,0
+"yj 1.99999999","inverse",1.0000000000000001e+300,1.414216003550599e+150
+"yj 1.99999999","inverse",-1.0000000000000001e+300,-Inf
+"yj 1.99999999","inverse",-3,-19.085536923187668
+"yj 1.99999999","inverse",3,1.6457513182661092
+"yj 1.99999999","inverse",0.10000000000000001,0.095445115053204965
+"yj 1.99999999","derivative",-Inf,0
+"yj 1.99999999","derivative",-2,0.33333333333333331
+"yj 1.99999999","derivative",-0,1
+"yj 1.99999999","derivative",0,1
+"yj 1.99999999","derivative",0.5,1.4999999939180235
+"yj 1.99999999","derivative",2,2.9999999670416315
+"yj 1.99999999","derivative",Inf,Inf
+"yj 1.99999999","derivative",NA,NA
+"yj 1.99999999","derivative",NaN,NA
+"yj 1.99999999","derivative",-1,0.5
+"yj 1.99999999","derivative",1,1.9999999861370565
+"yj 1.99999999","derivative",-0.5,0.66666666666666663
+"yj 1.99999999","derivative",1e-300,1
+"yj 1.99999999","derivative",-1e-300,1
+"yj 1.99999999","derivative",9.9999999999999995e-21,1
+"yj 1.99999999","derivative",1.0000000000000001e+300,9.9999309226862147e+299
+"yj 1.99999999","derivative",-1.0000000000000001e+300,1e-300
+"yj 1.99999999","derivative",-3,0.25
+"yj 1.99999999","derivative",3,3.9999999445482262
+"yj 1.99999999","derivative",0.10000000000000001,1.0999999989515881
+"yj 1.99999999","inverse_derivative",-Inf,Inf
+"yj 1.99999999","inverse_derivative",-2,7.3890560989306504
+"yj 1.99999999","inverse_derivative",-0,1
+"yj 1.99999999","inverse_derivative",0,1
+"yj 1.99999999","inverse_derivative",0.5,0.70710678329575372
+"yj 1.99999999","inverse_derivative",2,0.44721359819379142
+"yj 1.99999999","inverse_derivative",Inf,0
+"yj 1.99999999","inverse_derivative",NA,NA
+"yj 1.99999999","inverse_derivative",NaN,NA
+"yj 1.99999999","inverse_derivative",-1,2.7182818284590451
+"yj 1.99999999","inverse_derivative",1,0.57735027173758646
+"yj 1.99999999","inverse_derivative",-0.5,1.6487212707001282
+"yj 1.99999999","inverse_derivative",1e-300,1
+"yj 1.99999999","inverse_derivative",-1e-300,1
+"yj 1.99999999","inverse_derivative",9.9999999999999995e-21,1
+"yj 1.99999999","inverse_derivative",1.0000000000000001e+300,7.0710800531083937e-151
+"yj 1.99999999","inverse_derivative",-1.0000000000000001e+300,Inf
+"yj 1.99999999","inverse_derivative",-3,20.085536923187668
+"yj 1.99999999","inverse_derivative",3,0.37796447565786334
+"yj 1.99999999","inverse_derivative",0.10000000000000001,0.91287092997172981
+"timespan","transform",-Inf,-Inf
+"timespan","transform",-2,-2
+"timespan","transform",-0,-0
+"timespan","transform",0,0
+"timespan","transform",0.5,0.5
+"timespan","transform",2,2
+"timespan","transform",Inf,Inf
+"timespan","transform",NA,NA
+"timespan","transform",NaN,NaN
+"timespan","transform",-1,-1
+"timespan","transform",1,1
+"timespan","transform",-0.5,-0.5
+"timespan","transform",1e-300,1e-300
+"timespan","transform",-1e-300,-1e-300
+"timespan","transform",9.9999999999999995e-21,9.9999999999999995e-21
+"timespan","transform",1.0000000000000001e+300,1.0000000000000001e+300
+"timespan","transform",-1.0000000000000001e+300,-1.0000000000000001e+300
+"timespan","transform",-3,-3
+"timespan","transform",3,3
+"timespan","transform",0.10000000000000001,0.10000000000000001
+"timespan","inverse",-Inf,-Inf
+"timespan","inverse",-2,-2
+"timespan","inverse",-0,-0
+"timespan","inverse",0,0
+"timespan","inverse",0.5,0.5
+"timespan","inverse",2,2
+"timespan","inverse",Inf,Inf
+"timespan","inverse",NA,NA
+"timespan","inverse",NaN,NaN
+"timespan","inverse",-1,-1
+"timespan","inverse",1,1
+"timespan","inverse",-0.5,-0.5
+"timespan","inverse",1e-300,1e-300
+"timespan","inverse",-1e-300,-1e-300
+"timespan","inverse",9.9999999999999995e-21,9.9999999999999995e-21
+"timespan","inverse",1.0000000000000001e+300,1.0000000000000001e+300
+"timespan","inverse",-1.0000000000000001e+300,-1.0000000000000001e+300
+"timespan","inverse",-3,-3
+"timespan","inverse",3,3
+"timespan","inverse",0.10000000000000001,0.10000000000000001
+"timespan minute","transform",-Inf,-Inf
+"timespan minute","transform",-2,-120
+"timespan minute","transform",-0,-0
+"timespan minute","transform",0,0
+"timespan minute","transform",0.5,30
+"timespan minute","transform",2,120
+"timespan minute","transform",Inf,Inf
+"timespan minute","transform",NA,NA
+"timespan minute","transform",NaN,NaN
+"timespan minute","transform",-1,-60
+"timespan minute","transform",1,60
+"timespan minute","transform",-0.5,-30
+"timespan minute","transform",1e-300,5.9999999999999997e-299
+"timespan minute","transform",-1e-300,-5.9999999999999997e-299
+"timespan minute","transform",9.9999999999999995e-21,5.9999999999999999e-19
+"timespan minute","transform",1.0000000000000001e+300,6.0000000000000001e+301
+"timespan minute","transform",-1.0000000000000001e+300,-6.0000000000000001e+301
+"timespan minute","transform",-3,-180
+"timespan minute","transform",3,180
+"timespan minute","transform",0.10000000000000001,6
+"timespan minute","inverse",-Inf,-Inf
+"timespan minute","inverse",-2,-0.033333333333333333
+"timespan minute","inverse",-0,-0
+"timespan minute","inverse",0,0
+"timespan minute","inverse",0.5,0.0083333333333333332
+"timespan minute","inverse",2,0.033333333333333333
+"timespan minute","inverse",Inf,Inf
+"timespan minute","inverse",NA,NA
+"timespan minute","inverse",NaN,NaN
+"timespan minute","inverse",-1,-0.016666666666666666
+"timespan minute","inverse",1,0.016666666666666666
+"timespan minute","inverse",-0.5,-0.0083333333333333332
+"timespan minute","inverse",1e-300,1.6666666666666666e-302
+"timespan minute","inverse",-1e-300,-1.6666666666666666e-302
+"timespan minute","inverse",9.9999999999999995e-21,1.6666666666666666e-22
+"timespan minute","inverse",1.0000000000000001e+300,1.6666666666666668e+298
+"timespan minute","inverse",-1.0000000000000001e+300,-1.6666666666666668e+298
+"timespan minute","inverse",-3,-0.050000000000000003
+"timespan minute","inverse",3,0.050000000000000003
+"timespan minute","inverse",0.10000000000000001,0.0016666666666666668
+"timespan week","transform",-Inf,-Inf
+"timespan week","transform",-2,-1209600
+"timespan week","transform",-0,-0
+"timespan week","transform",0,0
+"timespan week","transform",0.5,302400
+"timespan week","transform",2,1209600
+"timespan week","transform",Inf,Inf
+"timespan week","transform",NA,NA
+"timespan week","transform",NaN,NaN
+"timespan week","transform",-1,-604800
+"timespan week","transform",1,604800
+"timespan week","transform",-0.5,-302400
+"timespan week","transform",1e-300,6.0480000000000005e-295
+"timespan week","transform",-1e-300,-6.0480000000000005e-295
+"timespan week","transform",9.9999999999999995e-21,6.0479999999999997e-15
+"timespan week","transform",1.0000000000000001e+300,6.0480000000000007e+305
+"timespan week","transform",-1.0000000000000001e+300,-6.0480000000000007e+305
+"timespan week","transform",-3,-1814400
+"timespan week","transform",3,1814400
+"timespan week","transform",0.10000000000000001,60480
+"timespan week","inverse",-Inf,-Inf
+"timespan week","inverse",-2,-3.306878306878307e-06
+"timespan week","inverse",-0,-0
+"timespan week","inverse",0,0
+"timespan week","inverse",0.5,8.2671957671957675e-07
+"timespan week","inverse",2,3.306878306878307e-06
+"timespan week","inverse",Inf,Inf
+"timespan week","inverse",NA,NA
+"timespan week","inverse",NaN,NaN
+"timespan week","inverse",-1,-1.6534391534391535e-06
+"timespan week","inverse",1,1.6534391534391535e-06
+"timespan week","inverse",-0.5,-8.2671957671957675e-07
+"timespan week","inverse",1e-300,1.6534391534391535e-306
+"timespan week","inverse",-1e-300,-1.6534391534391535e-306
+"timespan week","inverse",9.9999999999999995e-21,1.6534391534391533e-26
+"timespan week","inverse",1.0000000000000001e+300,1.6534391534391536e+294
+"timespan week","inverse",-1.0000000000000001e+300,-1.6534391534391536e+294
+"timespan week","inverse",-3,-4.9603174603174603e-06
+"timespan week","inverse",3,4.9603174603174603e-06
+"timespan week","inverse",0.10000000000000001,1.6534391534391537e-07

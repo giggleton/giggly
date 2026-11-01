@@ -79,6 +79,64 @@ stops the question being reopened from scratch. A new entry is about 150 words: 
 sentence or two of why, and one line per rejected alternative. What a later decision replaces is
 deleted from the entry it was in, never marked superseded; git history keeps every version.
 
+- **Box-Cox, modulus, Yeo-Johnson and a span of time are `{:boxcox, exponent}`, `{:modulus,
+  exponent}`, `{:yj, exponent}` and `{:timespan, unit}`, a modulus offset from 1 (2026-11-01,
+  Steve: "A", "A", increment 4's step 5; checked against scales 1.4.0).** The exponent, R's
+  required `p`, goes first as `{:log, base}`'s base does, an optional offset as a keyword,
+  `{:boxcox, 0.5, offset: 3}`, as `{:probability, :normal, mean: 1}` holds its options; `:yj`
+  keeps R's name, as `:asn` did; `:timespan` is seconds, its unit `:second` to `:week`,
+  `Breaks.timespan/2`'s names. The exponent is any number, a Box-Cox offset one from 0 up, R's
+  documented range, and a modulus offset one from 1 up: below 1 R's modulus no longer rises,
+  offset 0 sending 0.5 to -0.586 and -0.5 to +0.586. Anything else raises by guard.
+  *Rejected: `{:yeo_johnson, ...}`*: the house rule over R's name, where `:asn` kept R's.
+  *Rejected: keywords throughout*: an exponent no keyword can leave out. *Rejected: R's
+  documented offset from 0 for the modulus*: points near zero drawn out of order. *Rejected: R's
+  acceptance*: a negative offset, falling or folding through the squish and the breaks.
+
+- **The Box-Cox, modulus and Yeo-Johnson transformations are their documented formulas, R's
+  doubles but the platform's last bit (2026-11-01, Steve: "A", increment 4's step 5; checked
+  against R 4.6.1).** Each is `(base^exponent - 1) / exponent` as scales' help pages write it,
+  evaluated with R's `^` (`Double.power/2`: a square `x * x`, 1 and 0 deciding first), an
+  exponent within 1e-7 of 0 its logarithm, as R's. On 3,000 random doubles every value and
+  derivative was R's but where Erlang's power parts from R's x86 `powl` (Box-Cox in 3 on 65, up
+  to 42 ulps near 1 where the subtraction amplifies it; ours the right one 57 times, R's 19) and
+  log1p's and expm1's methods (a double). Near 0 both lose every digit, yj(0.5) of 1e-16 being 0.
+  yj's inverse derivative below 0 at an exponent of 2 is the slope `exp(-x)`, where R's fails (Q4).
+  *Rejected: an expm1/log1p form*, within 1e-13 of the truth everywhere: half of R's doubles moved
+  by a few ulps for precision no plot shows.
+
+- **Box-Cox's domain is R's, from 0 whatever the offset, and a value below minus its offset NaN
+  (2026-11-01, Steve: "A", "A", increment 4's step 5; checked against scales 1.4.0).** R refuses
+  the whole vector when any value is below minus the offset; here that value alone is NaN, as a
+  logarithm's negative is, so a plot draws the rest. R's domain is `c(0, Inf)` whatever the
+  offset, so with offset 3 on data from -2.9 to 1 ggplot2 finds breaks 0, 0.5 and 1 only, the
+  values from -3 to 0 still transformed; Giggly draws that axis, as the rule of copying R's odd
+  but unbroken drawings says. *Rejected: R's raise*: one stray value fails the plot, the only
+  transformation raising on data. *Rejected: the domain from minus the offset*: breaks -2 to 1
+  there, a departure for a few breaks on an uncommon axis.
+
+- **An axis past a bound a transformation never reaches is broken on its other end, as R's
+  (2026-11-01, Steve: "A", increment 4's step 5; checked against ggplot2 4.0.3).** Box-Cox and
+  modulus with a negative exponent and yj below 0 or above 2 bound their values, and the 5%
+  widening passes the bound: `Transform.squish/2` now squishes every transformation of numbers
+  into its sorted transformed domain, as `get_breaks()` does, so the end sits on the bound, turns
+  back to an infinity, and is set aside, as an exponential's NaN end is, R's five copies of the
+  other end found: boxcox(-1) on 1 to 100 draws no breaks, yj(-1) on -10 to 10 five stacked at
+  its bottom, as ggplot2 does; both ends, none. A third of random axes with a negative exponent.
+  *Rejected: no breaks whenever an end turns back*: a second rule, departing under yj(-1).
+  *Rejected: raising*: it fails a plot R draws.
+
+- **Box-Cox, modulus and Yeo-Johnson labels are written from their breaks in data units
+  (2026-11-01, Steve: "A", increment 4's step 5; checked against scales 1.4.0).** Turned back,
+  their breaks lose digits a fixed rounding cannot restore: under boxcox(2) 0.0064 comes back
+  0.0063999999999983, under boxcox(3) as few as three digits survive, since the transformed space
+  holds no more, and offset 3's 0 comes back -4.4e-16, which R writes `-4.440892e-16`; 14 digits
+  left noise on 10-35% of random axes. So `format/4`, handed the extent squished as `breaks/3`
+  is, finds the same breaks in data units again and writes each from its own value, the first
+  where two share a position; a given break is turned back at 14 digits, and a labels function
+  handed the round trip, as R hands it. *Rejected: the rule for every inexact inverse*: steps 3's
+  and 4's built code reopened. *Rejected: 14 digits, as theirs*: the noise.
+
 - **A plain label past what Erlang writes is written whole, as R writes it (2026-11-01, Steve:
   "A", increment 4's step 5's C8; checked against R 4.6.1).** `Labels.plain/1` raised
   `ArgumentError` on a break above about 1e255 or below about 1e-253, where

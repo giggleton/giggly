@@ -64,6 +64,18 @@ defmodule Scales.TransformTest do
   # long fraction before a positive exponent for the whole part).
   defp r_double(text), do: String.to_float(text)
 
+  # A double as an R fixture writes one: `NA` missing, `NaN`, `Inf` and `-Inf`, `-0` a negative zero.
+  defp r_value("NA"), do: nil
+  defp r_value("NaN"), do: :nan
+  defp r_value("Inf"), do: :infinity
+  defp r_value("-Inf"), do: :neg_infinity
+  defp r_value("-0"), do: -0.0
+
+  defp r_value(text) do
+    {value, ""} = Float.parse(text)
+    value
+  end
+
   # How many doubles apart two finite doubles are, each read from its bits in their order.
   defp ulps(left, right), do: abs(ordinal(left) - ordinal(right))
 
@@ -690,6 +702,331 @@ defmodule Scales.TransformTest do
                 ]},
                5
              )
+    end
+  end
+
+  describe "Box-Cox, modulus, Yeo-Johnson and timespan" do
+    # Golden: `fixtures/r_power_4.6.1.csv` is R 4.6.1's (scales 1.4.0) transform, inverse,
+    # d_transform and d_inverse of each at the nine doubles and eleven edges, the exponents near
+    # zero and near 2 among them (`inc4/step5/fixture.R`), but two of the package's own, agreed: a
+    # Box-Cox value below minus its offset is NaN, where R refuses the whole vector, and yj's
+    # inverse derivative below 0 at an exponent of 2 is the slope, exp(-x), where R's fails. Every
+    # double is R's but six, where log1p's and expm1's measured methods are a double off R's.
+    test "each gives R's doubles, its derivatives too, but log1p's and expm1's last bit" do
+      names = %{
+        "boxcox -1" => {:boxcox, -1},
+        "boxcox 0" => {:boxcox, 0},
+        "boxcox 0.5" => {:boxcox, 0.5},
+        "boxcox 1" => {:boxcox, 1},
+        "boxcox 2" => {:boxcox, 2},
+        "boxcox 1e-08" => {:boxcox, 1.0e-8},
+        "boxcox 0.5 offset 3" => {:boxcox, 0.5, offset: 3},
+        "boxcox 0 offset 3" => {:boxcox, 0, offset: 3},
+        "modulus -1" => {:modulus, -1},
+        "modulus 0" => {:modulus, 0},
+        "modulus 0.5" => {:modulus, 0.5},
+        "modulus 1" => {:modulus, 1},
+        "modulus 2" => {:modulus, 2},
+        "modulus 0.5 offset 3" => {:modulus, 0.5, offset: 3},
+        "yj -1" => {:yj, -1},
+        "yj 0" => {:yj, 0},
+        "yj 0.5" => {:yj, 0.5},
+        "yj 1" => {:yj, 1},
+        "yj 2" => {:yj, 2},
+        "yj 3" => {:yj, 3},
+        "yj 1e-08" => {:yj, 1.0e-8},
+        "yj 1.99999999" => {:yj, 1.99999999},
+        "timespan" => :timespan,
+        "timespan minute" => {:timespan, :minute},
+        "timespan week" => {:timespan, :week}
+      }
+
+      functions = %{
+        "transform" => &Transform.transform/2,
+        "inverse" => &Transform.inverse/2,
+        "derivative" => &Transform.derivative/2,
+        "inverse_derivative" => &Transform.inverse_derivative/2
+      }
+
+      rows =
+        __DIR__
+        |> Path.join("fixtures/r_power_4.6.1.csv")
+        |> File.stream!()
+        |> Stream.drop(1)
+        |> Enum.map(fn line ->
+          [name, function, value, expected] =
+            line
+            |> String.trim()
+            |> String.split(",")
+
+          {Map.fetch!(names, String.trim(name, ~s("))), String.trim(function, ~s(")),
+           r_value(value), r_value(expected)}
+        end)
+
+      assert Enum.count(rows) == 1880
+
+      departed =
+        Enum.reject(rows, fn {name, function, value, expected} ->
+          [ours] = functions[function].(name, [value])
+          ours === expected
+        end)
+
+      assert Enum.map(departed, fn {name, function, value, _expected} ->
+               {name, function, value}
+             end) ==
+               [
+                 {{:yj, 0}, "transform", 2.0},
+                 {{:yj, 0}, "inverse", 0.1},
+                 {{:yj, 2}, "transform", -2.0},
+                 {{:yj, 1.0e-8}, "transform", 2.0},
+                 {{:yj, 1.0e-8}, "inverse", 0.1},
+                 {{:yj, 1.99999999}, "transform", -2.0}
+               ]
+
+      for {name, function, value, expected} <- departed do
+        [ours] = functions[function].(name, [value])
+        assert ulps(ours, expected) == 1
+      end
+    end
+
+    # Golden: ggplot2's axes, the plot `ggplot(data.frame(x = seq_along(ys), y = ys), aes(x, y)) +
+    # geom_point() + scale_y_continuous(transform = ...)` for the ys named (`inc4/step5/axes*.R`).
+    # R writes these labels with format(), so `0.0 2.5` and `10.18059` where the package writes
+    # plain decimals to 15 digits.
+    test "each finds extended breaks in data units, minor breaks regular in transformed space" do
+      # ys = c(1, 100)
+      assert axis({:boxcox, 0.5}, {-0.90000000000000002, 18.899999999999999}) ==
+               {[
+                  {8.0, "25"},
+                  {12.142135623730951, "50"},
+                  {15.320508075688775, "75"},
+                  {18.0, "100"}
+                ],
+                [
+                  3.857864376269049,
+                  5.9289321881345245,
+                  10.071067811865476,
+                  13.731321849709863,
+                  16.660254037844389
+                ]}
+
+      # ys = c(0, 10): 0 at minus infinity, so the axis is 10's alone
+      assert axis({:boxcox, 0}, {2.2525850929940461, 2.3525850929940457}) ==
+               {[
+                  {2.2772672850097559, "9.75"},
+                  {2.3025850929940459, "10.00"},
+                  {2.3272777055844172, "10.25"},
+                  {2.3513752571634776, "10.50"}
+                ],
+                [2.2646083810176112, 2.2899261890019007, 2.3149313992892315, 2.3393264813739476]}
+
+      # ys = c(-5, 5)
+      assert axis({:modulus, -1}, {-0.91666666666666674, 0.91666666666666674}) ==
+               {[
+                  {-0.90909090909090906, "-10"},
+                  {-0.83333333333333337, "-5"},
+                  {-0.0, "0"},
+                  {0.83333333333333337, "5"},
+                  {0.90909090909090906, "10"}
+                ],
+                [
+                  -0.87121212121212122,
+                  -0.41666666666666669,
+                  0.41666666666666669,
+                  0.87121212121212122
+                ]}
+
+      # ys = c(-5, 5), an offset of 3
+      assert axis({:modulus, 2, offset: 3}, {-34.649999999999999, 34.649999999999999}) ==
+               {[
+                  {-31.5, "-5.0"},
+                  {-14.625, "-2.5"},
+                  {0.0, "0.0"},
+                  {14.625, "2.5"},
+                  {31.5, "5.0"}
+                ], [-23.0625, -7.3125, 7.3125, 23.0625]}
+
+      # ys = c(-100, 100)
+      assert axis({:yj, 0.5}, {-710.73119397535902, 52.805986728794203}) ==
+               {[
+                  {0.0, "0"},
+                  {26.354893757515651, "200"},
+                  {38.049968789001575, "400"},
+                  {47.03060268852505, "600"}
+                ],
+                [
+                  -26.354893757515651,
+                  -13.177446878757825,
+                  13.177446878757825,
+                  32.202431273258611,
+                  42.540285738763316
+                ]}
+
+      # ys = c(-10, 10)
+      assert axis({:yj, 2}, {-5.5177900364382895, 63.11989476363992}) ==
+               {[
+                  {-5.3033049080590757, "-200"},
+                  {-5.0172798368149243, "-150"},
+                  {-4.6151205168412597, "-100"},
+                  {-3.9318256327243257, "-50"},
+                  {0.0, "0"}
+                ],
+                [
+                  -5.446317443681151,
+                  -5.1602923724370005,
+                  -4.816200176828092,
+                  -4.2734730747827925,
+                  -1.9659128163621629,
+                  0.14301253562207572,
+                  0.28602507124415144
+                ]}
+    end
+
+    # Golden: ggplot2's axes, as above. Where the 5% widening passes a bound the transformation
+    # never reaches, ggplot2 squishes the extent onto it, the bound turns back to an infinity, and
+    # R's extended breaks on one infinite end are five copies of the other: kept, by a rounding
+    # hair, under yj(-1) on c(-10, 10), outside the extent under boxcox(-1) on c(1, 100).
+    test "an end that turns back to an infinity is set aside, as R's breaks then sit on the other" do
+      assert axis({:boxcox, -1}, {-0.049500000000000002, 1.0395000000000001}) == {[], []}
+
+      stacked = List.duplicate({-465.54545454545422, "-10.1805902224244"}, 5)
+      assert axis({:yj, -1}, {-465.5454545454545, 23.121212121212125}) == {stacked, []}
+
+      assert Transform.squish({:yj, -1}, {-465.5454545454545, 23.121212121212125}) ===
+               {-465.5454545454545, 1.0}
+
+      # As ggplot2's get_breaks() squishes every transformation's limits into its domain
+      # transformed, sorted: exp's from 0, the reverse's not at all, its ends -Inf and Inf
+      assert {Transform.squish(:exp, {-1.0, 3.0}), Transform.squish(:reverse, {-3.0, 5.0})} ===
+               {{0.0, 3.0}, {-3.0, 5.0}}
+
+      assert Transform.breaks({:modulus, -1}, Transform.squish({:modulus, -1}, {-1.5, 1.5})) == []
+    end
+
+    # Golden: ggplot2's axes, as above. R labels each break turned back, so boxcox(0.5, offset =
+    # 3)'s 0 is -4.440892e-16 and every label scientific, `-4.440892e-16 5.000000e-01
+    # 1.000000e+00`; boxcox(3) keeps few digits near 0, which R's seven hide. Its domain is R's,
+    # from 0 whatever the offset, so ys = c(-2.9, 1) finds no break below 0.
+    test "each labels its breaks from the values in data units they were found from" do
+      assert axis({:boxcox, 0.5, offset: 3}, {-1.5359216913646403, 2.1683772233983163}) ==
+               {[{1.4641016151377544, "0.0"}, {1.7416573867739413, "0.5"}, {2.0, "1.0"}],
+                [
+                  1.1865458435015674,
+                  1.3253237293196609,
+                  1.6028795009558479,
+                  1.8708286933869707,
+                  2.1387778858180937
+                ]}
+
+      assert axis({:boxcox, 3}, {-0.33333328668611861, -0.33333267514444442}) ==
+               {[
+                  {-0.33333321900000001, "0.007"},
+                  {-0.3333330903333333, "0.009"},
+                  {-0.33333288966666669, "0.011"}
+                ],
+                [
+                  -0.33333328333333334,
+                  -0.33333315466666669,
+                  -0.33333299,
+                  -0.3333328253333333,
+                  -0.33333276099999998
+                ]}
+
+      # A break given is turned back and rounded to 14 significant digits, which keeps the round
+      # trip's error here: 0.007 comes back 0.006999999999715905
+      assert Transform.format({:boxcox, 3}, [-0.33333321900000001], :given) ==
+               ["0.0069999999997159"]
+
+      # 0 and 0.000005 cubed are one double from -1/3: the first labels the position they share
+      extent = {-0.3333333333333334, -0.33333333333333054}
+
+      breaks =
+        {:boxcox, 3}
+        |> Transform.breaks(Transform.squish({:boxcox, 3}, extent))
+        |> inside(extent)
+
+      assert [shared, shared | _rest] = breaks
+
+      assert Transform.format({:boxcox, 3}, breaks, extent) ==
+               ["0.000000", "0.000000", "0.000010", "0.000015", "0.000020"]
+    end
+
+    # Golden: ggplot2's axes, as above, ys counted in the unit named.
+    test "a span of time is its seconds, broken and labelled as a span, in its unit" do
+      # ys = c(0, 100) seconds
+      assert axis(:timespan, {-5.0, 105.0}) ==
+               {[
+                  {0.0, "0"},
+                  {20.0, "20s"},
+                  {40.0, "40s"},
+                  {60.0, "1m"},
+                  {80.0, "80s"},
+                  {100.0, "100s"}
+                ], [10.0, 30.0, 50.0, 70.0, 90.0]}
+
+      # ys = c(0, 100) minutes
+      assert axis({:timespan, :minute}, {-300.0, 6300.0}) ==
+               {[
+                  {0.0, "0"},
+                  {1200.0, "20m"},
+                  {2400.0, "40m"},
+                  {3600.0, "1h"},
+                  {4800.0, "80m"},
+                  {6000.0, "100m"}
+                ], [600.0, 1800.0, 3000.0, 4200.0, 5400.0]}
+
+      # ys = c(-30, 30) hours
+      assert axis({:timespan, :hour}, {-118_800.0, 118_800.0}) ==
+               {[{-69_120.0, "-1 152m"}, {0.0, "0"}, {69_120.000000000029, "19h"}],
+                [-103_680.0, -34_560.0, 34_560.000000000015, 103_680.00000000003]}
+
+      # ys = c(0, 3) weeks
+      assert axis({:timespan, :week}, {-90_720.0, 1_905_120.0}) ==
+               {[{0.0, "0"}, {604_800.0, "1w"}, {1_209_600.0, "2w"}, {1_814_400.0, "3w"}],
+                [302_400.0, 907_200.0, 1_512_000.0]}
+    end
+
+    test "a span of time counts no breaks and has no derivatives, as R's" do
+      breaks =
+        assert_raise(ArgumentError, fn -> Transform.breaks(:timespan, {0.0, 3.0}, n: 3) end)
+
+      assert breaks.message =~ "the :timespan transformation counts no breaks"
+
+      for name <- [:timespan, {:timespan, :minute}] do
+        assert_raise FunctionClauseError, fn -> Transform.derivative(name, [1.0]) end
+        assert_raise FunctionClauseError, fn -> Transform.inverse_derivative(name, [1.0]) end
+      end
+
+      # R: trim_to_domain(transform_timespan("mins"), c(-5, 0.3, 9, NA)) is -300 540
+      assert Transform.trim_to_domain({:timespan, :minute}, [-5, 0.3, 9, nil]) === {-300.0, 540.0}
+    end
+
+    # R takes any number as an exponent, garbage at Inf and failing at NA, and any offset: a
+    # negative one refuses values, and a modulus offset below 1 no longer rises, offset 0 sending
+    # 0.5 to -0.586 and -0.5 to 0.586 (`inc4/step5/params.R`).
+    test "an exponent not a number, an offset out of range or another unit is refused" do
+      for name <- [
+            {:boxcox, :infinity},
+            {:boxcox, nil},
+            {:boxcox, 0.5, offset: -1},
+            {:boxcox, 0.5, offset: :infinity},
+            {:boxcox, 0.5, scale: 3},
+            {:boxcox, 0.5, offset: 1, offset: 2},
+            {:modulus, nil},
+            {:modulus, 0.5, offset: 0.999},
+            {:modulus, 0.5, offset: 0},
+            {:yj, :nan},
+            {:yj, 0.5, offset: 1},
+            {:timespan, :month},
+            {:timespan, "mins"}
+          ] do
+        assert_raise FunctionClauseError, fn -> Transform.transform(name, [1.0]) end
+      end
+
+      assert {Transform.transform({:boxcox, 0.5, offset: 0}, [2.0]),
+              Transform.transform({:modulus, 0.5, offset: 1}, [2.0])} ===
+               {Transform.transform({:boxcox, 0.5}, [2.0]),
+                Transform.transform({:modulus, 0.5}, [2.0])}
     end
   end
 
