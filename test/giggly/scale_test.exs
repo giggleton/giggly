@@ -425,9 +425,10 @@ defmodule Giggly.ScaleTest do
                [{2.0, "2 of 4"}, {3.0, "3 of 4"}, {4.0, "4 of 4"}, {5.0, "5 of 4"}]
     end
 
-    # Golden: ggplot2 4.0.3 draws a missing label `NA`, given in a list or by a function alike, and
-    # draws nothing for one among `label_log()`'s powers, a logical `NA` in an expression.
-    test "a missing label is written NA, and as nothing among powers" do
+    # Golden: ggplot2 4.0.3 draws a missing label `NA`, given in a list or by a function alike; one
+    # among `label_log()`'s powers, a logical `NA` in an expression vector, it draws as nothing on an
+    # axis or a bar and `NA` in a legend, so the scale leaves it to the guide.
+    test "a missing label is written NA, and left missing among powers" do
       power = {:power, "10", "3"}
       signed = {:signed, "-", power}
 
@@ -449,8 +450,8 @@ defmodule Giggly.ScaleTest do
       assert labelled === [
                [{2.0, "two"}, {3.0, "NA"}],
                [{2.0, "NA"}, {3.0, "three"}],
-               [{2.0, ""}, {3.0, power}],
-               [{2.0, signed}, {3.0, ""}],
+               [{2.0, nil}, {3.0, power}],
+               [{2.0, signed}, {3.0, nil}],
                [{2.0, "0"}, {3.0, power}]
              ]
     end
@@ -465,10 +466,11 @@ defmodule Giggly.ScaleTest do
             {:signed, "-", {:signed, "-", {:power, "10", "3"}}}
           ] do
         scale = weights(breaks: [2.0], labels: fn _breaks -> [label] end)
+        got = Regex.escape("breaks [2.0], got: #{inspect([label])}")
 
-        assert_raise ArgumentError, ~r/must return a string, a power or nil for each/, fn ->
-          Scale.breaks(scale, Scale.dimension(scale))
-        end
+        assert_raise ArgumentError,
+                     ~r/^a scale's labels function must return a string, a power or nil .*#{got}$/,
+                     fn -> Scale.breaks(scale, Scale.dimension(scale)) end
       end
     end
 

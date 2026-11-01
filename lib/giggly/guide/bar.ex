@@ -33,7 +33,7 @@ defmodule Giggly.Guide.Bar do
   # outward, and the labels. A title or labels the theme removes draw as none given; a background
   # or ticks removed draw nothing.
 
-  alias Giggly.Guide.Parts
+  alias Giggly.Guide.{Parts, Plotmath}
   alias Giggly.{Scene, Theme}
   alias Giggly.Scene.{Cell, Polylines}
 
@@ -98,7 +98,12 @@ defmodule Giggly.Guide.Bar do
     } = theme
 
     title = Parts.title(title, title_look)
-    labels = Parts.labels(keys, text_look)
+
+    labels =
+      keys
+      |> Parts.labels(text_look)
+      |> Plotmath.expressions()
+
     {label_margin, labels_width} = label_column(labels, text_look, installed_fonts)
 
     {widths, title_heights, first, title_cells} =
@@ -143,7 +148,12 @@ defmodule Giggly.Guide.Bar do
     } = theme
 
     title = Parts.title(title, title_look)
-    labels = Parts.labels(keys, text_look)
+
+    labels =
+      keys
+      |> Parts.labels(text_look)
+      |> Plotmath.expressions()
+
     label_height = label_row(labels, text_look, installed_fonts)
 
     {title_widths, heights, first, title_cells} =

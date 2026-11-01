@@ -124,13 +124,14 @@ defmodule Giggly.Scale do
   @type t :: Continuous.t() | Discrete.t() | Binned.t()
 
   @typedoc """
-  A break's label: text, or a power, as `Scales.Labels.log/2` writes one, signed or not; `:none`
-  where the scale has no labels.
+  A break's label: text, or a power, as `Scales.Labels.log/2` writes one, signed or not; `nil`
+  for a missing one among powers; `:none` where the scale has no labels.
   """
   @type label ::
           String.t()
           | {:power, String.t(), String.t()}
           | {:signed, String.t(), {:power, String.t(), String.t()}}
+          | nil
           | :none
 
   @typedoc "A break on an axis: its position and its label."
@@ -1101,15 +1102,13 @@ defmodule Giggly.Scale do
   end
 
   # A scale's labels as its guide draws them: a missing one (`nil`) written `NA`, as R draws a
-  # missing label, but as nothing among powers, as R's plotmath draws a missing label among
-  # them, an empty box beside its tick.
+  # missing label, but left `nil` among powers, which a guide draws as R draws a missing label in
+  # an expression vector, as nothing where it draws its labels together and `NA` where it draws
+  # each alone (`Giggly.Guide.Plotmath`).
   defp written(labels) do
-    missing = if Enum.any?(labels, &power?/1), do: "", else: "NA"
-
-    Enum.map(labels, fn
-      nil -> missing
-      label -> label
-    end)
+    if Enum.any?(labels, &power?/1),
+      do: labels,
+      else: Enum.map(labels, fn label -> label || "NA" end)
   end
 
   defp power?({:power, base, exponent}), do: is_binary(base) and is_binary(exponent)

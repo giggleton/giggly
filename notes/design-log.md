@@ -107,21 +107,31 @@ deleted from the entry it was in, never marked superseded; git history keeps eve
   measured unlike svglite's beside a base measured like it. *Rejected: the label's own font*:
   1.7 points narrower per sign at 8.8 points, every golden with one off.
 
-- **A missing label among powers is drawn as nothing (2026-10-31, Steve: "A"; checked against
-  ggplot2 4.0.3).** `label_log()`'s `NA` is logical inside an expression vector, which plotmath
-  draws as nothing, its tick kept and no room taken; `NA_character_` there would draw "NA". Giggly's
-  `nil` beside a power stands for the first, so the scale writes it `""`, an empty box, where any
-  label is a power, and `NA` otherwise (the entry beginning "A missing break's label").
-  *Rejected: `NA` everywhere*: one rule, but unlike what R draws for `label_log()`'s own `NA`.
+- **A missing label among powers is drawn as R draws its guide's, nothing on an axis or a bar
+  and `NA` in a legend, the guide writing it (2026-10-31, Steve: "A", and call 9 "A"; checked
+  against ggplot2 4.0.3).** `label_log()`'s `NA` is logical inside an expression vector, which
+  plotmath draws as nothing where a guide draws its labels as one grob (an axis, a colour bar,
+  colour steps), its tick kept and no room taken, while a legend, drawing each key's alone, draws
+  it "NA". Only the assembly knows a scale's final guide, so the scale leaves `nil` among powers
+  and writes `NA` otherwise (the entry beginning "A missing break's label"), and
+  `Plotmath.expressions/1` or `alone/1` writes it. *Rejected: `NA` everywhere*: unlike what R
+  draws for `label_log()`'s own `NA` on an axis. *Rejected: the scale told its guide's kind by
+  the assembly*: an argument on the scale's API that only says how a guide draws.
 
-- **A guide holding a power lays every label out as plotmath (2026-10-31, Steve: "A"; checked
-  against ggplot2 4.0.3 and vdiffr 1.0.9).** R's labels are a character vector or an expression
+- **A guide drawing its labels together lays every label out as plotmath where any is a power, a
+  legend each alone (2026-10-31, Steve: "A"; checked against ggplot2 4.0.3 and vdiffr 1.0.9).**
+  R's labels are a character vector or an expression
   vector, and `label_log()` returns the second, its zero included, so a string among powers is
   boxed by its own glyphs and started at its box's start (the zero 2.77 points off a plain one's
   place on an x axis), and a multi-line one is drawn as `GEText()` draws it, its lines up from the
   baseline over a box one line high. Every expression is drawn plain, as `GEMathText()` sets the
   plain font whatever the theme's face. `Guide.Plotmath.expressions/1` marks the strings for every
-  guide. *Rejected: label by label*: `label_log()`'s own zero placed unlike R's.
+  guide drawing its labels as one grob, an axis's, the angle axis's, a bar's. A legend draws each
+  key's label alone, as ggplot2 draws an expression vector's elements one at a time, so there a
+  power is plotmath and a string text, its lines stacked as text's (call 8, Steve: "A"; found by
+  the mutation pass). *Rejected: label by label on every guide*: `label_log()`'s own zero on an
+  axis placed unlike R's. *Rejected: the whole-guide rule in a legend*: a string there 0.7 points
+  off R's.
 
 - **Every text a guide draws breaks over lines (2026-10-31, Steve: "A"; checked against ggplot2
   4.0.3).** R breaks tick labels on both axes, a legend's and a colour bar's labels, and a radial
@@ -381,8 +391,8 @@ deleted from the entry it was in, never marked superseded; git history keeps eve
   `number()` takes `NA`, which widens the others' untrimmed padding to its two characters. Giggly
   takes a `nil` label from a labels function, a list or a map's value and draws `NA`, as grid
   draws R's `NA` on axes and legends alike; the scale writes it, so a guide never sees `nil`
-  (Steve: "A"), and among powers writes it as nothing (the entry beginning "A missing label
-  among powers"). A discrete scale's labels function is handed `nil`, so the labellers must take
+  (Steve: "A"), but among powers, where each guide writes it (the entry beginning "A missing
+  label among powers"). A discrete scale's labels function is handed `nil`, so the labellers must take
   it. *Rejected: refusing `nil`*: `wrap` and `dictionary` unusable on a missing level.
   *Rejected: the package writing `"NA"`*: not R's values, and a missing label then reads as text.
 

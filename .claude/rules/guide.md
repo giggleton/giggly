@@ -53,11 +53,14 @@ panel's grid lines are placed by the coordinate system".
   run over several lines" and "Every text a guide draws breaks"): each line a label of its own,
   its `line_spacing` below the one before, stacked `vjust` of the way down from its top as R's
   graphics engine stacks lines, a title, a strip's label, a tick label and a legend's alike.
-- **A guide whose labels hold a power lays every label out as R's plotmath lays out an expression
-  vector** (`Guide.Plotmath`; design-log §4, the entries beginning "`log/2` returns powers" and
-  "A guide holding a power"): `Plotmath.expressions/1` marks its strings `{:string, text}` where
-  any label is one, every guide calling it on all its labels at once (the axes, the angle axis,
-  `Parts.labels/2` for a legend and a bar), so a per-label measure still knows. An expression is
+- **A guide drawing its labels together whose labels hold a power lays every label out as R's
+  plotmath lays out an expression vector, and a legend lays out each alone** (`Guide.Plotmath`;
+  design-log §4, the entries beginning "`log/2` returns powers", "A guide drawing its labels together" and "A
+  missing label among powers"): the axes, the angle axis and a bar call
+  `Plotmath.expressions/1` on all their labels at once, which marks the strings `{:string, text}`
+  and a missing one (`nil`, which a scale leaves only among powers) an empty string, drawn as
+  nothing; a legend calls `Plotmath.alone/1` on each, a power an expression, a string text, a
+  missing one `NA`, as ggplot2 draws a legend's labels one at a time. An expression is
   boxed by its glyphs (`Font.box/5`), justified by its box as `GEMathText()` justifies one, drawn
   plain whatever the look's face, and measured as its box and the font's descent; each of its
   pieces (a sign, a base, an exponent's sign, an exponent, a string's lines) is a one-label

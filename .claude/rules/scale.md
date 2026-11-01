@@ -190,11 +190,11 @@ identity transformation: the entry beginning "A layer records its stat and posit
   (`{:power, base, exponent}`, signed or not, `Scales.Labels.log/2`'s) or `nil`, or the run
   raises; `:none` gives no breaks (so no minor breaks), no minor breaks, or `{position, :none}`
   for each break, which the axis draws as ticks alone.
-- **A missing label is written where a scale's labels are made, so a guide never sees `nil`**
-  (`written/1`, over a continuous, a discrete and a binned scale's labels alike, a list's, a map's
-  and a function's): `NA`, as R draws a missing label, but `""` where any label is a power, an
-  empty box beside its tick, as plotmath draws R's `NA` in an expression vector (design-log §4,
-  the entries beginning "A missing break's label" and "A missing label among powers").
+- **A missing label is written where a scale's labels are made, but among powers** (`written/1`,
+  over a continuous, a discrete and a binned scale's labels alike, a list's, a map's and a
+  function's): `NA`, as R draws a missing label, so a guide sees `nil` only where any label is a
+  power, and writes it as R draws its guide's (design-log §4, the entries beginning "A missing
+  break's label" and "A missing label among powers").
 - **A scale sees plain values, never a frame or a plot.** Its boundary lists `Scales`, R's scales
   half, which gives it its breaks, transformations, palettes, bounds and data ranges, and
   `Giggly.AsCharacter`, which writes a discrete level, and nothing else; the assembly pulls a

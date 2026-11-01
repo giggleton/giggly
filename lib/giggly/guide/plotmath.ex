@@ -3,9 +3,12 @@ defmodule Giggly.Guide.Plotmath do
 
   # A guide's labels laid out as R's plotmath lays out an expression vector's, as ggplot2 draws a
   # scale's labels when they are expressions, as `Scales.Labels.log/2`'s powers are in R. A guide
-  # holding any power holds expressions only (`expressions/1`): each string beside the powers is
-  # an expression too, `{:string, text}`, as every element of R's expression vector is, so it is
-  # boxed and placed as plotmath boxes and places one, not as text.
+  # drawing its labels together, as one grob, an axis's or a bar's, holds expressions only where it
+  # holds any power (`expressions/1`): each string beside the powers is an expression too,
+  # `{:string, text}`, as every element of R's expression vector is, so it is boxed and placed as
+  # plotmath boxes and places one, not as text. A legend draws each key's label alone, as ggplot2
+  # draws an expression vector's elements one at a time (`alone/1`): a power is an expression and
+  # a string text.
   #
   # An expression is laid out in plotmath's display style, at its look's size and family, and in
   # the plain face whatever the look's, as `GEMathText()` sets the plain font before it draws
@@ -56,15 +59,24 @@ defmodule Giggly.Guide.Plotmath do
   # The symbol-font text a sign is drawn as: R's unary minus and plus.
   @signs %{"-" => "−", "+" => "+"}
 
-  # A guide's `labels` as R holds them: each string an expression where any label is one, as an
-  # expression vector's every element is; as they are otherwise.
+  # A guide's `labels` as R draws them together, as one grob, an axis's or a bar's: each string an
+  # expression where any label is one, as an expression vector's every element is, and a missing
+  # one (`nil`, which a scale leaves only among powers) an empty string, which plotmath draws as
+  # nothing; as they are otherwise.
   @doc false
-  @spec expressions([String.t() | t() | :none]) :: [String.t() | t() | :none]
+  @spec expressions([String.t() | t() | nil | :none]) :: [String.t() | t() | :none]
   def expressions(labels) do
     if Enum.any?(labels, &expression?/1),
       do: Enum.map(labels, &as_expression/1),
       else: labels
   end
+
+  # A label as R draws it alone, as a legend draws each key's from an expression vector's
+  # element: a power an expression, a string text, and a missing one (`nil`) `NA`, as text.
+  @doc false
+  @spec alone(String.t() | t() | nil | :none) :: String.t() | t() | :none
+  def alone(nil), do: "NA"
+  def alone(label), do: label
 
   # Whether `label` is an expression, laid out by `layout/3`, rather than text.
   @doc false
@@ -78,6 +90,7 @@ defmodule Giggly.Guide.Plotmath do
   def expression?(_label), do: false
 
   defp as_expression(text) when is_binary(text), do: {:string, text}
+  defp as_expression(nil), do: {:string, ""}
   defp as_expression(label), do: label
 
   # `expression` laid out in `look`, measured with `installed_fonts`: its box and its pieces, in
@@ -109,12 +122,11 @@ defmodule Giggly.Guide.Plotmath do
 
   # An exponent, at script size: a leading minus R's unary minus round the rest, with no space
   # after it in script style.
-  defp script("-" <> rest, context) when rest != "" do
+  defp script("-" <> rest, context) do
     size = @script_size * size(context)
 
     "-"
     |> symbol(size, context)
-    |> beside(space(0.0))
     |> beside(string(rest, size, context))
   end
 

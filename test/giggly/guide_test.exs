@@ -52,6 +52,27 @@ defmodule Giggly.GuideTest do
              |> Enum.map(fn primitive -> primitive.__struct__ end) === [Giggly.Scene.Polylines]
     end
 
+    # Golden: ggplot2 4.0.3 (vdiffr 1.0.9) draws `expression("one", 10^2, "three")` on a radial
+    # plot's angle axis with every label start-anchored, its strings as plotmath boxes them, where
+    # a character vector's labels are each justified by their break's angle.
+    test "an angle axis's string among its powers is laid out as plotmath lays it out" do
+      coord = %Coord.Radial{}
+      breaks = [{2.0, "one"}, {3.0, {:power, "10", "2"}}]
+      params = Coord.panel_params(coord, {{1.0, 4.0}, breaks, []}, {{1.0, 4.0}, [], []})
+      theme = Theme.complete(%{complete: :none, settings: %{}})
+
+      texts =
+        coord
+        |> Guide.Axis.draw_inside(params, theme, false)
+        |> Enum.filter(fn primitive -> is_struct(primitive, Giggly.Scene.Text) end)
+
+      assert Enum.map(texts, fn text -> {text.labels, text.hjust} end) === [
+               {["one"], [0.0]},
+               {["10"], [0.0]},
+               {["2"], [0.0]}
+             ]
+    end
+
     # Golden: ggplot2 4.0.3 (vdiffr 1.0.9, R 4.6.1) draws no tick of `element_line(linetype =
     # "blank")` and leaves the panel where solid ticks leave it, as R's graphics engine draws no
     # line of the blank line type.
@@ -252,12 +273,19 @@ defmodule Giggly.GuideTest do
   describe "Plotmath, an expression laid out as R's plotmath lays it out" do
     @look %{size: 8.8, family: "", face: :bold, line_spacing: 9.504000000000001}
 
-    test "a guide's strings are expressions where any label is a power, and otherwise text" do
+    test "labels drawn together are expressions where any is a power, a missing one an empty string" do
       power = {:power, "10", "2"}
 
-      assert {Guide.Plotmath.expressions(["0", power, :none]),
+      assert {Guide.Plotmath.expressions(["0", power, nil, :none]),
               Guide.Plotmath.expressions(["0", :none])} ===
-               {[{:string, "0"}, power, :none], ["0", :none]}
+               {[{:string, "0"}, power, {:string, ""}, :none], ["0", :none]}
+    end
+
+    test "a label drawn alone is a power as an expression, a string as text, a missing one NA" do
+      power = {:power, "10", "2"}
+
+      assert Enum.map([power, "0", nil, :none], &Guide.Plotmath.alone/1) ===
+               [power, "0", "NA", :none]
     end
 
     test "only a power of text, signed by a minus or a plus, or a string is an expression" do
@@ -275,6 +303,7 @@ defmodule Giggly.GuideTest do
              )
 
       assert Guide.Plotmath.expression?({:signed, "+", {:power, "10", "2"}})
+      assert Guide.Plotmath.expression?({:string, "0"})
     end
 
     test "an exponent follows its base, raised and smaller, its minus a symbol with no space" do

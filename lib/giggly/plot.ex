@@ -98,8 +98,9 @@ defmodule Giggly.Plot do
   A label on an axis or a legend breaks over lines where it holds `"\n"`, and a missing one,
   `nil`, is drawn `NA`. A labels function may return powers, as `Scales.Labels.log/2` does, drawn
   as a base with a smaller exponent raised after it, a sign before it in the symbol font; where
-  any label of a guide is a power, its strings are placed as powers are, a missing one drawn as
-  nothing.
+  any label of an axis or a colour bar is a power, its strings are placed as powers are and a
+  missing one is drawn as nothing; a legend draws each key's label alone, a string as text and a
+  missing one `NA`.
 
   A colour, fill, alpha, shape or size scale chooses how values become colours, opacities, shapes or
   sizes, and sets its legend's title, limits, breaks and labels: `scale_color_manual/2` names each

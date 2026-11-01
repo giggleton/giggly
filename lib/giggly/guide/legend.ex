@@ -44,7 +44,7 @@ defmodule Giggly.Guide.Legend do
   defimpl Giggly.Guide, for: __MODULE__ do
     use Boundary, classify_to: Giggly.Guide
 
-    alias Giggly.Guide.Parts
+    alias Giggly.Guide.{Parts, Plotmath}
     alias Giggly.{Scene, Theme}
     alias Giggly.Scene.{Cell, Rect}
 
@@ -66,7 +66,12 @@ defmodule Giggly.Guide.Legend do
       %Theme{legend_margin: margin, legend_text_right: text_look} = theme
       title_look = title_look(direction, theme)
       title = Parts.title(title, title_look)
-      labels = Parts.labels(keys, text_look)
+
+      labels =
+        keys
+        |> Parts.labels(text_look)
+        |> Enum.map(&Plotmath.alone/1)
+
       label_widths = Parts.label_widths(labels, text_look, installed_fonts)
       rows = rows(length(keys), direction)
 

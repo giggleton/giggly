@@ -14,8 +14,9 @@
 #
 # label_log()'s powers, drawn as plotmath draws a^b: on a log x axis, each base at the label's
 # size and its exponent at 0.7 of it, raised, the axis as deep as the highest; on the y axis and
-# on a colour bar, signed, each sign in the symbol font a thin space before its base, and the zero
-# between them boxed by its own glyph. First checked with ggplot2 4.0.3, vdiffr 1.0.9 and svglite
+# a colour bar, signed, each sign in the symbol font a thin space before its base, the y axis's
+# zero boxed by its own glyph, and the colour bar's missing middle label drawn as nothing, its tick
+# kept, as plotmath draws a logical NA. First checked with ggplot2 4.0.3, vdiffr 1.0.9 and svglite
 # 2.2.2: every element and clip path matches vdiffr's but svglite's around the whole drawing and
 # the bar's fill, every stop matches svglite's, and the one departure is test/golden/point.R's,
 # the x axis drawn before the y.
@@ -28,7 +29,10 @@ plot <- ggplot(points, aes(x, y, colour = y)) +
   geom_point() +
   scale_x_log10(labels = scales::label_log()) +
   scale_y_continuous(breaks = c(-100, 0, 100), labels = scales::label_log()) +
-  scale_colour_continuous(breaks = c(-100, 0, 100), labels = scales::label_log()) +
+  scale_colour_continuous(
+    breaks = c(-100, 0, 100),
+    labels = function(breaks) replace(scales::label_log()(breaks), 2, NA)
+  ) +
   guides(colour = guide_colourbar(display = "gradient")) +
   theme_gray()
 

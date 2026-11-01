@@ -70,17 +70,11 @@ defmodule Giggly.Guide.Parts do
   def title(title, _look), do: title
 
   # The labels of a guide's `keys` as drawn in `look`: each `:none` where the theme removes the
-  # labels, so the guide draws as one whose scale has no labels, as ggplot2's does; and each an
-  # expression where any is (`Giggly.Guide.Plotmath.expressions/1`).
+  # labels, so the guide draws as one whose scale has no labels, as ggplot2's does.
   @doc false
-  @spec labels([%{label: label() | :none}], Theme.text()) :: [label() | :none]
+  @spec labels([%{label: label() | nil | :none}], Theme.text()) :: [label() | nil | :none]
   def labels(keys, :none), do: Enum.map(keys, fn _key -> :none end)
-
-  def labels(keys, _look) do
-    keys
-    |> Enum.map(fn key -> key.label end)
-    |> Plotmath.expressions()
-  end
+  def labels(keys, _look), do: Enum.map(keys, fn key -> key.label end)
 
   # A legend's title above its keys, in `look`, over a grid of `widths`, left to right: the widths
   # with the room a title wider than the grid leaves, split by the title's turned justification,
@@ -328,19 +322,13 @@ defmodule Giggly.Guide.Parts do
 
     texts
     |> Enum.zip_with(places, fn text, place ->
-      {{width, height, depth}, pieces} =
-        text
-        |> as_expression()
-        |> Plotmath.layout(look, installed_fonts)
+      {{width, height, depth}, pieces} = Plotmath.layout(text, look, installed_fonts)
 
       start = {along - look.hjust * width, up + depth - look.vjust * (height + depth)}
       Enum.map(pieces, fn piece -> piece_text(piece, place, start, look, installed_fonts) end)
     end)
     |> Enum.concat()
   end
-
-  defp as_expression(text) when is_binary(text), do: {:string, text}
-  defp as_expression(expression), do: expression
 
   # A piece of an expression, a text of one label at its size and face, started at its place from
   # the expression's start.

@@ -10201,7 +10201,8 @@ defmodule GigglyTest do
     # by test/golden/labels_log.R: every element matches it but the colour bar's fill, which
     # vdiffr's device does not draw, the x axis drawn before the y as in test/golden/point.svg, and
     # every clip path; the gradient's stops match svglite's. `Scales.Labels.log/2`'s powers on a log
-    # axis, and signed beside a zero on the y axis and a colour bar. It moves with what moves
+    # axis, signed beside a zero on the y axis, and on a colour bar beside a missing label, drawn as
+    # nothing, its tick kept. It moves with what moves
     # test/golden/point.svg, with the colour bar's layout, and with how plotmath's layout is
     # followed.
     test "powers are drawn as plotmath draws them, on both axes and a colour bar" do
@@ -10211,9 +10212,37 @@ defmodule GigglyTest do
         |> Plot.geom_point()
         |> Plot.scale_x_log10(labels: &Scales.Labels.log/1)
         |> Plot.scale_y_continuous(breaks: [-100, 0, 100], labels: &Scales.Labels.log/1)
-        |> Plot.scale_color_continuous(breaks: [-100, 0, 100], labels: &Scales.Labels.log/1)
+        |> Plot.scale_color_continuous(
+          breaks: [-100, 0, 100],
+          labels: fn breaks ->
+            breaks
+            |> Scales.Labels.log()
+            |> List.replace_at(1, nil)
+          end
+        )
 
       assert to_svg(plot) == File.read!("test/golden/labels_log.svg")
+    end
+
+    # Golden: test/golden/labels_legend.svg, checked against ggplot2's drawing of the same plot,
+    # made by test/golden/labels_legend.R: every element matches it, the x axis drawn before the y
+    # as in test/golden/point.svg, and every clip path. A string and a missing label among signed
+    # powers on a legend, each key's label drawn alone: the string as text, 0.7 points from where
+    # plotmath would place it, the missing one NA. It moves with what moves
+    # test/golden/labels_log.svg and with the legend's layout.
+    test "a legend draws each key's label alone, a string among powers as text and a missing one NA" do
+      plot =
+        %{"x" => [1, 2, 3, 4], "y" => [-100, 0, 50, 100]}
+        |> Plot.new(%{x: :x, y: :y, size: :y})
+        |> Plot.geom_point()
+        |> Plot.scale_size_continuous(
+          breaks: [-100, 0, 50, 100],
+          labels: fn _breaks ->
+            [{:signed, "-", {:power, "10", "2"}}, "x", nil, {:signed, "+", {:power, "10", "2"}}]
+          end
+        )
+
+      assert to_svg(plot) == File.read!("test/golden/labels_legend.svg")
     end
 
     # Golden: test/golden/labels_log_turned.svg, checked against ggplot2's drawing of the same
