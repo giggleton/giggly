@@ -51,8 +51,8 @@ defmodule Giggly.Scale.Discrete do
       on: a list; a function handed the axis's extent, `{low, high}`, and for one of two
       arguments the breaks' positions too, that returns them; or `:default` or `:none` for none.
     * `labels`: the breaks' labels: a list, one for each break; a map from a value to its label,
-      a value it does not hold keeping its own; a function handed every break drawn, which
-      returns their labels; `:none` for none; or `:default`, each value written as text.
+      a value it does not hold keeping its own, either's `nil` a missing one; a function handed
+      every break drawn, which returns their labels, each a string, a power or `nil`; `:none` for none; or `:default`, each value written as text.
     * `expand`: how far an axis reaches beyond its first and last values,
       `[mult: {low, high}, add: {low, high}]`: at each end, that multiple of the distance between
       them plus that constant.
@@ -99,7 +99,12 @@ defmodule Giggly.Scale.Discrete do
             | [number()]
             | ({number(), number()} -> [number()])
             | ({number(), number()}, [number()] -> [number()]),
-          labels: :default | :none | [String.t()] | %{term() => String.t()} | (list() -> list()),
+          labels:
+            :default
+            | :none
+            | [String.t() | nil]
+            | %{term() => String.t() | nil}
+            | (list() -> list()),
           expand: [mult: {number(), number()}, add: {number(), number()}]
         }
 

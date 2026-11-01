@@ -362,7 +362,8 @@ defmodule Giggly.ThemeTest do
         angle: 0.0,
         hjust: 0.5,
         vjust: 1.0,
-        margin: sides(2.1917808219178085, 0, 0, 0)
+        margin: sides(2.1917808219178085, 0, 0, 0),
+        line_spacing: 11.88
       }
 
       assert {theme.axis_text_x_bottom, theme.axis_text_theta, theme.axis_text_y_left} ===
@@ -449,7 +450,8 @@ defmodule Giggly.ThemeTest do
                   angle: 0.0,
                   hjust: 0.5,
                   vjust: 0.5,
-                  margin: sides(0, 0, 0, 0)
+                  margin: sides(0, 0, 0, 0),
+                  line_spacing: 14.399999999999999
                 },
                 %{
                   size: 15.0,
@@ -539,7 +541,8 @@ defmodule Giggly.ThemeTest do
                   angle: 0.0,
                   hjust: 0.0,
                   vjust: 0.5,
-                  margin: sides(0, 0, 0, 5.4794520547945211)
+                  margin: sides(0, 0, 0, 5.4794520547945211),
+                  line_spacing: 9.504000000000001
                 }, :none, :none, :none}
     end
 
@@ -957,7 +960,8 @@ defmodule Giggly.ThemeTest do
                   angle: 0.0,
                   hjust: 0.5,
                   vjust: 0.5,
-                  margin: sides(0, 0, 0, 0)
+                  margin: sides(0, 0, 0, 0),
+                  line_spacing: 11.88
                 }, :none}
     end
 

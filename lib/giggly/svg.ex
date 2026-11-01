@@ -918,11 +918,12 @@ defmodule Giggly.SVG do
   end
 
   # A face as vdiffr writes one, after the size: a weight for bold, a style for italic, both for
-  # bold italic, nothing for plain.
+  # bold italic, nothing for plain or for the symbol face, which vdiffr writes in its family.
   defp font_face(:plain), do: ""
   defp font_face(:bold), do: " font-weight: bold;"
   defp font_face(:italic), do: " font-style: italic;"
   defp font_face(:bold_italic), do: " font-weight: bold; font-style: italic;"
+  defp font_face(:symbol), do: ""
 
   # A label's colour as vdiffr writes it: left out for opaque black, SVG's default.
   defp text_fill("#000000", opacity) when opacity == 1, do: ""

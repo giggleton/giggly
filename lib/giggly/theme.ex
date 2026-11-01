@@ -92,7 +92,7 @@ defmodule Giggly.Theme do
   # for where it puts them.
   #
   # A text's family, its face, its angle and its justification are the theme's too, as ggplot2's
-  # `element_text()` gives them, and so is the spacing of a title's lines: the y axis's title is
+  # `element_text()` gives them, and so is the spacing of a text's lines: the y axis's title is
   # turned 90 degrees because `theme_gray()` turns it, and a tick label hangs from its tick because
   # the theme justifies it so. A legend's title and labels take their justification from the text
   # their side lays over the theme, as their margins do. A family is a font's name, `""` the
@@ -303,32 +303,15 @@ defmodule Giggly.Theme do
   @type face :: :plain | :bold | :italic | :bold_italic
 
   @typedoc """
-  Text's `size`, its `color`, an `#RRGGBB` drawn at `opacity`, from 0 to 1, its `family`, a font's
-  name, `""` the device's own, its `face`, the `angle` it is turned, in degrees anticlockwise, its
-  `hjust` and `vjust`, where it sits across and up as shares of its width and height, in its own
-  turned frame, and its `margin`: the space in points on each side of it, of which the drawing
-  counts the sides ggplot2 counts; or `:none`, removed.
+  Text, which may run over several lines: its `size`, its `color`, an `#RRGGBB` drawn at
+  `opacity`, from 0 to 1, its `family`, a font's name, `""` the device's own, its `face`, the
+  `angle` it is turned, in degrees anticlockwise, its `hjust` and `vjust`, where it sits across and
+  up as shares of its width and height, in its own turned frame, its `margin`: the space in points
+  on each side of it, of which the drawing counts the sides ggplot2 counts, and its
+  `line_spacing`, the distance in points from one line's baseline to the next's; or `:none`,
+  removed.
   """
   @type text ::
-          %{
-            size: float(),
-            color: String.t(),
-            opacity: float(),
-            family: String.t(),
-            face: face(),
-            angle: float(),
-            hjust: float(),
-            vjust: float(),
-            margin: margin()
-          }
-          | :none
-
-  @typedoc """
-  A title's or a strip's text, which may run over several lines: its `size`, `color`, `opacity`,
-  `family`, `face`, `angle`, `hjust`, `vjust` and `margin`, as text's, and its `line_spacing`, the
-  distance in points from one line's baseline to the next's; or `:none`, removed.
-  """
-  @type title ::
           %{
             size: float(),
             color: String.t(),
@@ -392,22 +375,22 @@ defmodule Giggly.Theme do
           axis_text_y_left: text(),
           axis_text_theta: text(),
           axis_text_r: text(),
-          axis_title_x_bottom: title(),
-          axis_title_y_left: title(),
+          axis_title_x_bottom: text(),
+          axis_title_y_left: text(),
           panel_spacing_x: float(),
           panel_spacing_y: float(),
           strip_background_x: rect(),
           strip_background_y: rect(),
-          strip_text_x_top: title(),
-          strip_text_y_right: title(),
+          strip_text_x_top: text(),
+          strip_text_y_right: text(),
           legend_background: rect(),
           legend_margin: margin(),
           legend_key: rect(),
           legend_key_width: float(),
           legend_key_height: float(),
           legend_key_spacing: float(),
-          legend_title_top: title(),
-          legend_title_left: title(),
+          legend_title_top: text(),
+          legend_title_left: text(),
           legend_text_right: text(),
           legend_text_bottom: text(),
           legend_ticks: line(),
@@ -429,10 +412,10 @@ defmodule Giggly.Theme do
           legend_box_margin: margin(),
           legend_box_background: rect(),
           legend_box_spacing: float(),
-          plot_title: title(),
-          plot_subtitle: title(),
-          plot_caption: title(),
-          plot_tag: title(),
+          plot_title: text(),
+          plot_subtitle: text(),
+          plot_caption: text(),
+          plot_tag: text(),
           geom: geom()
         }
 
@@ -697,14 +680,14 @@ defmodule Giggly.Theme do
       axis_text_y_left: text(theme, :axis_text_y_left),
       axis_text_theta: text(theme, :axis_text_theta),
       axis_text_r: text(theme, :axis_text_r),
-      axis_title_x_bottom: title(theme, :axis_title_x_bottom),
-      axis_title_y_left: title(theme, :axis_title_y_left),
+      axis_title_x_bottom: text(theme, :axis_title_x_bottom),
+      axis_title_y_left: text(theme, :axis_title_y_left),
       panel_spacing_x: distance(theme, :panel_spacing_x),
       panel_spacing_y: distance(theme, :panel_spacing_y),
       strip_background_x: rect(theme, :strip_background_x),
       strip_background_y: rect(theme, :strip_background_y),
-      strip_text_x_top: title(theme, :strip_text_x_top),
-      strip_text_y_right: title(theme, :strip_text_y_right),
+      strip_text_x_top: text(theme, :strip_text_x_top),
+      strip_text_y_right: text(theme, :strip_text_y_right),
       legend_background: rect(theme, :legend_background),
       legend_margin: margin(theme, :legend_margin),
       legend_key: rect(theme, :legend_key),
@@ -712,9 +695,9 @@ defmodule Giggly.Theme do
       legend_key_height: distance(theme, :legend_key_height),
       legend_key_spacing: gap,
       legend_title_top:
-        title(beside_keys(theme, {text_margin, :bottom, gap}, {0, 0.5}), :legend_title),
+        text(beside_keys(theme, {text_margin, :bottom, gap}, {0, 0.5}), :legend_title),
       legend_title_left:
-        title(beside_keys(theme, {text_margin, :right, gap}, {0, 0.5}), :legend_title),
+        text(beside_keys(theme, {text_margin, :right, gap}, {0, 0.5}), :legend_title),
       legend_text_right:
         text(beside_keys(theme, {text_margin, :left, gap}, {0, 0.5}), :legend_text),
       legend_text_bottom:
@@ -738,10 +721,10 @@ defmodule Giggly.Theme do
       legend_box_margin: margin(theme, :legend_box_margin),
       legend_box_background: box_background(theme),
       legend_box_spacing: distance(theme, :legend_box_spacing),
-      plot_title: title(theme, :plot_title),
-      plot_subtitle: title(theme, :plot_subtitle),
-      plot_caption: title(theme, :plot_caption),
-      plot_tag: title(theme, :plot_tag),
+      plot_title: text(theme, :plot_title),
+      plot_subtitle: text(theme, :plot_subtitle),
+      plot_caption: text(theme, :plot_caption),
+      plot_tag: text(theme, :plot_tag),
       geom: Map.fetch!(theme, :geom)
     }
   end
@@ -973,13 +956,6 @@ defmodule Giggly.Theme do
   end
 
   defp text(theme, name) do
-    case calculated(theme, name) do
-      :none -> :none
-      text -> text_look(text)
-    end
-  end
-
-  defp title(theme, name) do
     case calculated(theme, name) do
       :none ->
         :none

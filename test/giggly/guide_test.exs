@@ -136,7 +136,8 @@ defmodule Giggly.GuideTest do
             angle: angle,
             hjust: 0.2,
             vjust: 0.7,
-            margin: margin
+            margin: margin,
+            line_spacing: 9.504
           }
 
           {across, up} = Guide.Parts.turned_justification(look)
@@ -228,16 +229,92 @@ defmodule Giggly.GuideTest do
           line_spacing: 11.88
         }
 
-        text = Guide.Parts.text(["AV\nA"], [{0.5, 0.5}], {0.0, 0.0}, look, false)
+        [text] = Guide.Parts.text(["AV\nA"], [{0.5, 0.5}], {0.0, 0.0}, look, false)
         assert %Giggly.Scene.Glyphs{} = text.glyphs
 
         assert {text.labels, text.glyphs} ===
                  {["AV", "A"], Giggly.Font.glyphs(["AV", "A"], 11.0, "Lato", :bold, false)}
 
-        assert Guide.Parts.text(["AV"], [{0.5, 0.5}], {0.0, 0.0}, %{look | family: ""}, false).glyphs ===
-                 :none
+        assert [%{glyphs: :none}] =
+                 Guide.Parts.text(["AV"], [{0.5, 0.5}], {0.0, 0.0}, %{look | family: ""}, false)
       end
     end
+  end
+
+  # Golden: vdiffr 1.0.9's drawing of ggplot2 4.0.3's x axis labelled by `label_log()` (8.8-point
+  # labels): `10^-2`'s base at 50.11, its exponent's minus at 59.90 and its 2 at 64.68, both 4.42
+  # above the base's baseline at 6.16 points; `-10^3`'s minus at 65.28, its base at 73.34 and its
+  # 3 at 83.13; `"two\nlines"` from an expression vector, both lines at 50.06, the first 9.51
+  # above the second; each place is rounded on its own there, so a difference may be a hundredth off.
+  # The boxes are R's `grobWidth()`, `grobAscent()` and `grobDescent()` of each expression under
+  # vdiffr's device: 18.001632, 8.72124 and 0.08448 for `10^-2`, 21.275232 for `-10^3`'s width,
+  # 18.09984, 6.37824 and 0.08448 for the string, none at all for `""`.
+  describe "Plotmath, an expression laid out as R's plotmath lays it out" do
+    @look %{size: 8.8, family: "", face: :bold, line_spacing: 9.504000000000001}
+
+    test "a guide's strings are expressions where any label is a power, and otherwise text" do
+      power = {:power, "10", "2"}
+
+      assert {Guide.Plotmath.expressions(["0", power, :none]),
+              Guide.Plotmath.expressions(["0", :none])} ===
+               {[{:string, "0"}, power, :none], ["0", :none]}
+    end
+
+    test "only a power of text, signed by a minus or a plus, or a string is an expression" do
+      refute Enum.any?(
+               [
+                 "10",
+                 {:string, 10},
+                 {:power, 10, "2"},
+                 {:power, "10", nil},
+                 {:signed, "−", {:power, "10", "2"}},
+                 {:signed, "-", {:string, "10"}},
+                 {:other, "10", "2"}
+               ],
+               &Guide.Plotmath.expression?/1
+             )
+
+      assert Guide.Plotmath.expression?({:signed, "+", {:power, "10", "2"}})
+    end
+
+    test "an exponent follows its base, raised and smaller, its minus a symbol with no space" do
+      assert laid_out({:power, "10", "-2"}) ===
+               {{18.0, 8.72, 0.08},
+                [
+                  {"10", 8.8, :plain, {0.0, 0.0}},
+                  {"−", 6.16, :symbol, {9.79, 4.42}},
+                  {"2", 6.16, :plain, {14.58, 4.42}}
+                ]}
+    end
+
+    test "a sign stands a thin space before its power, in the symbol face, the face otherwise plain" do
+      assert laid_out({:signed, "-", {:power, "10", "3"}}) ===
+               {{21.28, 8.72, 0.08},
+                [
+                  {"−", 8.8, :symbol, {0.0, 0.0}},
+                  {"10", 8.8, :plain, {8.06, 0.0}},
+                  {"3", 6.16, :plain, {17.85, 4.42}}
+                ]}
+    end
+
+    test "a string is as wide as its widest line, drawn up from its baseline, an empty one as none" do
+      assert {laid_out({:string, "two\nlines"}), laid_out({:string, ""})} ===
+               {{{18.1, 6.38, 0.08},
+                 [{"two", 8.8, :plain, {0.0, 9.5}}, {"lines", 8.8, :plain, {0.0, 0.0}}]},
+                {{0.0, 0.0, 0.0}, []}}
+    end
+  end
+
+  # An expression laid out in the look above, every length rounded to the hundredth of a point
+  # vdiffr writes.
+  defp laid_out(expression) do
+    rounded = fn number -> Float.round(number, 2) end
+    {{width, height, depth}, pieces} = Guide.Plotmath.layout(expression, @look, false)
+
+    {{rounded.(width), rounded.(height), rounded.(depth)},
+     Enum.map(pieces, fn {text, size, face, {along, up}} ->
+       {text, rounded.(size), face, {rounded.(along), rounded.(up)}}
+     end)}
   end
 
   describe "draw/4 for a legend" do

@@ -60,7 +60,7 @@ defmodule Giggly.Guide.Title do
     {place, offset} = Parts.anchor(look, :both)
 
     {margin.top + height + margin.bottom,
-     [Parts.text([label], [place], offset, look, installed_fonts)]}
+     Parts.text([label], [place], offset, look, installed_fonts)}
   end
 
   # The tag, in a cell as wide and as deep as it and its margins, anchored in it as
@@ -72,6 +72,6 @@ defmodule Giggly.Guide.Title do
     {width, height} = Parts.extent([label], look, installed_fonts)
     {place, offset} = Parts.anchor(look, :both)
     cell = {margin.left + width + margin.right, margin.top + height + margin.bottom}
-    {cell, [Parts.text([label], [place], offset, look, installed_fonts)]}
+    {cell, Parts.text([label], [place], offset, look, installed_fonts)}
   end
 end

@@ -52,8 +52,9 @@ defmodule Giggly.Scale.Continuous do
       its transformation chooses.
     * `n_breaks`: how many breaks its transformation, or a breaks function of two arguments, is
       asked for, or `:default` for as many as it chooses.
-    * `labels`: a label for each break; a function handed every break drawn, in data units, a
-      time axis's as times of day wrapped past midnight, that returns their labels; on a date,
+    * `labels`: a label for each break, `nil` for a missing one; a function handed every break
+      drawn, in data units, a time axis's as times of day wrapped past midnight, that returns
+      their labels, each a string, a power (`Scales.Labels.log/2`) or `nil`; on a date,
       date-time or time axis, `{:format, format}`, each break written in `format` by
       `Calendar.strftime/3`, a time's wrapped past midnight; `:none` for none; or `:default` for
       its transformation's.
@@ -128,8 +129,8 @@ defmodule Giggly.Scale.Continuous do
           labels:
             :default
             | :none
-            | [String.t()]
-            | ([number() | time_value()] -> [String.t()])
+            | [String.t() | nil]
+            | ([number() | time_value()] -> [Scales.Labels.power_label()])
             | {:format, String.t()},
           expand: [mult: {number(), number()}, add: {number(), number()}]
         }

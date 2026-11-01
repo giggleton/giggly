@@ -79,6 +79,58 @@ stops the question being reopened from scratch. A new entry is about 150 words: 
 sentence or two of why, and one line per rejected alternative. What a later decision replaces is
 deleted from the entry it was in, never marked superseded; git history keeps every version.
 
+- **A plotmath piece is a text of its own, start-anchored where its box puts it (2026-10-31,
+  Steve: "A"; checked against vdiffr 1.0.9).** vdiffr writes a power as one `<text>` per piece,
+  sign, base, exponent's sign, exponent, each at its own size, a label's after the one before; so
+  `Parts.text/5` gives a list of `Scene.Text`s, a plain guide's one, an expression guide's one per
+  piece, each at `hjust` 0 and its offset from the label's place, in that order. `Scene.Text`
+  changes only by a `:symbol` face, and a registered font's outlines come per piece through its
+  `glyphs`. *Rejected: a size and a face for each label*: `Text`'s struct and every reader change,
+  its ascent and outlines worked out per size, for fewer primitives on a guide holding a power.
+
+- **`Font.box/5` measures a string as plotmath boxes it (2026-10-31, Steve: "A"; checked against
+  R 4.6.1 under vdiffr and svglite).** Plotmath reads each character's own metrics, so `10^1`
+  hung from its top sits lower than `10^0`; the box is the highest ascent and the deepest descent
+  among the characters, none below zero: the table's rows (a missing character codepoint 1's) or,
+  for a registered font, each glyph's box rounded outward to a pixel at 10,000 dpi as "M" is. The
+  x-height that raises an exponent is the box of "x", the thin space a sixth of "M"'s width. Lato
+  comes within a pixel of svglite. *Rejected: each character's metrics handed to the layout*: the
+  measuring rule, and a registered font's, would live outside `Giggly.Font`.
+
+- **A plotmath sign is drawn in the symbol face, measured as vdiffr and svglite measure it
+  (2026-10-31, Steve: "A"; checked against vdiffr 1.0.9 and svglite 2.2.2).** Plotmath draws `−`
+  and `+` in grid's `fontface = 5`, which vdiffr measures from a second table, Symbola's (the
+  minus 0.777 em, Liberation's 0.584) and svglite from its `symbol` alias. So `Giggly.Font` takes
+  a `:symbol` face, measured from a font registered with Pica as `"symbol"` whatever the family,
+  else from vdiffr's Symbola table copied whole into `priv/fonts/`, never an installed font, and
+  drawn as text in the label's family unless registered. *Rejected: the table always*: a sign
+  measured unlike svglite's beside a base measured like it. *Rejected: the label's own font*:
+  1.7 points narrower per sign at 8.8 points, every golden with one off.
+
+- **A missing label among powers is drawn as nothing (2026-10-31, Steve: "A"; checked against
+  ggplot2 4.0.3).** `label_log()`'s `NA` is logical inside an expression vector, which plotmath
+  draws as nothing, its tick kept and no room taken; `NA_character_` there would draw "NA". Giggly's
+  `nil` beside a power stands for the first, so the scale writes it `""`, an empty box, where any
+  label is a power, and `NA` otherwise (the entry beginning "A missing break's label").
+  *Rejected: `NA` everywhere*: one rule, but unlike what R draws for `label_log()`'s own `NA`.
+
+- **A guide holding a power lays every label out as plotmath (2026-10-31, Steve: "A"; checked
+  against ggplot2 4.0.3 and vdiffr 1.0.9).** R's labels are a character vector or an expression
+  vector, and `label_log()` returns the second, its zero included, so a string among powers is
+  boxed by its own glyphs and started at its box's start (the zero 2.77 points off a plain one's
+  place on an x axis), and a multi-line one is drawn as `GEText()` draws it, its lines up from the
+  baseline over a box one line high. Every expression is drawn plain, as `GEMathText()` sets the
+  plain font whatever the theme's face. `Guide.Plotmath.expressions/1` marks the strings for every
+  guide. *Rejected: label by label*: `label_log()`'s own zero placed unlike R's.
+
+- **Every text a guide draws breaks over lines (2026-10-31, Steve: "A"; checked against ggplot2
+  4.0.3).** R breaks tick labels on both axes, a legend's and a colour bar's labels, and a radial
+  plot's angle and radius labels at `"\n"`, each line its text's `lineheight` (0.9) x 1.2 sizes
+  below the one before, stacked by `vjust` as titles are, the axis or the key's row deepening to
+  fit. So a theme's text has one shape, every look carrying its `line_spacing`, and `Guide.Parts`
+  breaks every text by the one rule. *Rejected: breaking tick and legend labels alone*, the
+  spacing handed in at their calls: radial labels unlike R's, and two shapes of text kept.
+
 - **`dictionary/2` matches a value by `Scales.DataRange.key/1`, a map under `dictionary:` (2026-10-31,
   Steve: D1 to D4 "A"; checked against scales 1.4.0).** `dictionary(breaks, dictionary: %{value =>
   label}, nomatch:)`, the family's shape, each label a string or `nil`. A key names what a
@@ -327,8 +379,10 @@ deleted from the entry it was in, never marked superseded; git history keeps eve
   `number_auto` in its two `format()` ways, `nil` in the others, as R's `number()` gives and as
   both its ways give where R breaks on an `NA`, Steve: "A"; `dictionary`'s `nomatch:` for `nil` too); `comma`, `percent` and `currency` take `nil` as R's
   `number()` takes `NA`, which widens the others' untrimmed padding to its two characters. Giggly
-  takes a `nil` label from a labels function and draws `NA`, as grid draws R's `NA` on axes and
-  legends alike. A discrete scale's labels function is handed `nil`, so the labellers must take
+  takes a `nil` label from a labels function, a list or a map's value and draws `NA`, as grid
+  draws R's `NA` on axes and legends alike; the scale writes it, so a guide never sees `nil`
+  (Steve: "A"), and among powers writes it as nothing (the entry beginning "A missing label
+  among powers"). A discrete scale's labels function is handed `nil`, so the labellers must take
   it. *Rejected: refusing `nil`*: `wrap` and `dictionary` unusable on a missing level.
   *Rejected: the package writing `"NA"`*: not R's values, and a missing label then reads as text.
 
@@ -2288,7 +2342,7 @@ deleted from the entry it was in, never marked superseded; git history keeps eve
   unless set) x 1.2 font sizes below the one before, stacked by `vjust` as the engine stacks
   lines; it is as deep as its lines spaced out and a line of text, ggplot2's `titleGrob` measure,
   and as wide as its widest line. The scene and the backend learn nothing: a text's per-label
-  offsets place each line. Tick labels, strips and `geom_text()` labels stay one line. *Rejected:
+  offsets place each line. `geom_text()` labels stay one line. *Rejected:
   refusing a label that breaks at the call* until multi-line text arrived, recommended because no
   waiting example needs one; a title breaking over lines is common in ggplot2 practice.
 

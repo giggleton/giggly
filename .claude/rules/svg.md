@@ -38,7 +38,8 @@ size has a weight".
   `transform='translate(x,y) rotate(-angle)'`, the angle in whole degrees as vdiffr writes it with
   `%0.0f`, a tie to the even one), `text-anchor` (left out for text anchored at its start, as
   svglite leaves it out), a `style` of `font-size` (in `px`, the user unit), the face as vdiffr
-  writes it (`font-weight: bold;`, `font-style: italic;`, both for bold italic), `fill` and
+  writes it (`font-weight: bold;`, `font-style: italic;`, both for bold italic, nothing for plain
+  or the symbol face, which vdiffr writes in its family), `fill` and
   `fill-opacity` (left out for opaque black, SVG's default, as vdiffr leaves it out) and
   `font-family`, and `textLength` with `lengthAdjust='spacingAndGlyphs'`. Output can then be set
   beside the SVG in ggplot2's own visual-test snapshots.

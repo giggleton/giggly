@@ -95,6 +95,12 @@ defmodule Giggly.Plot do
   1970-01-01, one of date-times each at its seconds since 1970-01-01 00:00 UTC, and one of times
   each at its seconds since midnight.
 
+  A label on an axis or a legend breaks over lines where it holds `"\n"`, and a missing one,
+  `nil`, is drawn `NA`. A labels function may return powers, as `Scales.Labels.log/2` does, drawn
+  as a base with a smaller exponent raised after it, a sign before it in the symbol font; where
+  any label of a guide is a power, its strings are placed as powers are, a missing one drawn as
+  nothing.
+
   A colour, fill, alpha, shape or size scale chooses how values become colours, opacities, shapes or
   sizes, and sets its legend's title, limits, breaks and labels: `scale_color_manual/2` names each
   value's colour, `scale_color_hue/2` spaces hues round the colour wheel, `scale_color_gray/2`
@@ -4746,8 +4752,8 @@ defmodule Giggly.Plot do
   own, along and across it once turned: the y axis's title is turned 90 degrees, so its `vjust:
   1` puts its top toward the left. A legend's labels sit right of their keys, left-aligned and
   centred on them, and its title is left-aligned, unless `:legend_text` or `:legend_title` says
-  otherwise; `:text`'s justification never reaches them. `lineheight:` spaces a title's lines,
-  and a strip's.
+  otherwise; `:text`'s justification never reaches them. `lineheight:` spaces a text's lines,
+  a tick label's and a legend's as a title's.
   `family:` names the font a text is drawn in, inherited as any property is: `title: [family:
   "mono"]` reaches the axes' titles, the legends' titles and the plot's title, and `text:
   [family: "serif"]` every text but a layer's, which takes the complete theme's `base_family`.

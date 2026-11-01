@@ -46,47 +46,58 @@ defmodule Giggly.Font do
   alias Giggly.Scene.Glyphs
 
   @glyph_table_path Application.app_dir(:giggly, "priv/fonts/liberation_sans.txt")
+  @symbol_table_path Application.app_dir(:giggly, "priv/fonts/symbola.txt")
   @external_resource @glyph_table_path
+  @external_resource @symbol_table_path
 
-  # The size the table's metrics are given at, in points.
+  # The size the tables' metrics are given at, in points.
   @table_size 12
 
-  # why: the glyph table is read once, at compile time; no IO happens when a plot is measured
-  # instead of: the table as a heredoc in this module — rejected because it is generated data,
-  #   kept as a file so it can be regenerated and diffed against its source apart from the code
+  # why: the glyph tables are read once, at compile time; no IO happens when a plot is measured
+  # instead of: the tables as heredocs in this module — rejected because they are generated data,
+  #   kept as files so they can be regenerated and diffed against their source apart from the code
   # credo:disable-for-next-line Tack.Credo.Check.CorePurity
-  @glyph_table File.read!(@glyph_table_path)
+  @glyph_tables Enum.map([@glyph_table_path, @symbol_table_path], &File.read!/1)
 
-  # Each glyph's {width, ascent, descent} by codepoint; the table's comment lines start with "#".
-  @glyphs @glyph_table
-          |> String.split("\n", trim: true)
-          |> Enum.reject(fn line -> String.starts_with?(line, "#") end)
-          |> Map.new(fn line ->
-            [codepoint | metrics] = String.split(line)
+  # Each table's glyphs, {width, ascent, descent} by codepoint, Liberation Sans's for the text
+  # faces and Symbola's for the symbol face, a table's comment lines starting with "#"; and what a
+  # measure reads from them: the metrics of codepoint 1, which vdiffr gives a character the font
+  # lacks, the ascent of "M" and the deepest descent among "gjpqyQ".
+  @tables Enum.map(@glyph_tables, fn table ->
+            glyphs =
+              table
+              |> String.split("\n", trim: true)
+              |> Enum.reject(fn line -> String.starts_with?(line, "#") end)
+              |> Map.new(fn line ->
+                [codepoint | metrics] = String.split(line)
 
-            [width, ascent, descent] =
-              Enum.map(metrics, fn metric ->
-                {value, ""} = Float.parse(metric)
-                value
+                [width, ascent, descent] =
+                  Enum.map(metrics, fn metric ->
+                    {value, ""} = Float.parse(metric)
+                    value
+                  end)
+
+                {String.to_integer(codepoint), {width, ascent, descent}}
               end)
 
-            {String.to_integer(codepoint), {width, ascent, descent}}
+            %{
+              glyphs: glyphs,
+              missing: Map.fetch!(glyphs, 1),
+              ascent: elem(Map.fetch!(glyphs, ?M), 1),
+              descent:
+                "gjpqyQ"
+                |> String.to_charlist()
+                |> Enum.map(fn codepoint -> elem(Map.fetch!(glyphs, codepoint), 2) end)
+                |> Enum.max()
+            }
           end)
 
-  @widths Map.new(@glyphs, fn {codepoint, {width, _ascent, _descent}} -> {codepoint, width} end)
+  @text_table hd(@tables)
+  @symbol_table List.last(@tables)
 
-  # vdiffr measures a character the font lacks as the glyph at codepoint 1.
-  @missing_glyph_width elem(Map.fetch!(@glyphs, 1), 0)
-
-  @ascent elem(Map.fetch!(@glyphs, ?M), 1)
-
-  @descent "gjpqyQ"
-           |> String.to_charlist()
-           |> Enum.map(fn codepoint -> elem(Map.fetch!(@glyphs, codepoint), 2) end)
-           |> Enum.max()
-
-  # A face, as `Giggly.Theme` names one.
-  @type face :: :plain | :bold | :italic | :bold_italic
+  # A face, as `Giggly.Theme` names one, or the symbol face, grid's `fontface = 5`, which R's
+  # plotmath draws an operator's sign in.
+  @type face :: :plain | :bold | :italic | :bold_italic | :symbol
 
   # Each measure takes whether the machine's installed fonts are searched, `installed_fonts`.
 
@@ -110,6 +121,14 @@ defmodule Giggly.Font do
   def descent(size, family, face, installed_fonts) when is_boolean(installed_fonts),
     do: measure({:descent, size}, family, face, installed_fonts)
 
+  # How far `text` set at `size` points in `family`'s `face` reaches above its baseline and below
+  # it, in points, as R's plotmath boxes a string: the highest ascent and the deepest descent among
+  # its characters, each its own, and none below zero, as plotmath's box starts from none.
+  @doc false
+  @spec box(String.t(), number(), String.t(), face(), boolean()) :: {float(), float()}
+  def box(text, size, family, face, installed_fonts) when is_boolean(installed_fonts),
+    do: measure({:box, text, size}, family, face, installed_fonts)
+
   # The glyphs `texts`, each a label set at `size` points in `family`'s `face`, are drawn with, as
   # the scene carries them: each label's run of glyphs in order, and the outlines' scale in points
   # per font unit, where a font Pica holds gives them, or `:none` where they are measured from the
@@ -120,18 +139,39 @@ defmodule Giggly.Font do
       when is_list(texts) and is_boolean(installed_fonts),
       do: runs(texts, size, family, face, installed_fonts)
 
-  defp from_table({:width, text, size}) do
+  defp from_table({:width, text, size}, face) do
+    %{glyphs: glyphs, missing: missing} = table(face)
+
     advance =
       text
       |> String.to_charlist()
-      |> Enum.map(fn codepoint -> Map.get(@widths, codepoint, @missing_glyph_width) end)
+      |> Enum.map(fn codepoint -> elem(Map.get(glyphs, codepoint, missing), 0) end)
       |> Enum.sum()
 
     advance * (size / @table_size)
   end
 
-  defp from_table({:ascent, size}), do: @ascent * (size / @table_size)
-  defp from_table({:descent, size}), do: @descent * (size / @table_size)
+  defp from_table({:ascent, size}, face), do: table(face).ascent * (size / @table_size)
+  defp from_table({:descent, size}, face), do: table(face).descent * (size / @table_size)
+
+  defp from_table({:box, text, size}, face) do
+    %{glyphs: glyphs, missing: missing} = table(face)
+
+    {height, depth} =
+      text
+      |> String.to_charlist()
+      |> Enum.reduce({0.0, 0.0}, fn codepoint, {height, depth} ->
+        {_width, ascent, descent} = Map.get(glyphs, codepoint, missing)
+        {max(height, ascent), max(depth, descent)}
+      end)
+
+    {height * (size / @table_size), depth * (size / @table_size)}
+  end
+
+  # The table a face is measured from: Symbola's for the symbol face, as vdiffr measures R's
+  # symbol font, Liberation Sans's for every other.
+  defp table(:symbol), do: @symbol_table
+  defp table(_face), do: @text_table
 
   if Code.ensure_loaded?(Pica) do
     # The resolution a font's heights are rounded at, in dots per inch, and the points in an inch.
@@ -143,7 +183,11 @@ defmodule Giggly.Font do
     @generic_families ["", "sans", "serif", "mono"]
 
     # The font of `family`'s `face` Pica holds: registered, or, where `installed_fonts`, installed,
-    # but never installed for a generic family.
+    # but never installed for a generic family; for the symbol face, the font registered as
+    # `"symbol"`, svglite's name for it, whatever the family, and never an installed one.
+    defp lookup(_family, :symbol, _installed_fonts),
+      do: Pica.lookup("symbol", :plain, installed: false)
+
     defp lookup(family, face, installed_fonts) do
       Pica.lookup(family, face, installed: installed_fonts and family not in @generic_families)
     end
@@ -152,7 +196,7 @@ defmodule Giggly.Font do
     defp measure(measure, family, face, installed_fonts) do
       case lookup(family, face, installed_fonts) do
         {:ok, font} -> from_font(measure, font)
-        :error -> from_table(measure)
+        :error -> from_table(measure, face)
       end
     end
 
@@ -187,6 +231,31 @@ defmodule Giggly.Font do
       |> Float.floor()
       |> points()
       |> Kernel.-()
+    end
+
+    defp from_font({:box, text, size}, font) do
+      {top, bottom} =
+        font
+        |> boxes(text)
+        |> Enum.reduce({0.0, 0.0}, fn
+          :none, reached ->
+            reached
+
+          {_x_min, y_min, _x_max, y_max}, {top, bottom} ->
+            above =
+              y_max
+              |> pixels(size, font)
+              |> Float.ceil()
+
+            below =
+              y_min
+              |> pixels(size, font)
+              |> Float.floor()
+
+            {max(top, above), max(bottom, -below)}
+        end)
+
+      {points(top), points(bottom)}
     end
 
     defp boxes(font, text), do: Pica.glyph_boxes(font, Pica.glyph_ids(font, text))
@@ -245,7 +314,7 @@ defmodule Giggly.Font do
       end
     end
   else
-    defp measure(measure, _family, _face, _installed_fonts), do: from_table(measure)
+    defp measure(measure, _family, face, _installed_fonts), do: from_table(measure, face)
     defp runs(_texts, _size, _family, _face, _installed_fonts), do: :none
   end
 end

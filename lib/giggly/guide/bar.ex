@@ -278,7 +278,7 @@ defmodule Giggly.Guide.Bar do
   # theme removes leave them.
   defp unlabelled?(labels), do: Enum.all?(labels, fn label -> label == :none end)
 
-  defp label_cell(text, {rows, columns}) do
-    %Cell{rows: rows, columns: columns, clip: :off, hang: :none, primitives: [text]}
+  defp label_cell(texts, {rows, columns}) do
+    %Cell{rows: rows, columns: columns, clip: :off, hang: :none, primitives: texts}
   end
 end

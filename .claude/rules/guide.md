@@ -49,10 +49,20 @@ panel's grid lines are placed by the coordinate system".
   the margins it counts (`anchor/2`), as a share of the room and an offset in points, so it sits
   right in a room bigger than itself; and as wide and deep as grid's box round it turned, with the
   font's descent turned (`extent/3`), an axis's or a colour bar's labels measured together as one
-  grob, whatever its family. A title may break over lines (the entry beginning "A title may run
-  over several lines"): each line a label of its own, its `line_spacing` below the one before,
-  stacked `vjust` of the way down from its top as R's graphics engine stacks lines; a strip's label
-  breaks the same way; tick labels and a legend's labels stay one line.
+  grob, whatever its family. Every text may break over lines (the entries beginning "A title may
+  run over several lines" and "Every text a guide draws breaks"): each line a label of its own,
+  its `line_spacing` below the one before, stacked `vjust` of the way down from its top as R's
+  graphics engine stacks lines, a title, a strip's label, a tick label and a legend's alike.
+- **A guide whose labels hold a power lays every label out as R's plotmath lays out an expression
+  vector** (`Guide.Plotmath`; design-log §4, the entries beginning "`log/2` returns powers" and
+  "A guide holding a power"): `Plotmath.expressions/1` marks its strings `{:string, text}` where
+  any label is one, every guide calling it on all its labels at once (the axes, the angle axis,
+  `Parts.labels/2` for a legend and a bar), so a per-label measure still knows. An expression is
+  boxed by its glyphs (`Font.box/5`), justified by its box as `GEMathText()` justifies one, drawn
+  plain whatever the look's face, and measured as its box and the font's descent; each of its
+  pieces (a sign, a base, an exponent's sign, an exponent, a string's lines) is a one-label
+  `Scene.Text` of its own, start-anchored at its place in the box, in plotmath's order label by
+  label, so `Parts.text/5` gives a list of texts.
 - **A guide takes its breaks and its axis's line from the coordinate system, already placed**
   (`Coord.axes/2`), so ticks and marks are placed by one rule. Where an axis is drawn, which
   aesthetic's title goes there, and the look it is drawn in are the coordinate system's call; a

@@ -5338,6 +5338,23 @@ defmodule Giggly.PlotTest do
       assert Plot.scale_x_continuous(plot, labels: ["a", "b"], breaks: [1, 2]).scales.x.labels ===
                ["a", "b"]
     end
+
+    test "a list of labels takes nil for a missing one, and nothing but strings beside it" do
+      plot = Plot.new(@rows)
+
+      assert Plot.scale_x_continuous(plot, labels: ["a", nil], breaks: [1, 2]).scales.x.labels ===
+               ["a", nil]
+
+      assert Plot.scale_x_discrete(plot, labels: %{"4" => nil}).scales.x.labels === %{"4" => nil}
+
+      assert_raise NimbleOptions.ValidationError,
+                   ~r/expected a list of strings or nil, got: 1 in it/,
+                   fn -> Plot.scale_x_continuous(plot, labels: ["a", 1], breaks: [1, 2]) end
+
+      assert_raise NimbleOptions.ValidationError,
+                   ~r/expected each label a string or nil, got: :four/,
+                   fn -> Plot.scale_x_discrete(plot, labels: %{"4" => :four}) end
+    end
   end
 
   describe "a breaks function and n_breaks: on the scale functions" do

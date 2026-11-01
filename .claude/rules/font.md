@@ -39,14 +39,22 @@ entry beginning "A registered font is measured".
   and `to_svg/2`'s `text:` and `installed_fonts:` link rather than restate: a change to which
   fonts a family is measured or drawn in, or to either option, updates it (design-log §4, the
   entry beginning "Fonts are explained by one guide").
-- **The table is vdiffr's Liberation Sans table, copied as written, never recomputed.**
-  `priv/fonts/liberation_sans.txt` is regenerated from vdiffr's `glyph_dims.h` as its header
-  says. The ascent of "M", the descent of "gjpqyQ" and the missing-glyph width are read from it,
-  never restated as constants.
-- **The table is read at compile time and only then**, behind a `CorePurity` waiver of its own;
+- **The tables are vdiffr's, copied as written, never recomputed**: Liberation Sans's for every
+  face but the symbol face, `priv/fonts/liberation_sans.txt`, and Symbola's for `:symbol`
+  (grid's `fontface = 5`, which plotmath draws a sign in), `priv/fonts/symbola.txt`, each
+  regenerated from vdiffr's `glyph_dims.h` as its header says. The ascent of "M", the descent of
+  "gjpqyQ" and the missing glyph's metrics are read from them, never restated as constants.
+- **The symbol face is measured from a font registered with Pica as `"symbol"`, svglite's alias
+  for it, whatever the family, and otherwise from the Symbola table** — never an installed font
+  (design-log §4, the entry beginning "A plotmath sign is drawn in the symbol face").
+- **`box/5` is plotmath's box of a string**: the highest ascent and the deepest descent among its
+  characters, each its own row of the table, a missing one codepoint 1's, or its own glyph box
+  from a registered font, rounded outward to a pixel at 10,000 dpi as `ascent/4` and `descent/4`
+  round "M" and "gjpqyQ"; none below zero, as plotmath's box starts from none.
+- **The tables are read at compile time and only then**, behind one `CorePurity` waiver;
   measuring reads nothing but the fonts Pica holds, registered or installed, the first search of
   the installed ones reading the machine's font files, once for the VM's life, inside Pica. `@external_resource` recompiles the
-  module when the file changes, and the path comes from `Application.app_dir/2`.
+  module when a file changes, and the paths come from `Application.app_dir/2`.
 - **vdiffr's and R's rules for the table, which make ggplot2's snapshot layouts reproducible:** a
   string's width is the sum of its characters' advances, with no kerning; a character the font
   lacks takes codepoint 1's width; a line's height above its baseline is the ascent of "M"; the

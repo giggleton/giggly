@@ -5,8 +5,9 @@ defmodule Giggly.Scene.Text do
   # font `family` and `face` and turned `angle` degrees anticlockwise: grid's `textGrob()`. A
   # `family` of `""` is the default sans-serif, as R's is; `"sans"`, `"serif"` and `"mono"` are R's
   # generic families; any other is the font's name. The face is `:plain`, `:bold`, `:italic` or
-  # `:bold_italic`, grid's `fontface`. Neither changes a label's measured width, only how it is
-  # drawn.
+  # `:bold_italic`, grid's `fontface`, or `:symbol`, grid's `fontface = 5`, the symbol font R's
+  # plotmath draws a sign in, measured from its own table or font whatever the family
+  # (`Giggly.Font`). Neither changes a label's measured width, only how it is drawn.
   #
   # Each label has its own colour and opacity, `color` an `#RRGGBB`, or `:none`, written in no
   # colour, as svglite writes R's `NA`, and `opacity` from 0 to 1, as grid's graphical parameters
@@ -57,7 +58,7 @@ defmodule Giggly.Scene.Text do
           widths: [float()],
           size: float(),
           family: String.t(),
-          face: :plain | :bold | :italic | :bold_italic,
+          face: :plain | :bold | :italic | :bold_italic | :symbol,
           color: [String.t() | :none],
           opacity: [float()],
           angle: number(),

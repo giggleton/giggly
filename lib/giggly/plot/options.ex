@@ -1920,12 +1920,11 @@ defmodule Giggly.Plot.Options do
     labels: [
       type: {:custom, __MODULE__, :validate_scale_labels, []},
       doc:
-        "The breaks' labels: a list of strings, one for each of " <>
-          "`breaks:`, or of the breaks its function returns; a " <>
-          "function handed every break drawn, a list of numbers in " <>
-          "data units, that returns a string for each, as " <>
-          "`Scales.Labels`'s do; or `:none` for ticks with no labels. " <>
-          "A pair's label when a `breaks:` function returns pairs."
+        "The breaks' labels: a list of strings, `nil` drawn `NA`, one for each of `breaks:`, or " <>
+          "of the breaks its function returns; a function handed every break drawn, a list of " <>
+          "numbers in data units, that returns a label for each, a string, a power or `nil`, as " <>
+          "`Scales.Labels`'s do; or `:none` for ticks with no labels. A pair's label when a " <>
+          "`breaks:` function returns pairs."
     ],
     expand: [
       type: @scale_expand_type,
@@ -1989,14 +1988,14 @@ defmodule Giggly.Plot.Options do
                             labels: [
                               type: {:custom, __MODULE__, :validate_discrete_labels, []},
                               doc:
-                                "The breaks' labels: a list of strings, one for each break, " <>
-                                  "or for each limit when no breaks are given; a map from a " <>
-                                  "value to its label, a value it does not hold keeping its " <>
-                                  "own; a function handed every break drawn, a list of " <>
-                                  "values, that returns a string for each; or `:none` for " <>
-                                  "ticks with no labels. A pair's label when a `breaks:` " <>
-                                  "function returns pairs, else each value written as text, " <>
-                                  "when not given."
+                                "The breaks' labels: a list of strings, `nil` drawn `NA`, one " <>
+                                  "for each break, or for each limit when no breaks are given; a " <>
+                                  "map from a value to its label, a value it does not hold " <>
+                                  "keeping its own; a function handed every break drawn, a list " <>
+                                  "of values, that returns a label for each, a string, a power or " <>
+                                  "`nil`; or `:none` for ticks with no labels. A pair's label " <>
+                                  "when a `breaks:` function returns pairs, else each value " <>
+                                  "written as text, when not given."
                             ],
                             expand: [
                               type: @scale_expand_type,
@@ -2044,14 +2043,14 @@ defmodule Giggly.Plot.Options do
                         labels: [
                           type: {:custom, __MODULE__, :validate_scale_labels, []},
                           doc:
-                            "The breaks' labels: a list of strings, one for each of " <>
-                              "`breaks:`, or of the breaks its function returns; a function " <>
-                              "handed every break drawn, a list of dates, that returns a " <>
-                              "string for each; or `:none` for ticks with no labels. Not with " <>
-                              "`date_labels:`. When neither is given, the breaks the axis " <>
-                              "chooses are written as suits their step (`Sep 21`, `2026`), a " <>
-                              "`breaks:` function's pairs by their labels, and others in full " <>
-                              "(`2026-09-21`)."
+                            "The breaks' labels: a list of strings, `nil` drawn `NA`, one for " <>
+                              "each of `breaks:`, or of the breaks its function returns; a " <>
+                              "function handed every break drawn, a list of dates, that returns a " <>
+                              "label for each, a string, a power or `nil`; or `:none` for ticks " <>
+                              "with no labels. Not with `date_labels:`. When neither is given, " <>
+                              "the breaks the axis chooses are written as suits their step (`Sep " <>
+                              "21`, `2026`), a `breaks:` function's pairs by their labels, and " <>
+                              "others in full (`2026-09-21`)."
                         ],
                         date_labels: [
                           type: {:custom, __MODULE__, :validate_date_format, []},
@@ -2128,17 +2127,17 @@ defmodule Giggly.Plot.Options do
                             labels: [
                               type: {:custom, __MODULE__, :validate_scale_labels, []},
                               doc:
-                                "The breaks' labels: a list of strings, one for each of " <>
-                                  "`breaks:`, or of the breaks its function returns; a " <>
-                                  "function handed every break drawn, a list of date-times as " <>
-                                  "the column holds them, that returns a string for each; or " <>
-                                  "`:none` for ticks with no labels. Not with `date_labels:`. " <>
-                                  "When neither is given, the breaks the axis chooses are " <>
-                                  "written as suits their step (`06:00`, `Mar 10 06:00`, " <>
-                                  "`Mar 10`), a `breaks:` function's pairs by their labels, and " <>
-                                  "others in full, the date " <>
-                                  "alone where every one is a midnight (`2024-03-10`), else to " <>
-                                  "the second (`2024-03-10 06:30:00`)."
+                                "The breaks' labels: a list of strings, `nil` drawn `NA`, one " <>
+                                  "for each of `breaks:`, or of the breaks its function returns; " <>
+                                  "a function handed every break drawn, a list of date-times as " <>
+                                  "the column holds them, that returns a label for each, a " <>
+                                  "string, a power or `nil`; or `:none` for ticks with no labels. " <>
+                                  "Not with `date_labels:`. When neither is given, the breaks the " <>
+                                  "axis chooses are written as suits their step (`06:00`, `Mar 10 " <>
+                                  "06:00`, `Mar 10`), a `breaks:` function's pairs by their " <>
+                                  "labels, and others in full, the date alone where every one is " <>
+                                  "a midnight (`2024-03-10`), else to the second (`2024-03-10 " <>
+                                  "06:30:00`)."
                             ],
                             date_labels: [
                               type: {:custom, __MODULE__, :validate_datetime_format, []},
@@ -2224,17 +2223,16 @@ defmodule Giggly.Plot.Options do
                         labels: [
                           type: {:custom, __MODULE__, :validate_scale_labels, []},
                           doc:
-                            "The breaks' labels: a list of strings, one for each of " <>
-                              "`breaks:`, or of the breaks its function returns, a pair's " <>
-                              "label when it returns pairs; a function handed every break " <>
-                              "drawn, a list of times of day, wrapped past midnight, so a " <>
-                              "break at the end of " <>
-                              "the day is `~T[00:00:00]`, that returns a string for each; or " <>
-                              "`:none` for ticks with no labels. Not with `date_labels:`. When " <>
-                              "neither is given, each break is written in hours, minutes and " <>
-                              "seconds, with as many decimals of a second as the most precise " <>
-                              "needs, the hours counting on past midnight and a break before " <>
-                              "it negative (`10:30:00`, `24:00:00`, `-00:00:30`)."
+                            "The breaks' labels: a list of strings, `nil` drawn `NA`, one for " <>
+                              "each of `breaks:`, or of the breaks its function returns, a pair's " <>
+                              "label when it returns pairs; a function handed every break drawn, " <>
+                              "a list of times of day, wrapped past midnight, so a break at the " <>
+                              "end of the day is `~T[00:00:00]`, that returns a label for each, a " <>
+                              "string, a power or `nil`; or `:none` for ticks with no labels. Not " <>
+                              "with `date_labels:`. When neither is given, each break is written " <>
+                              "in hours, minutes and seconds, with as many decimals of a second " <>
+                              "as the most precise needs, the hours counting on past midnight and " <>
+                              "a break before it negative (`10:30:00`, `24:00:00`, `-00:00:30`)."
                         ],
                         date_labels: [
                           type: {:custom, __MODULE__, :validate_time_format, []},
@@ -2304,10 +2302,11 @@ defmodule Giggly.Plot.Options do
     labels: [
       type: {:custom, __MODULE__, :validate_discrete_labels, []},
       doc:
-        "The keys' labels: a list of strings, one for each break, or for each limit when no " <>
-          "breaks are given; a map from a value to its label, a value it does not hold keeping " <>
-          "its own; a function handed every break, a list of values, that returns a string for " <>
-          "each; or `:none` for keys with no labels. Each value written as text when not given."
+        "The keys' labels: a list of strings, `nil` drawn `NA`, one for each break, or for each " <>
+          "limit when no breaks are given; a map from a value to its label, a value it does not " <>
+          "hold keeping its own; a function handed every break, a list of values, that returns a " <>
+          "label for each, a string, a power or `nil`; or `:none` for keys with no labels. Each " <>
+          "value written as text when not given."
     ]
   ]
 
@@ -2338,10 +2337,10 @@ defmodule Giggly.Plot.Options do
     labels: [
       type: {:custom, __MODULE__, :validate_scale_labels, []},
       doc:
-        "The breaks' labels: a list of strings, one for each of `breaks:`, or of the breaks its " <>
-          "function returns; a function handed every break, a list of numbers, that returns a " <>
-          "string for each, as `Scales.Labels`'s do; or `:none` for no labels. A pair's label " <>
-          "when a `breaks:` function returns pairs."
+        "The breaks' labels: a list of strings, `nil` drawn `NA`, one for each of `breaks:`, or " <>
+          "of the breaks its function returns; a function handed every break, a list of numbers, " <>
+          "that returns a label for each, a string, a power or `nil`, as `Scales.Labels`'s do; or " <>
+          "`:none` for no labels. A pair's label when a `breaks:` function returns pairs."
     ]
   ]
 
@@ -2718,11 +2717,11 @@ defmodule Giggly.Plot.Options do
     labels: [
       type: {:custom, __MODULE__, :validate_scale_labels, []},
       doc:
-        "The breaks' labels: a list of strings, one for each of `breaks:`, or of the breaks its " <>
-          "function returns; a function handed every break, a list of numbers, that returns a " <>
-          "string for each, as `Scales.Labels`'s do, and handed the limits too where " <>
-          "`show_limits:` shows them; or `:none` for no labels. A pair's label when a `breaks:` " <>
-          "function returns pairs."
+        "The breaks' labels: a list of strings, `nil` drawn `NA`, one for each of `breaks:`, or " <>
+          "of the breaks its function returns; a function handed every break, a list of numbers, " <>
+          "that returns a label for each, a string, a power or `nil`, as `Scales.Labels`'s do, " <>
+          "and handed the limits too where `show_limits:` shows them; or `:none` for no labels. A " <>
+          "pair's label when a `breaks:` function returns pairs."
     ],
     n_breaks: [
       type: :pos_integer,
@@ -3358,8 +3357,8 @@ defmodule Giggly.Plot.Options do
         lineheight: [
           type: {:custom, __MODULE__, :validate_lineheight, []},
           doc:
-            "How far apart its lines are, 0 or more, a share of 1.2 times its size: a title's " <>
-              "or a strip's lines are 0.9 apart unless given."
+            "How far apart its lines are, 0 or more, a share of 1.2 times its size: a text's " <>
+              "lines are 0.9 apart unless given."
         ],
         margin: [
           type: {:custom, __MODULE__, :validate_theme_margin, [:text]},
@@ -4192,7 +4191,7 @@ defmodule Giggly.Plot.Options do
       {:error, "expected a number, a share of the text's width or height, got: #{inspect(just)}"}
 
   # NimbleOptions' check of a theme text's `lineheight:`: a number 0 or more, kept as a float, where
-  # R takes a negative one too and stacks a title's lines upward.
+  # R takes a negative one too and stacks a text's lines upward.
   @doc false
   @spec validate_lineheight(term()) :: {:ok, float()} | {:error, String.t()}
   def validate_lineheight(height) when is_number(height) and height >= 0, do: {:ok, height / 1}
@@ -4353,18 +4352,21 @@ defmodule Giggly.Plot.Options do
        inspect(breaks)}
   end
 
-  # NimbleOptions' check of a scale's labels: a list of strings, a function of one argument, which
-  # is handed the breaks, or `:none` for none.
+  # NimbleOptions' check of a scale's labels: a list of strings, `nil` for a missing one, a function
+  # of one argument, which is handed the breaks, or `:none` for none.
   @doc false
   @spec validate_scale_labels(term()) ::
-          {:ok, [String.t()] | (list() -> list()) | :none} | {:error, String.t()}
+          {:ok, [String.t() | nil] | (list() -> list()) | :none} | {:error, String.t()}
   def validate_scale_labels(:none), do: {:ok, :none}
   def validate_scale_labels(labeller) when is_function(labeller, 1), do: {:ok, labeller}
 
   def validate_scale_labels(labels) when is_list(labels) do
-    case Enum.reject(labels, &is_binary/1) do
-      [] -> {:ok, labels}
-      [other | _rest] -> {:error, "expected a list of strings, got: #{inspect(other)} in it"}
+    case Enum.reject(labels, fn label -> is_binary(label) or is_nil(label) end) do
+      [] ->
+        {:ok, labels}
+
+      [other | _rest] ->
+        {:error, "expected a list of strings or nil, got: #{inspect(other)} in it"}
     end
   end
 
@@ -4463,24 +4465,25 @@ defmodule Giggly.Plot.Options do
   defp discrete_value?(value), do: is_binary(value) or is_number(value) or is_atom(value)
 
   # NimbleOptions' check of a discrete scale's labels: a list of strings, a map from a value
-  # (`discrete_values/1`) to its label, a function of one argument, which is handed the breaks, or
-  # `:none` for none.
+  # (`discrete_values/1`) to its label, either's `nil` a missing one, a function of one argument,
+  # which is handed the breaks, or `:none` for none.
   @doc false
   @spec validate_discrete_labels(term()) ::
-          {:ok, [String.t()] | map() | (list() -> list()) | :none} | {:error, String.t()}
+          {:ok, [String.t() | nil] | map() | (list() -> list()) | :none} | {:error, String.t()}
   def validate_discrete_labels(labels) when is_map(labels) and not is_struct(labels) do
     values = Map.keys(labels)
     texts = Map.values(labels)
 
     with {:ok, _values} <- discrete_values(values),
-         [] <- Enum.reject(texts, &is_binary/1) do
+         [] <- Enum.reject(texts, fn text -> is_binary(text) or is_nil(text) end) do
       {:ok, labels}
     else
       {:error, _message} = error ->
         error
 
       [other | _rest] ->
-        {:error, "expected each label a string, got: #{inspect(other)} in #{inspect(labels)}"}
+        {:error,
+         "expected each label a string or nil, got: #{inspect(other)} in #{inspect(labels)}"}
     end
   end
 

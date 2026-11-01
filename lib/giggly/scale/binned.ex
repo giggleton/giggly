@@ -39,8 +39,9 @@ defmodule Giggly.Scale.Binned do
       scale's are, `n_breaks` of them wanted, 2 or more; `false` for `n_breaks` breaks spaced
       evenly between the ends of the limits, 1 or more.
     * `labels`: a label for each break: a list, one for each of its given breaks, or of its
-      default ones, a break left out taking its label with it; a function handed every break
-      kept, that returns their labels; `:none` for none; or `:default`, each written as a
+      default ones, a break left out taking its label with it, `nil` for a missing one; a
+      function handed every break kept, that returns their labels, each a string, a power
+      (`Scales.Labels.log/2`) or `nil`; `:none` for none; or `:default`, each written as a
       continuous scale writes a number.
     * `right`: where a value on a break falls: `true` in the bin below it, `false` in the bin
       above; the lowest value is in the lowest bin, and the highest in the highest.
@@ -101,7 +102,11 @@ defmodule Giggly.Scale.Binned do
             | [number()]
             | ({float(), float()} -> list())
             | ({float(), float()}, keyword() -> list()),
-          labels: :default | :none | [String.t()] | ([float()] -> [String.t()]),
+          labels:
+            :default
+            | :none
+            | [String.t() | nil]
+            | ([float()] -> [Scales.Labels.power_label()]),
           n_breaks: pos_integer(),
           nice_breaks: boolean(),
           right: boolean(),
