@@ -19,7 +19,8 @@ defmodule Giggly.Stat.Summary do
   # ggplot2's `uniquecols()` keeps those holding one value in each group and x: the cell's value
   # where it holds one, missing where it holds more, and a column holding more in every cell left
   # out. That is not `Giggly.Stat.Carry`'s rule, which ggplot2's default `compute_panel()` applies
-  # to a whole group. The range columns a summary writes are never carried.
+  # to a whole group. The columns a summary writes are never carried; any other is, a range it
+  # does not write among them, as R carries it.
   #
   # Its orientation, ggplot2's `has_flipped_aes()` with `stat_summary()`'s defaults: `orientation`
   # when it names an axis; else along y, the summary of x at each y, where y alone is discrete;
@@ -73,12 +74,9 @@ defmodule Giggly.Stat.Summary do
     alias Giggly.{Aesthetics, DataFrame}
     alias Giggly.DataFrame.Arithmetic
 
-    # The columns the stat writes, and the cells it summarises by.
-    @computed [:x, :group, :y, :ymin, :ymax, :panel, :flipped_aes]
+    # The cells the stat summarises by, and the columns it writes there, which it never carries.
     @cells [:panel, :group, :x]
-
-    # Columns a summary writes, in either orientation, which it never carries.
-    @ranges [:xmin, :xmax, :ymin, :ymax]
+    @written [:x, :group, :y, :ymin, :ymax, :panel]
 
     @impl Giggly.Stat
     def default_mapping(_stat), do: %{}
@@ -115,7 +113,7 @@ defmodule Giggly.Stat.Summary do
 
     defp summarised(frame, stat, flipped) do
       names = DataFrame.names(frame)
-      carried = Enum.reject(names, fn name -> name in (@computed ++ @ranges) end)
+      carried = Enum.reject(names, fn name -> name in @written end)
       rows = DataFrame.filter(frame, {:and, [{:is_finite, [:x]}, {:is_finite, [:y]}]})
       firsts = for name <- carried, do: {name, {:first, [name]}}
 
@@ -225,7 +223,7 @@ defmodule Giggly.Stat.Summary do
       selected =
         DataFrame.select(
           cells,
-          Enum.map([:x, :group, :y, :ymin, :ymax, :panel], fn name -> {name, name} end) ++
+          Enum.map(@written, fn name -> {name, name} end) ++
             Enum.map(kept, fn {name, _counts} -> {name, name} end)
         )
 
@@ -236,16 +234,12 @@ defmodule Giggly.Stat.Summary do
 
     # A carried column missing in each cell holding more than one of its values.
     defp cell_values(cells, name, counts) do
-      if Enum.all?(counts, fn count -> count == 1 end) do
+      values =
         cells
-      else
-        values =
-          cells
-          |> DataFrame.pull(name)
-          |> Enum.zip_with(counts, &in_cell/2)
+        |> DataFrame.pull(name)
+        |> Enum.zip_with(counts, &in_cell/2)
 
-        put_like(cells, name, values)
-      end
+      put_like(cells, name, values)
     end
 
     defp in_cell(value, 1), do: value

@@ -142,8 +142,9 @@ the entry beginning "Each facet, coordinate system, geom, stat and position is a
   function of the values the frame's `list` pulls, which must return a number, or missing;
   `flipped_aes`, along y by `orientation` or where y alone is discrete, flipped and flipped back.
   It carries no group's constant columns: each other column goes to each cell holding one of its
-  values, missing in a cell holding more, dropped where every cell does, a range column never. It
-  computes nothing an after_stat can read and consumes nothing.
+  values, missing in a cell holding more, dropped where every cell does, a column it writes
+  never, a range it does not write as R carries it. It computes nothing an after_stat can read
+  and consumes nothing.
 - **Aligning is ggplot2's `stat_align()`, `geom_area()`'s stat, R's to the last digit**: rows
   missing or infinite in x or y left out first, as ggplot2's stats drop them; a panel of one group
   kept as it is; in a panel of several, the places are its rows' distinct x and the points where a

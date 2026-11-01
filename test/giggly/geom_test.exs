@@ -2012,6 +2012,10 @@ defmodule Giggly.GeomTest do
       assert [%Segments{starts: [{0.25, +0.0}, {0.75, 0.5}]}, %Circles{} = points] =
                draw_panel(@pointrange, frame, coord, params)
 
+      # A missing size draws no point, as `GeomPoint` drops the row.
+      unsized = DataFrame.put(frame, :size, [nil, nil])
+      assert [%Segments{}] = draw_panel(@pointrange, unsized, coord, params)
+
       as_point =
         draw_panel(%Geom.Point{}, DataFrame.put(frame, :size, [2.0, 4.0]), coord, params)
 
@@ -2162,6 +2166,26 @@ defmodule Giggly.GeomTest do
       assert {across.starts, across.ends} === {[{0.125, 0.25}], [{0.375, 0.25}]}
       assert first.stroke_width === @default_width
       assert across.stroke_width === 1.25 * (72.27 / 25.4) / 96 * 72
+      assert {first.mitre_limit, across.mitre_limit} === {10.0, 10.0}
+    end
+
+    # R's engine draws no line of no width, and svglite writes a border of none 0 wide.
+    test "a crossbar of a missing width draws its box unbordered and no line across",
+         %{coord: coord, params: params} do
+      frame =
+        DataFrame.new(
+          x: [1.0],
+          y: [1.0],
+          xmin: [0.5],
+          xmax: [1.5],
+          ymin: [0.0],
+          ymax: [2.0],
+          group: [1],
+          flipped_aes: [false],
+          linewidth: [nil]
+        )
+
+      assert [%Polygons{stroke_width: +0.0}] = draw_panel(@crossbar, frame, coord, params)
     end
 
     test "a crossbar's middle and box looks replace its own" do
@@ -2195,6 +2219,11 @@ defmodule Giggly.GeomTest do
 
       assert {box.xmin, box.xmax, box.ymin, box.ymax} === {[0.125], [0.875], [0.25], [0.75]}
       assert across.stroke_width === box.stroke_width
+      assert {box.mitre_limit, across.mitre_limit} === {10.0, 10.0}
+
+      # A missing line type, R's `NA`, draws the box unbordered and no line across.
+      assert [%Rectangles{color: [:none]}] =
+               draw_key(@crossbar, %{flipped_aes: false, linetype: nil})
 
       assert [%Rectangles{xmin: [0.25], ymin: [0.125]}, %Polylines{lines: [[{0.5, 0.125}, _end]]}] =
                draw_key(@crossbar, %{flipped_aes: true})
@@ -2203,6 +2232,37 @@ defmodule Giggly.GeomTest do
     test "an error bar's key is a path's, across the key either way" do
       assert draw_key(@errorbar, %{flipped_aes: false}) == draw_key(@path, %{})
       assert draw_key(@errorbar, %{flipped_aes: true}) == draw_key(@path, %{})
+    end
+  end
+
+  describe "draw_panel/5 for a range layer's empty panel" do
+    test "a panel of no rows draws nothing, and a layer of no rows is set up with no sides" do
+      params = Coord.panel_params(@cartesian, {{0.0, 4.0}, [], []}, {{0.0, 4.0}, [], []})
+
+      row =
+        DataFrame.new(
+          x: [1.0],
+          y: [1.0],
+          xmin: [0.5],
+          xmax: [1.5],
+          ymin: [0.0],
+          ymax: [2.0],
+          group: [1],
+          panel: [1],
+          flipped_aes: [false]
+        )
+
+      empty = DataFrame.slice(row, [])
+
+      for geom <- [@linerange, @errorbar, @crossbar] do
+        assert draw_panel(geom, empty, @cartesian, params) == []
+      end
+
+      unset = DataFrame.select(empty, x: :x, ymin: :ymin, panel: :panel)
+      set_up = Geom.setup_data(@errorbar, unset, @continuous)
+
+      assert DataFrame.row_count(set_up) == 0
+      assert {DataFrame.pull(set_up, :xmin), DataFrame.pull(set_up, :xmax)} == {[], []}
     end
   end
 

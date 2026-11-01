@@ -2523,6 +2523,32 @@ defmodule Giggly.PlotTest do
                  }
                }
              ] = Plot.geom_crossbar(plot).reversed_layers
+
+      assert [%Plot.Layer{accepted: crossbar_accepted}] =
+               Plot.geom_crossbar(plot).reversed_layers
+
+      assert crossbar_accepted == [
+               :alpha,
+               :color,
+               :fill,
+               :group,
+               :linetype,
+               :linewidth,
+               :width,
+               :x,
+               :xmax,
+               :xmin,
+               :y,
+               :ymax,
+               :ymin
+             ]
+
+      assert [%Plot.Layer{geom: %Geom.Crossbar{line_join: :bevel}, fixed: %{linetype: {4, 4}}}] =
+               Plot.geom_crossbar(plot, linejoin: :bevel, linetype: :dashed).reversed_layers
+
+      assert_raise NimbleOptions.ValidationError, ~r/linetype/, fn ->
+        Plot.geom_crossbar(plot, linetype: :wiggly)
+      end
     end
 
     # ggplot2 4.0.3's `geom_crossbar(middle.colour = , middle.linetype = , box.linewidth = )`, R's
@@ -2570,6 +2596,16 @@ defmodule Giggly.PlotTest do
         end
 
       assert error.message =~ "Plot.geom_crossbar/3 runs along y"
+
+      # A crossbar's line across stands at its y, ggplot2's `required_aes` `c("x", "y", ...)`.
+      error =
+        assert_raise ArgumentError, fn ->
+          @bars
+          |> Plot.new(%{x: :trt})
+          |> Plot.geom_crossbar(%{ymin: :lower, ymax: :upper})
+        end
+
+      assert error.message =~ "Plot.geom_crossbar/3 needs :y"
 
       for {layer, function} <- [
             {&Plot.geom_errorbar/3, "Plot.geom_errorbar/3"},
@@ -2655,6 +2691,10 @@ defmodule Giggly.PlotTest do
                  layer.(plot, %{}, position: dodge).reversed_layers
 
         assert_raise NimbleOptions.ValidationError, fn -> layer.(plot, %{}, position: :stack) end
+
+        assert_raise NimbleOptions.ValidationError, ~r/expected :identity, :dodge, :dodge2/, fn ->
+          layer.(plot, %{}, position: Plot.position_jitter())
+        end
       end
     end
 
@@ -2741,6 +2781,9 @@ defmodule Giggly.PlotTest do
 
       assert [%Plot.Layer{stat: %Stat.Summary{fun_data: {:mean_se, mult: 1.0}}}] =
                Plot.stat_summary(plot, fun_data: :mean_se).reversed_layers
+
+      assert [%Plot.Layer{stat: %Stat.Summary{orientation: :x}}] =
+               Plot.stat_summary(plot, orientation: :x).reversed_layers
     end
 
     test "each geom takes its function's options, and the bars' position is the identity" do

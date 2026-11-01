@@ -499,8 +499,8 @@ defmodule Giggly.StatTest do
     # ggplot2 4.0.3's `uniquecols()` keeps a column cell by cell, as its `layer_data()` of x
     # `c(1, 1, 2, 2, 3)`, y `1:5` and `aes(colour = c)` of c `c(10, 10, 20, 21, 30)` shows: the
     # colours of 10, `NA` and 30. Each column here takes one of its cases: kept, missing in some
-    # cells, a category's levels kept, held more than once in every cell and dropped, and a range
-    # the summary writes.
+    # cells, a category's levels kept, held more than once in every cell and dropped, the range
+    # the summary writes, and one it does not write, carried as R carries it.
     test "a column goes to each x it holds one value at, missing where it holds more" do
       frame =
         summary_frame(
@@ -511,7 +511,9 @@ defmodule Giggly.StatTest do
           shape:
             {["a", "b", "b", "b", "b", "b"], {:category, levels: ["b", "a"], ordered: false}},
           stroke: [0.5, 0.6, 0.7, 0.8, 0.9, 1.0],
-          ymin: List.duplicate(9.0, 6)
+          ymin: List.duplicate(9.0, 6),
+          ymax: List.duplicate(9.0, 6),
+          xmin: List.duplicate(7.0, 6)
         )
 
       summaries =
@@ -520,14 +522,16 @@ defmodule Giggly.StatTest do
         |> Stat.compute_layer(frame, axes([1], false, false))
 
       assert DataFrame.names(summaries) ==
-               [:x, :group, :y, :ymin, :ymax, :panel, :color, :size, :shape, :flipped_aes]
+               [:x, :group, :y, :ymin, :ymax, :panel, :color, :size, :shape, :xmin, :flipped_aes]
 
-      assert columns(summaries, [:y, :color, :size, :shape, :ymin]) === [
+      assert columns(summaries, [:y, :color, :size, :shape, :ymin, :ymax, :xmin]) === [
                [1.5, 3.5, 5.5],
                [10, nil, 30],
                [nil, nil, 5],
                [nil, "b", "b"],
-               [nil, nil, nil]
+               [nil, nil, nil],
+               [nil, nil, nil],
+               [7.0, 7.0, 7.0]
              ]
 
       assert DataFrame.category(summaries, :shape) ==
