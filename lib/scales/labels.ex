@@ -1424,7 +1424,16 @@ defmodule Scales.Labels do
       |> Enum.map(&decimals_needed/1)
       |> Enum.max(fn -> 0 end)
 
-    Enum.map(rounded, fn value -> :erlang.float_to_binary(value, decimals: decimals) end)
+    Enum.map(rounded, fn value -> fixed(value, decimals) end)
+  end
+
+  # `value` with `decimals` decimals, as Erlang writes it, or, past the 253 decimals or 256
+  # characters Erlang writes at most (below about 1e-253 or above 1e255), as C's `sprintf()`
+  # writes it, the exact value's digits, as R's `format()` writes them.
+  defp fixed(value, decimals) do
+    :erlang.float_to_binary(value, decimals: decimals)
+  rescue
+    ArgumentError -> Format.fixed(value, decimals)
   end
 
   # Plain decimals of breaks turned back through an inverse that does not give a break back

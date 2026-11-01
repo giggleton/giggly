@@ -224,6 +224,21 @@ defmodule Scales.TransformTest do
       assert Transform.transform(:log10, [0, -1, 10, :infinity, nil]) ==
                [:neg_infinity, :nan, 1.0, :infinity, nil]
     end
+
+    # R: trimws(format(10^c(306, 307, 308), scientific = FALSE)), each the double's exact digits,
+    # past the 256 characters Erlang's float_to_binary/2 writes; 10^307's double lies just below
+    # it, so its 307 digits start 9999.
+    test "labels a power near the largest double whole, as R writes it" do
+      labels = Transform.format(:log10, [306.0, 307.0, 308.0], {306.0, 308.0})
+
+      assert Enum.map(labels, &String.length/1) == [307, 307, 309]
+
+      assert List.last(labels) ==
+               "1000000000000000010979063629440455417404923096773118463368106829031575854049114915371633" <>
+                 "2897849468889906124966972117251561159028374314008832830700919814604603127166450293302718" <>
+                 "5697489699588559043338384466165001178426897626212945177628091195786707458122783970171784" <>
+                 "415105291802893207873272974885715430223118336"
+    end
   end
 
   describe "sqrt" do

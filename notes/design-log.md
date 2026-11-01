@@ -79,6 +79,17 @@ stops the question being reopened from scratch. A new entry is about 150 words: 
 sentence or two of why, and one line per rejected alternative. What a later decision replaces is
 deleted from the entry it was in, never marked superseded; git history keeps every version.
 
+- **A plain label past what Erlang writes is written whole, as R writes it (2026-11-01, Steve:
+  "A", increment 4's step 5's C8; checked against R 4.6.1).** `Labels.plain/1` raised
+  `ArgumentError` on a break above about 1e255 or below about 1e-253, where
+  `float_to_binary/2` refuses more than 256 characters or 253 decimals, so a log10 axis reaching
+  1e256 failed its plot. There it now writes the double's exact digits, `Labels.Format`'s
+  `sprintf()` rule, as R's `format(scientific = FALSE)` does: 2e257 in R's 258 characters,
+  10^308 in 309; every smaller label is unchanged, 1e23 still R's `99999999999999991611392`.
+  *Rejected: scientific notation past some size*, as R's default `format()` writes `1e+23`:
+  plain's rule is never scientific, and 1e23's label would change too. *Rejected: the fix inside
+  step 5's commit*: an unrelated fix mixed into the transformations.
+
 - **A distribution's spread is above 0 and its location a number, and the normal quantile's
   middle is bisected on `erf` (2026-11-01, Steve: "A", "A", increment 4's step 4, "Ok" for the
   quartiles; checked against scales 1.4.0).** `{:probability, :normal, mean:, sd:}` and `{:probability, :logistic,

@@ -1631,5 +1631,21 @@ defmodule Scales.LabelsTest do
     test "no breaks have no labels" do
       assert Labels.plain([]) == []
     end
+
+    # R: trimws(format(2e257, scientific = FALSE)), its exact digits, 258 characters, past the
+    # 256 that Erlang's float_to_binary/2 writes; and format(c(1e-300, 0.25), scientific = FALSE),
+    # past its 253 decimals.
+    test "a break past the characters or decimals Erlang writes is written whole, as R writes it" do
+      assert Labels.plain([2.0e257]) == [
+               "2000000000000000060255319800281085005780973079549390257664215959806548266755292465642224" <>
+                 "7125382915271364876860343455656359338682733727546893769990039911439972557329123488427600" <>
+                 "5207941131245911204484318605390207565762827048057062398328588249283527946922885120"
+             ]
+
+      assert Labels.plain([1.0e-300, 0.25]) == [
+               "0." <> String.duplicate("0", 299) <> "1",
+               "0.25" <> String.duplicate("0", 298)
+             ]
+    end
   end
 end
