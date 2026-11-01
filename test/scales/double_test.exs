@@ -225,9 +225,11 @@ defmodule Scales.DoubleTest do
 
   describe "the tangents and sines" do
     # R's tanh(-Inf) -1, tanh(-0) +0, tanh(-1000) -1, tanh(2) 0.9640275800758169; atanh(-0) +0,
-    # atanh(1) Inf, atanh(-1) -Inf, atanh(-2), atanh(Inf) and atanh(-Inf) NaN, atanh(0.25)
+    # atanh(1) Inf, atanh(-1) -Inf, atanh(-2), atanh(-1.5), atanh(Inf) and atanh(-Inf) NaN,
+    # atanh(0.25)
     # 0.25541281188299536; sin(-0) and asin(-0) +0, sin(Inf) NaN, sin(2) 0.90929742682568171,
-    # asin(-1) -1.5707963267948966, asin(2) and asin(-Inf) NaN (`inc4/step4/edge.R`)
+    # asin(-1) -1.5707963267948966, asin(2) and asin(-Inf) NaN (`inc4/step4/edge.R`,
+    # `gaps.R`)
     test "R's at each edge, a zero of either sign 0.0" do
       assert {Double.hyperbolic_tangent(:neg_infinity), Double.hyperbolic_tangent(-0.0),
               Double.hyperbolic_tangent(-1000.0), Double.hyperbolic_tangent(2.0),
@@ -236,11 +238,12 @@ defmodule Scales.DoubleTest do
 
       assert {Double.inverse_hyperbolic_tangent(-0.0), Double.inverse_hyperbolic_tangent(1.0),
               Double.inverse_hyperbolic_tangent(-1), Double.inverse_hyperbolic_tangent(-2.0),
-              Double.inverse_hyperbolic_tangent(1.5),
+              Double.inverse_hyperbolic_tangent(-1.5), Double.inverse_hyperbolic_tangent(1.5),
               Double.inverse_hyperbolic_tangent(:infinity),
               Double.inverse_hyperbolic_tangent(:neg_infinity),
               Double.inverse_hyperbolic_tangent(:nan), Double.inverse_hyperbolic_tangent(0.25)} ===
-               {0.0, :infinity, :neg_infinity, :nan, :nan, :nan, :nan, :nan, 0.25541281188299536}
+               {0.0, :infinity, :neg_infinity, :nan, :nan, :nan, :nan, :nan, :nan,
+                0.25541281188299536}
 
       assert {Double.sine(-0.0), Double.sine(:infinity), Double.sine(:neg_infinity),
               Double.sine(:nan), Double.sine(2.0)} ===
@@ -255,11 +258,11 @@ defmodule Scales.DoubleTest do
   describe "normal_distribution/1, normal_quantile/1 and normal_density/1" do
     # R's pnorm(-Inf) +0, pnorm(-0) 0.5, pnorm(1e-300) 0.5, pnorm(40.5) and pnorm(Inf) 1,
     # pnorm(-1000) +0, pnorm(0.25) 0.5987063256829237; qnorm(-0) -Inf, qnorm(0.5) +0, qnorm(1)
-    # Inf, qnorm(-1), qnorm(2) and qnorm(-Inf) NaN, qnorm(1e-300) -37.047096299361201; dnorm(-Inf)
-    # and dnorm(40.5) +0, dnorm(-0) 0.3989422804014327, dnorm(-38.4) 2.5345567631655948e-321,
-    # dnorm(1) 0.24197072451914337 (`inc4/step4/edge.R`); pnorm(1e300) 1, pnorm(-1e300) 0,
-    # dnorm(1e200) and dnorm(-1e300) 0, where the arithmetic would pass the largest double
-    # (`inc4/step4/pins.R`)
+    # Inf, qnorm(-1), qnorm(-0.25), qnorm(1.5), qnorm(2) and qnorm(-Inf) NaN, qnorm(1e-300)
+    # -37.047096299361201; dnorm(-Inf) and dnorm(40.5) +0, dnorm(-0) 0.3989422804014327,
+    # dnorm(-38.4) 2.5345567631655948e-321, dnorm(1) 0.24197072451914337 (`inc4/step4/edge.R`,
+    # `gaps.R`); pnorm(1e300) 1, pnorm(-1e300) 0, dnorm(1e200) and dnorm(-1e300) 0, where the
+    # arithmetic would pass the largest double (`inc4/step4/pins.R`)
     test "R's at each edge, 0 and 1 beyond 40 either side" do
       assert {Double.normal_distribution(:neg_infinity), Double.normal_distribution(-0.0),
               Double.normal_distribution(1.0e-300), Double.normal_distribution(40.5),
@@ -274,10 +277,12 @@ defmodule Scales.DoubleTest do
 
       assert {Double.normal_quantile(-0.0), Double.normal_quantile(0.5),
               Double.normal_quantile(1), Double.normal_quantile(-1.0),
+              Double.normal_quantile(-0.25), Double.normal_quantile(1.5),
               Double.normal_quantile(2.0), Double.normal_quantile(:neg_infinity),
               Double.normal_quantile(:infinity), Double.normal_quantile(:nan),
               Double.normal_quantile(1.0e-300)} ===
-               {:neg_infinity, 0.0, :infinity, :nan, :nan, :nan, :nan, :nan, -37.047096299361201}
+               {:neg_infinity, 0.0, :infinity, :nan, :nan, :nan, :nan, :nan, :nan, :nan,
+                -37.047096299361201}
 
       assert {Double.normal_density(:neg_infinity), Double.normal_density(40.5),
               Double.normal_density(-40.5), Double.normal_density(-0.0),
