@@ -3996,6 +3996,10 @@ tells the story (`git show <hash>`). Until 2026-10-15 each milestone also had a 
 `git log -S "<title>" -- notes/design-log.md` finds it in this file's history. The phases are
 §1's roadmap.
 
+- 2026-11-01 — Carry Box-Cox, modulus, Yeo-Johnson and a span of time (transforms, step 5)
+  (`dd131e6`); §4: "Box-Cox, modulus, Yeo-Johnson and a span of time", "The Box-Cox, modulus and
+  Yeo-Johnson transformations", "Box-Cox's domain", "An axis past a bound", "Box-Cox, modulus and
+  Yeo-Johnson labels"
 - 2026-11-01 — Write a plain label past what Erlang writes whole, as R writes it (`4bdb310`);
   §4: "A plain label past"
 - 2026-11-01 — Draw the notebook examples the summaries unlock, and narrow every verdict to what

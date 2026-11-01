@@ -42,7 +42,7 @@ defmodule Scales.Transform.BoxCox do
 
     Enum.map(values, fn
       nil ->
-        Power.missing_derivative(exponent, :transform)
+        Power.missing_derivative(exponent)
 
       value ->
         value
@@ -56,7 +56,7 @@ defmodule Scales.Transform.BoxCox do
     {exponent, _offset} = parameters(transformation)
 
     Enum.map(positions, fn
-      nil -> Power.missing_derivative(exponent, :inverse)
+      nil -> Power.missing_derivative(exponent)
       position -> Power.inverse_derivative(position, exponent)
     end)
   end

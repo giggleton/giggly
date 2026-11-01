@@ -247,10 +247,10 @@ defmodule Scales.Transform do
   def inverse(name, positions), do: module(name).inverse(name, positions)
 
   # As ggplot2's `get_breaks()` squishes its limits with `oob_squish()` into the domain
-  # transformed, its ends sorted, a NaN among them dropped: so a transformation of every number
-  # whose values are bounded, yj's below 1 for a negative exponent, squishes there too, and a
-  # domain transformed to no width, the reciprocal's two zeros, or to one end squishes nothing, as
-  # R leaves it. A date's, date-time's or time's domain is every one, so it squishes nothing.
+  # transformed, its ends sorted: so a transformation of every number whose values are bounded,
+  # yj's below 1 for a negative exponent, squishes there too, and a domain transformed to no width,
+  # the reciprocal's two zeros, squishes nothing, as R leaves it. No domain transforms to NaN,
+  # which R drops. A date's, date-time's or time's domain is every one, so it squishes nothing.
   @doc """
   The extent `{low, high}`, in transformed space, squished into the domain of the transformation
   `name`, transformed: each end outside it moved onto it, as R's `oob_squish()` moves it, so
@@ -268,19 +268,8 @@ defmodule Scales.Transform do
 
   def squish(name, extent) do
     {domain_low, domain_high} = module(name).domain(name)
-
-    transformed =
-      name
-      |> transform([domain_low, domain_high])
-      |> Enum.reject(fn domain_end -> domain_end == :nan end)
-
-    case transformed do
-      [first, second] ->
-        squished(extent, {Double.minimum(first, second), Double.maximum(first, second)})
-
-      _one_end ->
-        extent
-    end
+    [first, second] = transform(name, [domain_low, domain_high])
+    squished(extent, {Double.minimum(first, second), Double.maximum(first, second)})
   end
 
   defp squished({low, high} = extent, domain) do

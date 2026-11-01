@@ -89,19 +89,12 @@ defmodule Scales.Transform.Power do
     end
   end
 
-  # `derivative/2`'s (`:transform`) or `inverse_derivative/2`'s (`:inverse`) at a missing value:
-  # R's `NA^0`, 1, where the power is 0, else missing, as it is for an exponent that counts as
-  # zero, whose derivatives are a quotient and an exponential.
+  # `derivative/2`'s and `inverse_derivative/2`'s at a missing value: R's `NA^0`, 1, where their
+  # power, `exponent - 1` or `1 / exponent - 1`, is 0, at an exponent of 1 alone, else missing.
   @doc false
-  @spec missing_derivative(number(), :transform | :inverse) :: float() | nil
-  def missing_derivative(exponent, function) do
-    cond do
-      near_zero?(exponent) -> nil
-      function == :transform and exponent - 1 == 0 -> 1.0
-      function == :inverse and 1 / exponent - 1 == 0 -> 1.0
-      true -> nil
-    end
-  end
+  @spec missing_derivative(number()) :: float() | nil
+  def missing_derivative(exponent) when exponent == 1, do: 1.0
+  def missing_derivative(_exponent), do: nil
 
   # The breaks of an axis showing `extent` in transformed space, through `inverse` and
   # `transform` of one value each.

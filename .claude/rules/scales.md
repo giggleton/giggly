@@ -162,7 +162,7 @@ R's regular ones: the entry beginning "The panel's grid lines are placed by the 
   the breaks outside it are dropped. Breaks the transformation did not choose, given or laid by a
   width, are handed `:given` instead of the extent, and a date writes them in full, `2026-09-21`,
   as R's `format()` writes a date its pretty breaks did not name. **Breaks follow ggplot2's `get_breaks()`**: the extent
-  squished into the domain transformed, its ends sorted and a NaN among them dropped, at both
+  squished into the domain transformed, its ends sorted, at both
   ends (log10 from -100, sqrt from 0, exp from 0, yj(-1) at 1, the bound its values never pass),
   a transformed domain of no width or one end squishing nothing, a date's, date-time's or time's
   never squished, turned back into data

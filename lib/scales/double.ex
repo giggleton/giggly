@@ -117,10 +117,7 @@ defmodule Scales.Double do
   @doc false
   @spec power(operand(), operand()) :: operand()
   def power(base, exponent) when is_number(base) and is_number(exponent) and exponent == 2,
-    do: multiply(base / 1, base / 1)
-
-  def power(base, exponent) when is_number(exponent) and exponent == 2,
-    do: multiply(base, base)
+    do: multiply(base / 1, base)
 
   def power(base, exponent)
       when (is_number(base) and base == 1) or (is_number(exponent) and exponent == 0),
@@ -137,13 +134,12 @@ defmodule Scales.Double do
     do: if(whole?(exponent), do: 0.0, else: :nan)
 
   def power(:neg_infinity, exponent) when is_number(exponent),
-    do: if(whole?(exponent), do: odd_power(:neg_infinity, exponent), else: :nan)
+    do: if(whole?(exponent), do: odd_power(exponent), else: :nan)
 
-  def power(base, exponent) when base == :neg_infinity or exponent in @infinities,
-    do: infinite_power(base, exponent)
+  def power(base, exponent) when exponent in @infinities, do: infinite_power(base, exponent)
 
   def power(base, exponent) do
-    :math.pow(base / 1, exponent / 1)
+    :math.pow(base, exponent)
   rescue
     ArithmeticError -> finite_power_beyond(base, exponent)
   end
@@ -154,8 +150,8 @@ defmodule Scales.Double do
 
   # Minus infinity, or a negative base past the largest double, to a whole power: its sign the
   # base's when the power is odd.
-  defp odd_power(_base, exponent) when rem(trunc(exponent), 2) == 0, do: :infinity
-  defp odd_power(_base, _exponent), do: :neg_infinity
+  defp odd_power(exponent) when rem(trunc(exponent), 2) == 0, do: :infinity
+  defp odd_power(_exponent), do: :neg_infinity
 
   # A finite base to an infinite power, or minus infinity to one: NaN below zero, else the
   # infinity or zero the power tends to.
@@ -168,7 +164,7 @@ defmodule Scales.Double do
   defp finite_power_beyond(base, exponent) do
     cond do
       base < 0 and not whole?(exponent) -> :nan
-      base < 0 -> odd_power(base, exponent)
+      base < 0 -> odd_power(exponent)
       true -> :infinity
     end
   end

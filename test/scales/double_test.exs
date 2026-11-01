@@ -220,6 +220,13 @@ defmodule Scales.DoubleTest do
               Double.power(-2.0, 1.0e300), Double.power(:neg_infinity, 1.0e300),
               Double.power(-1.0, :infinity), Double.power(10, 2)} ===
                {:neg_infinity, -0.0, :infinity, :infinity, :infinity, :nan, 100.0}
+
+      # R: (-Inf)^3L, 1.5^-Inf, 0.5^-1075.5, 0.5^-1075 and (-0.5)^-1075 are -Inf 0 Inf Inf -Inf
+      # (`inc4/step5/pins.R`): a whole exponent as an integer, a base between 1 and 2 to minus
+      # infinity, and a base below 1 past the largest double, to a fractional and a whole power
+      assert {Double.power(:neg_infinity, 3), Double.power(1.5, :neg_infinity),
+              Double.power(0.5, -1075.5), Double.power(0.5, -1075.0), Double.power(-0.5, -1075.0)} ===
+               {:neg_infinity, 0.0, :infinity, :infinity, :neg_infinity}
     end
   end
 

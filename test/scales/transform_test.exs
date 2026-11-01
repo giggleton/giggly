@@ -932,6 +932,35 @@ defmodule Scales.TransformTest do
                   -0.33333276099999998
                 ]}
 
+      # A break not among the axis's own, as on an axis of no width, is written as a given one
+      assert Transform.format({:boxcox, 3}, [-0.33333321900000001], {0.0, 1.0}) ==
+               Transform.format({:boxcox, 3}, [-0.33333321900000001], :given)
+
+      # and, beside one that is, both are
+      both = [-0.33333321900000001, -0.333333]
+      extent = {-0.33333328668611861, -0.33333267514444442}
+
+      assert Transform.format({:boxcox, 3}, both, extent) ==
+               Transform.format({:boxcox, 3}, both, :given)
+
+      # ys = c(0.0012, 0.0061), where the round trip writes 0.00099999999999989
+      assert axis({:modulus, 2}, {0.0009548257500000489, 0.0063644992499999383}) ==
+               {[
+                  {0.0010004999999998487, "0.001"},
+                  {0.0020019999999999483, "0.002"},
+                  {0.0030044999999998545, "0.003"},
+                  {0.0040080000000000116, "0.004"},
+                  {0.0050124999999998643, "0.005"},
+                  {0.0060179999999999678, "0.006"}
+                ],
+                [
+                  0.0015012499999998985,
+                  0.0025032499999999014,
+                  0.003506249999999933,
+                  0.0045102499999999379,
+                  0.0055152499999999161
+                ]}
+
       # A break given is turned back and rounded to 14 significant digits, which keeps the round
       # trip's error here: 0.007 comes back 0.006999999999715905
       assert Transform.format({:boxcox, 3}, [-0.33333321900000001], :given) ==
@@ -997,6 +1026,13 @@ defmodule Scales.TransformTest do
         assert_raise FunctionClauseError, fn -> Transform.inverse_derivative(name, [1.0]) end
       end
 
+      # R: transform_timespan("secs") and ("days") of 1 and 2.5 are 1 2.5 and 86400 216000, the
+      # latter's inverse of 86400 and 3600 1 0.041666666666666664 (`inc4/step5/pins.R`)
+      assert {Transform.transform({:timespan, :second}, [1, 2.5]),
+              Transform.transform({:timespan, :day}, [1, 2.5]),
+              Transform.inverse({:timespan, :day}, [86_400.0, 3600.0])} ===
+               {[1.0, 2.5], [86_400.0, 216_000.0], [1.0, 0.041666666666666664]}
+
       # R: trim_to_domain(transform_timespan("mins"), c(-5, 0.3, 9, NA)) is -300 540
       assert Transform.trim_to_domain({:timespan, :minute}, [-5, 0.3, 9, nil]) === {-300.0, 540.0}
     end
@@ -1022,6 +1058,11 @@ defmodule Scales.TransformTest do
           ] do
         assert_raise FunctionClauseError, fn -> Transform.transform(name, [1.0]) end
       end
+
+      # R: transform_boxcox(1e-7) of 0.5 and 2 is -0.69314715633872481 0.69314720407831487, a
+      # power, an exponent below 1e-7 alone counting as 0 (`inc4/step5/pins.R`)
+      assert Transform.transform({:boxcox, 1.0e-7}, [0.5, 2.0]) ===
+               [-0.69314715633872481, 0.69314720407831487]
 
       assert {Transform.transform({:boxcox, 0.5, offset: 0}, [2.0]),
               Transform.transform({:modulus, 0.5, offset: 1}, [2.0])} ===

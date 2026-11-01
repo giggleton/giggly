@@ -42,7 +42,7 @@ defmodule Scales.Transform.Modulus do
 
     Enum.map(values, fn
       nil ->
-        Power.missing_derivative(exponent, :transform)
+        Power.missing_derivative(exponent)
 
       value ->
         value
@@ -58,7 +58,7 @@ defmodule Scales.Transform.Modulus do
 
     Enum.map(positions, fn
       nil ->
-        Power.missing_derivative(exponent, :inverse)
+        Power.missing_derivative(exponent)
 
       position ->
         position
@@ -123,9 +123,8 @@ defmodule Scales.Transform.Modulus do
     |> Double.multiply(shifted)
   end
 
-  # R's `sign()`: 1, -1, or 0 for either zero, NaN's NaN; plus infinity, an atom, sorts above
-  # every number, so it is above 0.
-  defp sign(:nan), do: :nan
+  # R's `sign()`: 1, -1, or 0 for either zero; plus infinity and NaN, atoms, sort above every
+  # number, so they are 1, NaN's product NaN all the same.
   defp sign(:neg_infinity), do: -1.0
   defp sign(value) when value > 0, do: 1.0
   defp sign(value) when value < 0, do: -1.0
