@@ -80,13 +80,14 @@ sentence or two of why, and one line per rejected alternative. What a later deci
 deleted from the entry it was in, never marked superseded; git history keeps every version.
 
 - **A distribution's spread is above 0 and its location a number, and the normal quantile's
-  middle is bisected on `erf` (2026-11-01, Steve: "A", "A", increment 4's step 4; checked against
-  scales 1.4.0).** `{:probability, :normal, mean:, sd:}` and `{:probability, :logistic,
+  middle is bisected on `erf` (2026-11-01, Steve: "A", "A", increment 4's step 4, "Ok" for the
+  quartiles; checked against scales 1.4.0).** `{:probability, :normal, mean:, sd:}` and `{:probability, :logistic,
   location:, scale:}` take either keyword or both, R's defaults 0 and 1, `:probit` and `:logit`
   their standard forms; any other value is refused by guard, as a base is. The quantile bisected
   on the distribution was 25% off at p = 0.5 + 1 ulp, many quantiles sharing one distribution
-  double there: from 0.25 to 0.75 it is bisected on `erf(q / sqrt(2)) / 2` against `p - 0.5`,
-  exact there, within 5 ulps of R's, correctly rounded on 86% of 3,000 where R's is on 31%; the
+  double there: between 0.25 and 0.75 it is bisected on `erf(q / sqrt(2)) / 2` against `p - 0.5`,
+  exact there, the quartiles themselves on the distribution, which gives them correctly
+  rounded, as R's, where `erf` is a double off; within 5 ulps of R's, correctly rounded on 86% of 3,000 where R's is on 31%; the
   density splits `x * x` exactly first (Dekker), within 7 ulps of R's, nearer the truth where
   they part. *Rejected: R's positional parameters*: sd alone would spell out the mean.
   *Rejected: R's spread of 0*: every value at the mean. *Rejected: Wichura's AS241*: 50 typed
@@ -3932,6 +3933,9 @@ tells the story (`git show <hash>`). Until 2026-10-15 each milestone also had a 
 - 2026-11-01 — Add Hmisc's summaries to stat_summary(): mean_cl_normal, mean_sdl, median_hilow
   and a seeded mean_cl_boot (summaries, step 5); §4: "`mean_cl_boot` draws its resamples", "The
   Hmisc summaries take Hmisc's arguments"
+- 2026-11-01 — Carry asn, atanh, logit, probit and the normal and logistic probabilities
+  (transforms, step 4) (`6e2fa4f`); §4: "A distribution's spread", "A break turned back through an
+  inexact inverse", "A logarithm's or exponential's base"
 - 2026-11-01 — Carry the logarithms, log1p, the exponentials, asinh and the pseudo-logarithm
   (transforms, step 3) (`f99fb82`); §4: "A break turned back through an inexact inverse", "A
   logarithm's or exponential's base"

@@ -222,15 +222,15 @@ defmodule Scales.Double do
   # The inverse hyperbolic tangent, as R's `atanh()`: 1's plus infinity and -1's minus, NaN past
   # them and at the infinities, and a zero of either sign `0.0`, as R's. The platform's
   # (`:math.atanh/1`): R's is correctly rounded, and against it this one was 1 ulp off on 368 of
-  # 3,000 random values under glibc 2.39, exact where the platform's is correctly rounded too.
+  # 3,000 random values under glibc 2.39, exact where the platform's is correctly rounded too. An
+  # infinity or NaN, an atom, sorts above every number, so it is not between -1 and 1.
   @doc false
   @spec inverse_hyperbolic_tangent(operand()) :: operand()
-  def inverse_hyperbolic_tangent(value) when value in @infinities or value == :nan, do: :nan
   def inverse_hyperbolic_tangent(value) when value == 1, do: :infinity
   def inverse_hyperbolic_tangent(value) when value == -1, do: :neg_infinity
-  def inverse_hyperbolic_tangent(value) when value > 1 or value < -1, do: :nan
   def inverse_hyperbolic_tangent(value) when value == 0, do: 0.0
-  def inverse_hyperbolic_tangent(value), do: :math.atanh(value)
+  def inverse_hyperbolic_tangent(value) when value > -1 and value < 1, do: :math.atanh(value)
+  def inverse_hyperbolic_tangent(_beyond_one_infinity_or_nan), do: :nan
 
   # The sine, as R's `sin()`: NaN at the infinities, and a zero of either sign `0.0`, as R's. The
   # platform's (`:math.sin/1`).
@@ -241,13 +241,13 @@ defmodule Scales.Double do
   def sine(value), do: :math.sin(value)
 
   # The arcsine, as R's `asin()`: NaN past -1 and 1 and at the infinities, and a zero of either
-  # sign `0.0`, as R's. The platform's (`:math.asin/1`).
+  # sign `0.0`, as R's. The platform's (`:math.asin/1`). An infinity or NaN, an atom, sorts above
+  # every number, so it is not between -1 and 1.
   @doc false
   @spec arc_sine(operand()) :: operand()
-  def arc_sine(value) when value in @infinities or value == :nan, do: :nan
-  def arc_sine(value) when value > 1 or value < -1, do: :nan
   def arc_sine(value) when value == 0, do: 0.0
-  def arc_sine(value), do: :math.asin(value)
+  def arc_sine(value) when value >= -1 and value <= 1, do: :math.asin(value)
+  def arc_sine(_beyond_one_infinity_or_nan), do: :nan
 
   # 1 / sqrt(2), and its rounding error, 1 / sqrt(2) less the double nearest it.
   @reciprocal_square_root_of_two 0.7071067811865476
@@ -259,79 +259,82 @@ defmodule Scales.Double do
   # function for: `erfc(z) / 2` for `z = -value / sqrt(2)`, the rounding error in `z` found
   # exactly (Dekker's product, and 1 / sqrt(2)'s own rounding) and `erfc` moved by its derivative,
   # `-2 / sqrt(pi) * exp(-z^2)`, across it. Beyond 40 either side it is 0 or 1, as every double
-  # there is. Measured on 3,000 random values: within 3 ulps of R's, correctly rounded on 88% of
-  # them against a 60-digit truth, R's on 86%.
+  # there is, and the arithmetic would pass the largest double far beyond; plus infinity, an
+  # atom, sorts above every number, so is among those above 40. Measured on 3,000 random values:
+  # within 3 ulps of R's, correctly rounded on 88% of them against a 60-digit truth, R's on 86%.
   @doc false
   @spec normal_distribution(operand()) :: operand()
   def normal_distribution(:nan), do: :nan
-  def normal_distribution(:infinity), do: 1.0
   def normal_distribution(:neg_infinity), do: 0.0
-  def normal_distribution(value) when value > 40, do: 1.0
   def normal_distribution(value) when value < -40, do: 0.0
-  def normal_distribution(value), do: distribution_below(value / 1)
+  def normal_distribution(value) when value > 40, do: 1.0
+  def normal_distribution(value), do: distribution_below(value)
 
   # The standard normal quantile of `probability`, as R's `qnorm()`, which Erlang has no function
-  # for: bisected to neighbouring doubles, the nearer taken. Below 0.25 on the distribution
-  # (`normal_distribution/1`); from 0.25 to 0.5 on `erf(q / sqrt(2)) / 2` against
-  # `probability - 0.5`, exact there, with the rounding of `q / sqrt(2)` corrected as the
-  # distribution's is, since many quantiles near 0 share one distribution value near 0.5; above
-  # 0.5 by symmetry, `1 - probability` exact there. 0's and 1's are the infinities, NaN outside
-  # them. Measured on 3,000 random values: within 5 ulps of R's, correctly rounded on 86% of them
-  # against a 60-digit truth, R's on 31%. Below the smallest normal double, where one distribution
-  # double stands for a stretch of quantiles, it is one of them: at 5e-324, -38.475 where R gives
-  # -38.467; from about 1e-310 up, the stretch is under a double wide.
+  # for: bisected to neighbouring doubles, the nearer taken. To 0.25 on the distribution
+  # (`normal_distribution/1`), which gives the quartile correctly rounded; above it to 0.5 on
+  # `erf(q / sqrt(2)) / 2` against `probability - 0.5`, exact there, with the rounding of
+  # `q / sqrt(2)` corrected as the distribution's is, since many quantiles near 0 share one
+  # distribution value near 0.5 (correctly rounded on 218 of 300 from 0.25 to 0.45, where the
+  # distribution's bisection is on 122); above 0.5 by symmetry, `1 - probability` exact there.
+  # 0's and 1's are the infinities, NaN outside them. Measured on 3,000 random values: within 5
+  # ulps of R's, correctly rounded on 86% of them against a 60-digit truth, R's on 31%. Below the
+  # smallest normal double, where one distribution double stands for a stretch of quantiles, it
+  # is one of them: at 5e-324, -38.475 where R gives -38.467; from about 1e-310 up, the stretch is
+  # under a double wide. An infinity or NaN, an atom, sorts above every number, so it is between
+  # none of them.
   @doc false
   @spec normal_quantile(operand()) :: operand()
-  def normal_quantile(probability) when probability in @infinities or probability == :nan,
-    do: :nan
-
-  def normal_quantile(probability) when probability < 0 or probability > 1, do: :nan
   def normal_quantile(probability) when probability == 0, do: :neg_infinity
   def normal_quantile(probability) when probability == 1, do: :infinity
   def normal_quantile(probability) when probability == 0.5, do: 0.0
-  def normal_quantile(probability) when probability > 0.5, do: -lower_quantile(1.0 - probability)
-  def normal_quantile(probability), do: lower_quantile(probability / 1)
+
+  def normal_quantile(probability) when probability > 0 and probability < 0.5,
+    do: lower_quantile(probability)
+
+  def normal_quantile(probability) when probability > 0.5 and probability < 1,
+    do: -lower_quantile(1.0 - probability)
+
+  def normal_quantile(_outside_or_nan), do: :nan
 
   # The standard normal density, as R's `dnorm()`: `exp(-value^2 / 2) / sqrt(2 * pi)`, the square
   # split exactly into two doubles (Dekker's product) so its rounding is not raised to the power,
   # `exp(-high / 2) * exp(-low / 2)`. 0 at the infinities and beyond 40 either side, as every
   # double there is. Measured on 3,493 random values: within 7 ulps of R's, as often correctly
   # rounded against a 60-digit truth, and nearer it between 4 and 5 either side, where R's is up
-  # to 6 off it and this one 2.
+  # to 6 off it and this one 2. The square would pass the largest double far beyond 40; an
+  # infinity, an atom, sorts above every number, so is among those beyond it.
   @doc false
   @spec normal_density(operand()) :: operand()
   def normal_density(:nan), do: :nan
-  def normal_density(value) when value in @infinities, do: 0.0
   def normal_density(value) when value > 40 or value < -40, do: 0.0
 
   def normal_density(value) do
-    {high, low} = exact_product(value / 1, value / 1)
+    {high, low} = exact_product(value, value)
     @reciprocal_square_root_of_two_pi * (:math.exp(-high / 2) * :math.exp(-low / 2))
   end
 
+  # Where erfc underflows to 0, its step does too, so the distribution is 0.
   defp distribution_below(value) do
-    argument = -value * @reciprocal_square_root_of_two
-    complement = :math.erfc(argument)
-
-    if complement == 0.0,
-      do: 0.0,
-      else: 0.5 * (complement - error_function_step(-value, argument))
+    {argument, step} = error_function_argument(-value)
+    0.5 * (:math.erfc(argument) - step)
   end
 
   defp half_error_function(quantile) do
-    argument = quantile * @reciprocal_square_root_of_two
-    0.5 * (:math.erf(argument) + error_function_step(quantile, argument))
+    {argument, step} = error_function_argument(quantile)
+    0.5 * (:math.erf(argument) + step)
   end
 
-  # The error function's change across the rounding error in `argument`, the double nearest
-  # `value / sqrt(2)`: that error, found exactly, times the derivative, 2 / sqrt(pi) exp(-z^2).
-  defp error_function_step(value, argument) do
-    {product, product_error} = exact_product(value, @reciprocal_square_root_of_two)
-    error = product - argument + product_error + value * @reciprocal_square_root_of_two_error
-    error * @two_over_square_root_of_pi * :math.exp(-argument * argument)
+  # The double nearest `value / sqrt(2)`, and the error function's change across its rounding
+  # error: that error, found exactly (the product's, and 1 / sqrt(2)'s own), times the
+  # derivative, 2 / sqrt(pi) exp(-z^2).
+  defp error_function_argument(value) do
+    {argument, product_error} = exact_product(value, @reciprocal_square_root_of_two)
+    error = product_error + value * @reciprocal_square_root_of_two_error
+    {argument, error * @two_over_square_root_of_pi * :math.exp(-argument * argument)}
   end
 
-  defp lower_quantile(probability) when probability >= 0.25,
+  defp lower_quantile(probability) when probability > 0.25,
     do: bisect(&half_error_function/1, probability - 0.5, -0.7, 0.0)
 
   defp lower_quantile(probability), do: bisect(&distribution_below/1, probability, -40.0, 0.0)

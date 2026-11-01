@@ -572,6 +572,33 @@ defmodule Scales.TransformTest do
                   -0.20273255405408214
                 ]}
 
+      # y = c(0.01, 0.5, 0.99) under "probit"
+      assert axis(:probit, {-2.5589826614449249, 2.5589826614449249}) ==
+               {[{-0.67448975019608171, "0.25"}, {0.0, "0.50"}, {0.67448975019608171, "0.75"}],
+                [
+                  -1.3489795003921634,
+                  -1.0117346252941226,
+                  -0.33724487509804085,
+                  0.33724487509804085,
+                  1.0117346252941226,
+                  1.3489795003921634
+                ]}
+
+      # y = c(0.01, 0.5, 0.99) under transform_probability("norm", mean = 1, sd = 2)
+      assert axis(
+               {:probability, :normal, mean: 1, sd: 2},
+               {-4.1179653228898498, 6.1179653228898498}
+             ) ==
+               {[{-0.34897950039216341, "0.25"}, {1.0, "0.50"}, {2.3489795003921632, "0.75"}],
+                [
+                  -1.6979590007843268,
+                  -1.0234692505882452,
+                  0.32551024980391829,
+                  1.6744897501960816,
+                  3.0234692505882448,
+                  3.6979590007843264
+                ]}
+
       # y = c(0.01, 0.5, 0.99) under transform_probability("logis", location = 1, scale = 2)
       assert axis(
                {:probability, :logistic, location: 1, scale: 2},
@@ -588,10 +615,8 @@ defmodule Scales.TransformTest do
                 ]}
     end
 
-    # Golden: as above. The platform's atanh places R's -0.5 and 0.5 a double nearer zero, and the
-    # normal quantile is within 5 doubles of R's: at 0.25 R's is the nearer the truth, at 0.009,
-    # 0.01 and 0.015 the package's.
-    test "atanh's and the normal's positions are within their measured doubles of R's" do
+    # Golden: as above. The platform's atanh places R's -0.5 and 0.5 a double nearer zero.
+    test "atanh's positions are within a double of R's" do
       # y = c(-0.9, 0, 0.9) under "atanh"
       assert near_axis?(
                axis(:atanh, {-1.6194414385415423, 1.6194414385415423}),
@@ -606,42 +631,11 @@ defmodule Scales.TransformTest do
                 ]},
                1
              )
-
-      # y = c(0.01, 0.5, 0.99) under "probit"
-      assert near_axis?(
-               axis(:probit, {-2.5589826614449249, 2.5589826614449249}),
-               {[{-0.67448975019608171, "0.25"}, {0.0, "0.50"}, {0.67448975019608171, "0.75"}],
-                [
-                  -1.3489795003921634,
-                  -1.0117346252941226,
-                  -0.33724487509804085,
-                  0.33724487509804085,
-                  1.0117346252941226,
-                  1.3489795003921634
-                ]},
-               5
-             )
-
-      # y = c(0.01, 0.5, 0.99) under transform_probability("norm", mean = 1, sd = 2)
-      assert near_axis?(
-               axis(
-                 {:probability, :normal, mean: 1, sd: 2},
-                 {-4.1179653228898498, 6.1179653228898498}
-               ),
-               {[{-0.34897950039216341, "0.25"}, {1.0, "0.50"}, {2.3489795003921632, "0.75"}],
-                [
-                  -1.6979590007843268,
-                  -1.0234692505882452,
-                  0.32551024980391829,
-                  1.6744897501960816,
-                  3.0234692505882448,
-                  3.6979590007843264
-                ]},
-               5
-             )
     end
 
-    # y = c(0.00092, 0.0021) under "logit" and c(0.0091, 0.015) under "probit": turned back,
+    # y = c(0.00092, 0.0021) under "logit" and c(0.0091, 0.015) under "probit", the normal
+    # quantile within 5 doubles of R's, the package's the nearer the truth at 0.009, 0.01 and
+    # 0.015: turned back,
     # 0.0009 is 0.0009000000000000006, which plain decimals to 15 digits write
     # "0.000900000000000001"
     test "a probability labels each break turned back rounded to 14 significant digits" do
@@ -771,6 +765,16 @@ defmodule Scales.TransformTest do
 
       assert Transform.transform({:probability, :normal, mean: 1}, [0.5, 0.75]) ===
                Transform.transform({:probability, :normal, mean: 1, sd: 1}, [0.5, 0.75])
+
+      # Golden: R's transform_probability("norm", sd = 2) of 0.7212275324855 and
+      # 0.19690938852727413, and transform_probability("logis", scale = 2) of 0.1 and 0.75,
+      # each about R's default location of 0 (`inc4/step4/pins.R`, `pins2.R`)
+      assert {Transform.transform({:probability, :normal, sd: 2}, [
+                0.7212275324855,
+                0.19690938852727413
+              ]), Transform.transform({:probability, :logistic, scale: 2}, [0.1, 0.75])} ===
+               {[1.172984002905157, -1.7054249286588437],
+                [-4.3944491546724382, 2.1972245773362196]}
     end
   end
 

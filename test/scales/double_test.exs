@@ -257,7 +257,9 @@ defmodule Scales.DoubleTest do
     # pnorm(-1000) +0, pnorm(0.25) 0.5987063256829237; qnorm(-0) -Inf, qnorm(0.5) +0, qnorm(1)
     # Inf, qnorm(-1), qnorm(2) and qnorm(-Inf) NaN, qnorm(1e-300) -37.047096299361201; dnorm(-Inf)
     # and dnorm(40.5) +0, dnorm(-0) 0.3989422804014327, dnorm(-38.4) 2.5345567631655948e-321,
-    # dnorm(1) 0.24197072451914337 (`inc4/step4/edge.R`)
+    # dnorm(1) 0.24197072451914337 (`inc4/step4/edge.R`); pnorm(1e300) 1, pnorm(-1e300) 0,
+    # dnorm(1e200) and dnorm(-1e300) 0, where the arithmetic would pass the largest double
+    # (`inc4/step4/pins.R`)
     test "R's at each edge, 0 and 1 beyond 40 either side" do
       assert {Double.normal_distribution(:neg_infinity), Double.normal_distribution(-0.0),
               Double.normal_distribution(1.0e-300), Double.normal_distribution(40.5),
@@ -265,6 +267,10 @@ defmodule Scales.DoubleTest do
               Double.normal_distribution(-40.5), Double.normal_distribution(0.25),
               Double.normal_distribution(:nan)} ===
                {0.0, 0.5, 0.5, 1.0, 1.0, 0.0, 0.0, 0.5987063256829237, :nan}
+
+      assert {Double.normal_distribution(1.0e300), Double.normal_distribution(-1.0e300),
+              Double.normal_density(1.0e200), Double.normal_density(-1.0e300)} ===
+               {1.0, 0.0, 0.0, 0.0}
 
       assert {Double.normal_quantile(-0.0), Double.normal_quantile(0.5),
               Double.normal_quantile(1), Double.normal_quantile(-1.0),
@@ -278,6 +284,26 @@ defmodule Scales.DoubleTest do
               Double.normal_density(-38.4), Double.normal_density(1), Double.normal_density(:nan)} ===
                {0.0, 0.0, 0.0, 0.3989422804014327, 2.5345567631655948e-321, 0.24197072451914337,
                 :nan}
+    end
+  end
+
+  describe "normal_quantile/1's rounding" do
+    # Golden: R's qnorm() of 0.7212275324855, 0.19690938852727413, 0.5335679799318314, 0.25 and
+    # 0.75 (`inc4/step4/pins.R`, `edge.R`), each the double nearest the truth; the erf step's
+    # sign, the bisection's direction at a tie and its choice of the nearer end each move one of
+    # the first three a double off, and the erf middle the quartiles (`inc4/step4/replay/`).
+    test "R's quantile where it is correctly rounded, the quartiles among them" do
+      assert Enum.map(
+               [0.7212275324855, 0.19690938852727413, 0.5335679799318314, 0.25, 0.75],
+               &Double.normal_quantile/1
+             ) ===
+               [
+                 0.58649200145257852,
+                 -0.85271246432942183,
+                 0.084241981814811337,
+                 -0.67448975019608171,
+                 0.67448975019608171
+               ]
     end
   end
 
