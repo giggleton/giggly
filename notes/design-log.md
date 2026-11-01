@@ -3757,6 +3757,11 @@ tells the story (`git show <hash>`). Until 2026-10-15 each milestone also had a 
 `git log -S "<title>" -- notes/design-log.md` finds it in this file's history. The phases are
 §1's roadmap.
 
+- 2026-10-31 — Break axis and legend labels over lines, draw missing labels NA, and draw powers as
+  plotmath draws them (labels, step 6) (`def4123`, fixes `c6726c6`, `66602bb`); §4: "Every text a
+  guide draws breaks", "A guide drawing its labels together", "A missing label among powers", "A
+  plotmath sign is drawn in the symbol face", "`Font.box/5` measures", "A plotmath piece is a
+  text", and "A missing break's label" amended
 - 2026-10-31 — Wrap text and look labels up in a dictionary, and break a facet's wrapped strips by
   them (labels, step 5); §4: "`dictionary/2` matches", "`wrap/2` takes", "`wrap/2` counts a
   character", "Wrapping a strip's label"
