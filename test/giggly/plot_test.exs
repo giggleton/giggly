@@ -2864,11 +2864,13 @@ defmodule Giggly.PlotTest do
         for fun_data <- [
               :mean_cl_normal,
               {:mean_cl_normal, conf_int: 0},
+              {:mean_cl_normal, conf_int: 0.5},
               {:mean_cl_normal, mult: 1},
               :mean_sdl,
               {:mean_sdl, mult: 1},
               :median_hilow,
               {:median_hilow, conf_int: 1},
+              {:median_hilow, conf_int: 0},
               :mean_cl_boot,
               {:mean_cl_boot, seed: -3, resamples: 1, conf_int: 0.5},
               {:mean_cl_boot, []}
@@ -2880,11 +2882,13 @@ defmodule Giggly.PlotTest do
       assert recorded === [
                {:mean_cl_normal, conf_int: 0.95},
                {:mean_cl_normal, conf_int: 0.0},
+               {:mean_cl_normal, conf_int: 0.5},
                {:mean_cl_normal, mult: 1.0},
                {:mean_sdl, mult: 2.0},
                {:mean_sdl, mult: 1.0},
                {:median_hilow, conf_int: 0.95},
                {:median_hilow, conf_int: 1.0},
+               {:median_hilow, conf_int: 0.0},
                {:mean_cl_boot, conf_int: 0.95, resamples: 1000, seed: 0},
                {:mean_cl_boot, conf_int: 0.5, resamples: 1, seed: -3},
                {:mean_cl_boot, conf_int: 0.95, resamples: 1000, seed: 0}

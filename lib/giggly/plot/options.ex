@@ -4777,15 +4777,13 @@ defmodule Giggly.Plot.Options do
 
   defp check_summary_data_names(summary, arguments) do
     taken = summary_data_taken(summary)
-
-    names = if Keyword.keyword?(arguments), do: Keyword.keys(arguments), else: [:none]
-    distinct = Enum.uniq(names)
-
-    names_taken =
-      Enum.all?(names, fn name -> name in taken end) and length(names) == length(distinct)
-
+    names_taken = Keyword.keyword?(arguments) and taken_once?(Keyword.keys(arguments), taken)
     summary_data_names(summary, arguments, taken, names_taken)
   end
+
+  # Whether every name is one the summary takes, and none is given twice.
+  defp taken_once?(names, taken),
+    do: Enum.all?(names, fn name -> name in taken end) and names == Enum.uniq(names)
 
   defp summary_data_names(summary, arguments, taken, false) do
     listed = Enum.map_join(taken, ", ", fn name -> "#{name}:" end)
