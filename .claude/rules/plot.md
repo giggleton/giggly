@@ -344,7 +344,7 @@ stat and position" and "Each facet, coordinate system, geom, stat and position i
   given (R's `preserve`, `orientation` and `reverse` wait), dodging by clusters' `preserve:`,
   `padding:` 0 to 1 and `reverse:`, its `width:` waiting, and jittering's `width:` and `height:`,
   each 0 or more, a float, `:none` when not given, where R moves nothing for a negative one, and
-  `seed:`, any integer, 0 when not given; stacking, nudging and the identity take none. Its
+  `seed:`, any integer, 0 when not given; stacking and the identity take none. Its
   options never become the geom's (design-log §4, the entry beginning "Dodging by clusters takes
   `preserve:`"). A bar function's position is `:stack`, `:dodge` or `:dodge2`. **A range
   function's `position:` (`geom_linerange/3`, `geom_pointrange/3`, `geom_errorbar/3`,

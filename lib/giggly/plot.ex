@@ -122,11 +122,6 @@ defmodule Giggly.Plot do
       iex> plot |> Giggly.layer_data(1) |> Giggly.DataFrame.pull(:x)
       [0.0673789719000282, 1.0819934130875033]
 
-  ### Moving marks a set distance: `:nudge`
-
-  Every mark moves across by the layer's `nudge_x:` and up by its `nudge_y:`, in the units of each
-  axis. Text and labels are nudged by default. It takes no options.
-
   ## Colours
 
   A colour is a CSS colour name, such as `"steelblue"`, a hex colour, such as `"#4682B4"`, or
@@ -5853,7 +5848,6 @@ defmodule Giggly.Plot do
 
   defp position_struct(:identity, []), do: %Position.Identity{}
   defp position_struct(:stack, []), do: %Position.Stack{}
-  defp position_struct(:nudge, []), do: %Position.Nudge{}
   defp position_struct(:dodge, options), do: %Position.Dodge{width: width_given(options)}
   defp position_struct(:dodge2, options), do: struct!(Position.Dodge2, options)
 

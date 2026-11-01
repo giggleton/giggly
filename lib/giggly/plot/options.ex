@@ -438,7 +438,6 @@ defmodule Giggly.Plot.Options do
   @position_kind_options %{
     identity: [],
     stack: [],
-    nudge: [],
     dodge: [
       width: [
         type: {:custom, __MODULE__, :validate_width, []},

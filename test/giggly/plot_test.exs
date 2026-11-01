@@ -2829,6 +2829,12 @@ defmodule Giggly.PlotTest do
       assert [%Plot.Layer{geom: %Geom.Bar{just: +0.0}, position: %Position.Stack{}}] =
                Plot.stat_summary(plot, geom: :bar, position: :stack, just: 0).reversed_layers
 
+      assert [%Plot.Layer{position: %Position.Dodge{width: 0.5}}] =
+               Plot.stat_summary(plot, geom: :bar, position: {:dodge, width: 0.5}).reversed_layers
+
+      assert [%Plot.Layer{position: %Position.Dodge2{preserve: :total}}] =
+               Plot.stat_summary(plot, geom: :bar, position: :dodge2).reversed_layers
+
       assert [%Plot.Layer{position: %Position.Jitter{}}] =
                Plot.stat_summary(plot, geom: :point, position: :jitter).reversed_layers
 
