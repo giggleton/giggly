@@ -156,4 +156,121 @@ defmodule Scales.DoubleTest do
       assert_raise FunctionClauseError, fn -> Double.less?(:neg_infinity, nan) end
     end
   end
+
+  describe "logarithm/2, power/2 and exponential/1" do
+    # R's log(0, 3) is -Inf, log(-2, 3) and log(-Inf, 3) NaN, log(0.5, 3) -0.63092975357145742,
+    # 3^-Inf 0, 3^0.5 1.7320508075688772, 3^800 Inf, exp(-Inf) 0, exp(2) 7.3890560989306504 and
+    # exp(800) Inf (`inc4/step3/probe.R`)
+    test "a logarithm is minus infinity at zero and NaN below it, in base 2 and 10 their own" do
+      assert {Double.logarithm(0.0, 3), Double.logarithm(-0.0, 3), Double.logarithm(-2.0, 3),
+              Double.logarithm(:neg_infinity, 3), Double.logarithm(:infinity, 3),
+              Double.logarithm(:nan, 3), Double.logarithm(0.5, 3)} ===
+               {:neg_infinity, :neg_infinity, :nan, :nan, :infinity, :nan, -0.63092975357145742}
+
+      # log(1000, 10), where log(1000) / log(10) is 2.9999999999999996; log(3, 2), where
+      # log(3) / log(2) is 1.5849625007211563
+      assert {Double.logarithm(1000.0, 10), Double.logarithm(3.0, 2)} ===
+               {3.0, 1.5849625007211561}
+    end
+
+    test "a power and an exponential are zero at minus infinity and infinite past the largest double" do
+      assert {Double.power(3, :neg_infinity), Double.power(3, 0.5), Double.power(3, 800.0),
+              Double.power(3, :infinity), Double.power(3, :nan)} ===
+               {0.0, 1.7320508075688772, :infinity, :infinity, :nan}
+
+      assert {Double.exponential(:neg_infinity), Double.exponential(2.0),
+              Double.exponential(800.0), Double.exponential(:infinity), Double.exponential(:nan)} ===
+               {0.0, 7.3890560989306504, :infinity, :infinity, :nan}
+    end
+  end
+
+  describe "logarithm_of_one_plus/1 and exponential_minus_one/1" do
+    # R's log1p(-1) is -Inf, log1p(-2) and log1p(-Inf) NaN, log1p(-0) +0 on a vector,
+    # log1p(-1e-300) -1e-300, log1p(0.5) 0.40546510810816438; expm1(-Inf) -1, expm1(-1000) -1,
+    # expm1(-0) +0, expm1(-1e-300) -1e-300, expm1(-2) -0.8646647167633873, expm1(800) Inf
+    test "R's at each edge, a zero of either sign 0.0, and near zero the value itself" do
+      assert {Double.logarithm_of_one_plus(-1.0), Double.logarithm_of_one_plus(-2.0),
+              Double.logarithm_of_one_plus(:neg_infinity), Double.logarithm_of_one_plus(-0.0),
+              Double.logarithm_of_one_plus(-1.0e-300), Double.logarithm_of_one_plus(0.5),
+              Double.logarithm_of_one_plus(:infinity), Double.logarithm_of_one_plus(:nan)} ===
+               {:neg_infinity, :nan, :nan, 0.0, -1.0e-300, 0.40546510810816438, :infinity, :nan}
+
+      assert {Double.exponential_minus_one(:neg_infinity), Double.exponential_minus_one(-1000.0),
+              Double.exponential_minus_one(-0.0), Double.exponential_minus_one(-1.0e-300),
+              Double.exponential_minus_one(-2.0), Double.exponential_minus_one(800.0),
+              Double.exponential_minus_one(:infinity), Double.exponential_minus_one(:nan)} ===
+               {-1.0, -1.0, 0.0, -1.0e-300, -0.8646647167633873, :infinity, :infinity, :nan}
+    end
+  end
+
+  describe "hyperbolic_sine/1, hyperbolic_cosine/1 and inverse_hyperbolic_sine/1" do
+    # R's sinh(-0) and asinh(-0) are +0 on a vector, sinh(2) 3.626860407847019, sinh(-1000)
+    # -Inf, cosh(2) 3.7621956910836314, cosh(-1000) and cosh(-Inf) Inf, asinh(2)
+    # 1.4436354751788103
+    test "R's at each edge, a zero of either sign 0.0, past the largest double an infinity" do
+      assert {Double.hyperbolic_sine(-0.0), Double.hyperbolic_sine(2.0),
+              Double.hyperbolic_sine(-1000.0), Double.hyperbolic_sine(1000.0),
+              Double.hyperbolic_sine(:neg_infinity), Double.hyperbolic_sine(:nan)} ===
+               {0.0, 3.626860407847019, :neg_infinity, :infinity, :neg_infinity, :nan}
+
+      assert {Double.hyperbolic_cosine(2.0), Double.hyperbolic_cosine(-1000.0),
+              Double.hyperbolic_cosine(:neg_infinity), Double.hyperbolic_cosine(:nan)} ===
+               {3.7621956910836314, :infinity, :infinity, :nan}
+
+      assert {Double.inverse_hyperbolic_sine(-0.0), Double.inverse_hyperbolic_sine(2.0),
+              Double.inverse_hyperbolic_sine(:neg_infinity), Double.inverse_hyperbolic_sine(:nan)} ===
+               {0.0, 1.4436354751788103, :neg_infinity, :nan}
+    end
+
+    # Golden: `fixtures/r_elementary_4.6.1.csv` is R 4.6.1's asinh(), log1p() and expm1() at
+    # random doubles, from -1 up, tiny and huge (`inc4/step3/fixture.R`). R's asinh is correctly
+    # rounded, the platform's within 1 ulp of it (369 of 3,000 off under glibc 2.39); Goldberg's
+    # log1p is within 2 ulps of R's, Kahan's expm1 within 1.
+    test "asinh, log1p and expm1 are within their measured ulps of R's" do
+      bounds = %{"asinh" => 1, "log1p" => 2, "expm1" => 1}
+
+      functions = %{
+        "asinh" => &Double.inverse_hyperbolic_sine/1,
+        "log1p" => &Double.logarithm_of_one_plus/1,
+        "expm1" => &Double.exponential_minus_one/1
+      }
+
+      rows =
+        __DIR__
+        |> Path.join("fixtures/r_elementary_4.6.1.csv")
+        |> File.stream!()
+        |> Stream.drop(1)
+        |> Enum.map(fn line ->
+          [quoted, value, expected] =
+            line
+            |> String.trim()
+            |> String.split(",")
+
+          {String.trim(quoted, ~s(")), double(value), double(expected)}
+        end)
+
+      assert Enum.count(rows) == 1393
+
+      far =
+        Enum.reject(rows, fn {function, value, expected} ->
+          ulps(functions[function].(value), expected) <= bounds[function]
+        end)
+
+      assert far == []
+    end
+  end
+
+  # A number as R wrote it, `-1` among them.
+  defp double(text) do
+    {value, ""} = Float.parse(text)
+    value
+  end
+
+  # How many doubles apart two finite doubles are, each read from its bits in their order.
+  defp ulps(left, right), do: abs(ordinal(left) - ordinal(right))
+
+  defp ordinal(value) do
+    <<sign::1, magnitude::63>> = <<value::float>>
+    if sign == 1, do: -magnitude, else: magnitude
+  end
 end

@@ -112,7 +112,10 @@ R's regular ones: the entry beginning "The panel's grid lines are placed by the 
   infinities** (`t:Scales.double/0`; design-log §4, the entry beginning "A NaN is `:nan`"), and
   **`Scales.Double` is the one home of R's IEEE arithmetic on them**, an infinity past the largest
   double, NaN for 0/0, Inf − Inf and Inf × 0, a zero's sign read from its bit; its operators take
-  no `nil`, which their callers set aside first. Its tests pin R's answers.
+  no `nil`, which their callers set aside first. **It is the one home too of the elementary
+  functions transformations are built from**, a logarithm in a base, a power, log1p, expm1, the
+  hyperbolic sine and cosine and asinh, each R's at the infinities, NaN and zero; `Breaks` and
+  `Labels` take their logarithms from it. Its tests pin R's answers.
 - **The rescaling functions are R's `rescale()`, `rescale_mid()` and `rescale_max()` to the last
   digit** (`Scales.Bounds`), on lists as R's are on vectors, a `nil` in giving `nil` out, as R's
   `NA`, and NaN `:nan`, given or worked out; a value, an end or a midpoint may be an infinity,
@@ -168,11 +171,28 @@ R's regular ones: the entry beginning "The panel's grid lines are placed by the 
   `nil` and NaN; a date's, date-time's or time's has neither and raises, as R's has no
   derivatives and takes numbers. `trim_to_domain/2` gives `:none` with nothing to range over,
   where R warns at an empty `range()` (design-log §4, the entry beginning "A transformation gives R's doubles").
-- **log10's breaks are `Breaks.log/2`'s, five wanted unless `n:` says, in base 10**
-  (`Transform.Log10`), on the extent turned back into data units, put back into log space; its
-  test pins R's own axis, labels and minor breaks, for each of `breaks_log()`'s branches, and
-  compares its breaks with `Breaks.log/2`'s, whose test pins R's figures. sqrt, reverse and
-  reciprocal take extended breaks on the data range, as R's `extended_breaks()` does.
+- **A logarithm in a base's breaks are `Breaks.log/2`'s, five wanted unless `n:` says, in its
+  base** (`Transform.Log`: `:log` in base e, `:log2`, `:log10`, `{:log, base}`), on the extent
+  turned back into data units, put back into log space, so `:log`'s are powers of e; its test
+  pins R's own axis, labels and minor breaks, for each of `breaks_log()`'s branches, and compares
+  its breaks with `Breaks.log/2`'s, whose test pins R's figures. log1p, exp, asinh, the
+  pseudo-logarithm, sqrt, reverse and reciprocal take extended breaks on the data range, as R's
+  `extended_breaks()` does; an exponential's extent reaching zero or below is broken on its high
+  end alone, as R's breaks drop its NaN.
+- **Every transformation of scales 1.4.0 is a name** (design-log §4, the entries beginning "The
+  scales package carries every transformation" and "A logarithm's or exponential's base"): a base
+  is a number above 1 and a pseudo-logarithm's sigma above 0, each checked by guard where the name
+  is resolved, so `FunctionClauseError` wherever it is handed, where R also takes a falling base
+  below 1; `{:pseudo_log, ...}` takes `sigma:`, `base:` or both, once each. `{:log, 10}` and
+  `{:log, 2}` place every value where `:log10` and `:log2` do, as R's `log(x, base)` takes those
+  bases by their own functions; R's `exp(1)^x`, not `exp(x)`, is `:log`'s inverse and `:exp`.
+  Every value, derivative, domain and break is R's but where the platform's asinh is not
+  correctly rounded (asinh and the pseudo-logarithm, within 1 and 2 ulps of R's) and log1p's
+  and expm1's measured methods (within 2 and 1); R's `+0` for a negative zero from log1p, expm1,
+  asinh, sinh and the pseudo-logarithm on a vector. The derivatives are in the order that gave
+  R's doubles, the pseudo-logarithm's `1 / (sqrt(1 + x * x / (4 * sigma * sigma)) * 2 * sigma *
+  log(base))` alone of twelve. Their tests pin R's figures over the nine doubles, ggplot2's axes
+  and `test/scales/fixtures/r_elementary_4.6.1.csv`'s bounds.
 - **A date scale works in days since 1970-01-01, as R stores a date** (`Transform.Date`, R's
   `transform_date()`): a date is a float of its days, a missing one `nil`, and a position turned
   back the day it falls on, rounded down, as R's `format()` writes it; it trains, expands and
@@ -261,8 +281,9 @@ R's regular ones: the entry beginning "The panel's grid lines are placed by the 
 - **A number of breaks wanted, `n:`, reaches every transformation's own breaks but time's**
   (`Transform.breaks/3`, `format/4`; design-log §4, the entry beginning "`n:` reaches"), as R's
   `transformation$breaks(limits, n)`: extended breaks' under the identity, sqrt, reverse and
-  reciprocal, a whole number from 2, as R's search finds nothing for one and never ends for none;
-  `Breaks.log/2`'s under log10, from 1; R's `pretty()` under the date and date-time
+  reciprocal, log1p, exp, asinh and the pseudo-logarithm, a whole number from 2, as R's search
+  finds nothing for one and never ends for none; `Breaks.log/2`'s under a logarithm in a base,
+  from 1; R's `pretty()` under the date and date-time
   transformations, from 0, as R takes it, and their labels found with the same `n:`, as R's
   breaks carry theirs as names. Time refuses it, as R's `transform_hms()` takes no number.
 - **A width's breaks are exactly R's `fullseq()` and `breaks_width()`, on numbers, dates,
@@ -327,4 +348,8 @@ R's regular ones: the entry beginning "The panel's grid lines are placed by the 
 - **Labels are written the Elixir way, not R's** (`Scales.Labels.plain/1`): `inspect`'s plain
   decimals, rounded to 15 significant digits, as many decimals on every label as the most precise
   needs, none when all are whole, negative zero as `0`, never scientific, no thousands separators,
-  so a log axis's `1e+05` is written `100000`.
+  so a log axis's `1e+05` is written `100000` and a natural one's powers of e to 15 digits. **A
+  break turned back through an inverse that does not give it back exactly is rounded to 14
+  significant digits first** (`Labels.plain_round_tripped/1`: log1p's, exp's, asinh's, the
+  pseudo-logarithm's), so `10000` under sigma 2, base 10 is not `9999.99999999999`; its test and
+  the axes' pin it.

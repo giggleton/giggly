@@ -15,8 +15,8 @@ defmodule Scales.Transform do
   whole axis, so `format/3` is handed the extent too. A date, date-time or time transformation
   also lays breaks a calendar or clock step apart (`width/3`).
 
-  A value the transformation cannot place, below log10's or the square root's domain, becomes
-  `:nan`, R's `NaN`; a value placed at an infinity is `:infinity` or `:neg_infinity`, and a
+  A value the transformation cannot place, below a logarithm's or the square root's domain,
+  becomes `:nan`, R's `NaN`; a value placed at an infinity is `:infinity` or `:neg_infinity`, and a
   missing one stays `nil`.
   """
 
@@ -37,8 +37,13 @@ defmodule Scales.Transform do
   # records with its time zone and the database that reads it, `{:datetime, zone, database}`, as
   # R's `transform_time(tz)` holds its zone; the time-of-day transformation (`Transform.Time`),
   # which a scale of times records, as ggplot2's `scale_x_time()` records `transform_hms()`; and
-  # log10, square root, reverse and reciprocal (`Transform.Log10`, `Transform.Sqrt`,
-  # `Transform.Reverse`, `Transform.Reciprocal`), which a plot's scale names. Every callback is
+  # the logarithms in a base above 1 (`Transform.Log`: `:log`, `:log2`, `:log10`, `{:log, base}`),
+  # log1p, exponentials (`Transform.Exp`: `:exp`, `{:exp, base}`), the inverse hyperbolic sine,
+  # the pseudo-logarithm, square root, reverse and reciprocal (`Transform.Log1p`,
+  # `Transform.Asinh`, `Transform.PseudoLog`, `Transform.Sqrt`, `Transform.Reverse`,
+  # `Transform.Reciprocal`), which a plot's scale names. A name holding a base or a sigma is
+  # refused where it is resolved unless each is a number in range, so every callback reads them
+  # unchecked. Every callback is
   # handed the transformation as the scale records it, so one that holds more than its name reads
   # it, as R's object's functions close over theirs. Each finds its
   # breaks as ggplot2's `get_breaks()` does, on the extent turned back into data units, and returns
@@ -55,34 +60,56 @@ defmodule Scales.Transform do
                       type: :non_neg_integer,
                       doc:
                         "The number of breaks wanted, five when not given, for every " <>
-                          "transformation but `:time`: from 2 for the identity, square root, " <>
-                          "reverse and reciprocal, from 1 for log10, and from 0 for dates and " <>
-                          "date-times, as R's own breaks take it."
+                          "transformation but `:time`: from 1 for the logarithms in a base " <>
+                          "(`:log`, `:log2`, `:log10`, `{:log, base}`), from 0 for dates and " <>
+                          "date-times, and from 2 for the rest, as R's own breaks take it."
                     ]
                   )
 
   @typedoc """
-  A transformation, by name: `:identity`, R's `transform_identity()`; `:log10`, `:sqrt`,
-  `:reverse` (each value negated) and `:reciprocal`, R's `transform_log10()` and its kin; `:date`,
+  A transformation, by name: `:identity`, R's `transform_identity()`; `:log` (base e), `:log2`,
+  `:log10` and `{:log, base}`, R's `transform_log()`, `transform_log2()`, `transform_log10()` and
+  `transform_log(base)`; `:log1p`, R's `transform_log1p()`; `:exp` (base e) and `{:exp, base}`,
+  R's `transform_exp()`; `:asinh`, R's `transform_asinh()`; `:pseudo_log` and
+  `{:pseudo_log, sigma: sigma, base: base}`, either or both, R's
+  `transform_pseudo_log(sigma = 1, base = exp(1))`; `:sqrt`, `:reverse` (each value negated) and
+  `:reciprocal`, R's `transform_sqrt()` and its kin; `:date`,
   a `Date` as its days since 1970-01-01, R's `transform_date()`; `{:datetime, zone, database}`, a
   `DateTime` or `NaiveDateTime` as its seconds since 1970-01-01 00:00 UTC, its breaks laid on
   the clock of `zone`, read by the time zone database `database`, R's `transform_time(tz)`, the
   zone `:default` until a column settles it and `:naive` for naive date-times; and `:time`, a
   `Time` as its seconds since midnight, R's `transform_hms()`.
+
+  A base is a number above 1 and a sigma a number above 0, and a name holding any other raises
+  `FunctionClauseError` wherever it is handed, where R also takes a base below 1, falling, and
+  gives no axis at 1. A falling axis is the transformation in a base above 1 reversed.
   """
   @type name ::
           :identity
           | :date
           | {:datetime, String.t() | :default | :naive, module()}
           | :time
+          | :log
+          | :log2
           | :log10
+          | {:log, number()}
+          | :log1p
+          | :exp
+          | {:exp, number()}
+          | :asinh
+          | :pseudo_log
+          | {:pseudo_log, [sigma: number(), base: number()]}
           | :sqrt
           | :reverse
           | :reciprocal
 
-  # The date, date-time and time transformations, whose data are not numbers; the date-time one
-  # is the only name a tuple.
-  defguardp is_temporal(name) when name in [:date, :time] or is_tuple(name)
+  # The date, date-time and time transformations, whose data are not numbers.
+  defguardp is_temporal(name)
+            when name in [:date, :time] or (is_tuple(name) and elem(name, 0) == :datetime)
+
+  # A base a logarithm, an exponential or a pseudo-logarithm takes, and a pseudo-logarithm's sigma.
+  defguardp is_base(base) when is_number(base) and base > 1
+  defguardp is_sigma(sigma) when is_number(sigma) and sigma > 0
 
   # The values in transformed space: a number, `nil`, `:infinity`, `:neg_infinity` or `:nan` each,
   # a value outside the domain `:nan`, R's NaN.
@@ -270,13 +297,14 @@ defmodule Scales.Transform do
   @doc """
   The default breaks, in transformed space, of an axis showing `extent` under the transformation
   `name`, in the order the transformation leaves them: extended breaks (`Scales.Breaks`) on the
-  extent in data units, powers of ten under log10, calendar dates under the date
+  extent in data units, powers of the base and their multiples under a logarithm in a base
+  (`Scales.Breaks.log/2`, so powers of e under `:log`), calendar dates under the date
   transformation and clock times under the date-time one, as R's `pretty()` finds them, and
   spans of time under the time one, as `Scales.Breaks.timespan/2` finds them.
 
-  `n:` asks for that many: of `Scales.Breaks.extended/2` under the identity, square root, reverse
-  and reciprocal transformations, of `Scales.Breaks.log/2` under log10, and of R's `pretty()`
-  under the date and date-time ones. The time transformation counts no breaks, as R's takes no
+  `n:` asks for that many: of `Scales.Breaks.log/2` under a logarithm in a base, of R's
+  `pretty()` under the date and date-time transformations, and of `Scales.Breaks.extended/2`
+  under the rest. The time transformation counts no breaks, as R's takes no
   number, and raises `ArgumentError` for it; `Scales.Breaks.timespan/2` takes one.
 
   ## Options
@@ -394,7 +422,22 @@ defmodule Scales.Transform do
   defp module(:date), do: Transform.Date
   defp module({:datetime, _zone, _database}), do: Transform.Datetime
   defp module(:time), do: Transform.Time
-  defp module(:log10), do: Transform.Log10
+  defp module(name) when name in [:log, :log2, :log10], do: Transform.Log
+  defp module({:log, base}) when is_base(base), do: Transform.Log
+  defp module(:log1p), do: Transform.Log1p
+  defp module(:exp), do: Transform.Exp
+  defp module({:exp, base}) when is_base(base), do: Transform.Exp
+  defp module(:asinh), do: Transform.Asinh
+  defp module(:pseudo_log), do: Transform.PseudoLog
+  defp module({:pseudo_log, [sigma: sigma]}) when is_sigma(sigma), do: Transform.PseudoLog
+  defp module({:pseudo_log, [base: base]}) when is_base(base), do: Transform.PseudoLog
+
+  defp module({:pseudo_log, [sigma: sigma, base: base]}) when is_sigma(sigma) and is_base(base),
+    do: Transform.PseudoLog
+
+  defp module({:pseudo_log, [base: base, sigma: sigma]}) when is_sigma(sigma) and is_base(base),
+    do: Transform.PseudoLog
+
   defp module(:sqrt), do: Transform.Sqrt
   defp module(:reverse), do: Transform.Reverse
   defp module(:reciprocal), do: Transform.Reciprocal

@@ -147,8 +147,11 @@ defmodule Scales.Labels do
   #
   # Its options are checked by NimbleOptions, which the `Scales` boundary lists for it.
 
-  alias Scales.{DataRange, DateBreaks}
+  alias Scales.{DataRange, DateBreaks, Double}
   alias Scales.Labels.{Arithmetic, DateFormat, Format, Wrap}
+
+  # The significant digits a break turned back through an inexact inverse is written to.
+  @round_trip_digits 14
 
   @typedoc "A step for `scale_cut:`: the suffix written after a label, and the threshold it starts at."
   @type step :: {String.t(), number()}
@@ -1424,6 +1427,19 @@ defmodule Scales.Labels do
     Enum.map(rounded, fn value -> :erlang.float_to_binary(value, decimals: decimals) end)
   end
 
+  # Plain decimals of breaks turned back through an inverse that does not give a break back
+  # exactly, log1p's, exp's, asinh's and the pseudo-logarithm's, so `10000` comes back
+  # `9999.999999999989`: each rounded to 14 significant digits (R's `signif()`) before `plain/1`
+  # writes it. Against the labels of the breaks as found in data units, at 15 digits up to 40% of
+  # random axes showed the round trip's error, at 14 none of 28,000; R hides it by writing 7.
+  @doc false
+  @spec plain_round_tripped([float()]) :: [String.t()]
+  def plain_round_tripped(values) do
+    values
+    |> Enum.map(fn value -> Arithmetic.signif(value, @round_trip_digits) end)
+    |> plain()
+  end
+
   # Rounds through the 15-significant-digit scientific form; a zero of either sign becomes 0.0.
   # `:erlang.float_to_binary/2` takes a negative `scientific:` precision without complaint and uses
   # its default of six decimals, where a negative `decimals:` raises, so the example with a break
@@ -2161,7 +2177,7 @@ defmodule Scales.Labels do
 
     exponents =
       Enum.map(values, fn value ->
-        value && Arithmetic.logarithm(logged(value, signed), settings.base)
+        value && Double.logarithm(logged(value, signed), settings.base)
       end)
 
     texts =

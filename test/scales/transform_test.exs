@@ -294,6 +294,212 @@ defmodule Scales.TransformTest do
     end
   end
 
+  describe "the logarithms in a base" do
+    test "mark the powers of the base, e's under the natural logarithm, labelled in data units" do
+      # y = c(1, 1000) and c(0.5, 20) under scale_y_continuous(transform = "log"); R writes the
+      # powers of e with format(), "2.718282", the package in plain decimals
+      assert axis(:log, {-0.34538776394910686, 7.253143042931244}) ==
+               {[
+                  {1.0, "2.71828182845905"},
+                  {3.0, "20.08553692318770"},
+                  {5.0, "148.41315910257700"},
+                  {7.0, "1096.63315842846009"}
+                ], [0.0, 2.0, 4.0, 6.0]}
+
+      assert axis(:log, {-0.87759115326564208, 3.1801762462596876}) ==
+               {[
+                  {0.0, "1.00000000000000"},
+                  {1.0, "2.71828182845905"},
+                  {2.0, "7.38905609893065"},
+                  {3.0, "20.08553692318770"}
+                ], [-0.5, 0.5, 1.5, 2.5]}
+
+      # y = c(1, 64) and c(0.3, 3) under "log2"; y = c(2, 30) under transform_log(3)
+      assert axis(:log2, {-0.30000000000000004, 6.2999999999999998}) ==
+               {[{1.0, "2"}, {3.0, "8"}, {5.0, "32"}], [0.0, 2.0, 4.0, 6.0]}
+
+      assert axis(:log2, {-1.9030619989105744, 1.7510589054655243}) ==
+               {[{-1.0, "0.5"}, {0.0, "1.0"}, {1.0, "2.0"}], [-1.5, -0.5, 0.5, 1.5]}
+
+      assert axis({:log, 3}, {0.50768107753556102, 3.2191519503252808}) ==
+               {[{1.0, "3"}, {2.0, "9"}, {3.0, "27"}], [1.5, 2.5]}
+    end
+
+    test "in base 10 and 2, place, break and label every value as log10 and log2 do" do
+      # y = c(2000, 9000) under transform_log(10), R's axis under "log10" too
+      assert axis({:log, 10}, {3.2683693699752139, 3.9869031351280921}) ==
+               {[
+                  {3.3010299956639813, "2000"},
+                  {3.4771212547196626, "3000"},
+                  {3.6989700043360187, "5000"}
+                ],
+                [3.3890756251918219, 3.5880456295278407, 3.7870156338638594, 3.8750612633917001]}
+
+      values = [1.0e-300, 0.3, 3.0, 7.0e5, 1.7e308]
+
+      assert {Transform.transform({:log, 10}, values), Transform.transform({:log, 2}, values)} ===
+               {Transform.transform(:log10, values), Transform.transform(:log2, values)}
+    end
+
+    # As log10's: the breaks are `Breaks.log/2`'s on the extent turned back, in the base.
+    test "breaks are breaks_log()'s in the base on the extent in data units" do
+      extent = {0.3, 4.1}
+
+      expected =
+        {:math.pow(3, 0.3), :math.pow(3, 4.1)}
+        |> Breaks.log(n: 5, base: 3)
+        |> Enum.map(fn break -> :math.log(break) / :math.log(3) end)
+
+      assert Transform.breaks({:log, 3}, extent) == expected
+    end
+  end
+
+  describe "log1p, exp, asinh and the pseudo-logarithm" do
+    # Golden: ggplot2's axes, as the log10 ones above (`inc4/step3/axes.R`).
+    test "take extended breaks in data units, labelled there" do
+      # y = c(0, 100) and c(-0.5, 10) under "log1p"
+      assert axis(:log1p, {-0.23075602584206301, 4.8458765426833228}) ==
+               {[
+                  {0.0, "0"},
+                  {3.2580965380214821, "25"},
+                  {3.9318256327243257, "50"},
+                  {4.3307333402863311, "75"},
+                  {4.6151205168412597, "100"},
+                  {4.836281906951478, "125"}
+                ],
+                [
+                  1.6290482690107411,
+                  3.5949610853729039,
+                  4.1312794865053286,
+                  4.4729269285637958,
+                  4.7257012118963688
+                ]}
+
+      assert axis(:log1p, {-0.84769930322786113, 2.5524473954662863}) ==
+               {[
+                  {0.0, "0"},
+                  {1.3862943611198906, "3"},
+                  {1.9459101490553132, "6"},
+                  {2.3025850929940459, "9"}
+                ],
+                [
+                  -0.69314718055994529,
+                  0.69314718055994529,
+                  1.6661022550876019,
+                  2.1242476210246797
+                ]}
+
+      # y = c(0, 3) under "exp": the extent turned back reaches -3
+      assert axis(:exp, {0.045723153840616759, 21.039813769347049}) ==
+               {[
+                  {0.049787068367863951, "-3"},
+                  {0.1353352832366127, "-2"},
+                  {0.36787944117144233, "-1"},
+                  {1.0, "0"},
+                  {2.7182818284590451, "1"},
+                  {7.3890560989306495, "2"},
+                  {20.085536923187664, "3"}
+                ],
+                [
+                  0.092561175802238327,
+                  0.25160736220402752,
+                  0.68393972058572117,
+                  1.8591409142295225,
+                  5.0536689636948466,
+                  13.737296511059157,
+                  20.128311030622037,
+                  20.171085138056412
+                ]}
+
+      # y = c(-100, 100) and c(0, 1000) under "asinh"
+      assert axis(:asinh, {-5.8281766021716477, 5.8281766021716477}) ==
+               {[{-5.2983423656105888, "-100"}, {0.0, "0"}, {5.2983423656105888, "100"}],
+                [-2.6491711828052944, 2.6491711828052944]}
+
+      assert axis(:asinh, {-0.38004513547709945, 7.980947845019088}) ==
+               {[{0.0, "0"}, {6.9077562789806368, "500"}, {7.6009027095419883, "1000"}],
+                [3.4538781394903184, 7.254329494261313]}
+
+      # y = c(-100, 100) under "pseudo_log"; y = c(0, 50) under transform_pseudo_log(0.5)
+      assert axis(:pseudo_log, {-5.0657971880905661, 5.0657971880905661}) ==
+               {[{-4.6052701709914237, "-100"}, {0.0, "0"}, {4.6052701709914237, "100"}],
+                [-2.3026350854957118, 2.3026350854957118]}
+
+      assert axis({:pseudo_log, sigma: 0.5}, {-0.2302635085495712, 4.8355336795409949}) ==
+               {[
+                  {0.0, "0"},
+                  {3.6895038689889055, "20"},
+                  {4.3821828480654981, "40"},
+                  {4.7875611799938103, "60"}
+                ], [1.8447519344944527, 4.0358433585272016, 4.5848720140296546]}
+    end
+
+    # y = c(-1000, 1e4) under transform_pseudo_log(2, 10): turned back, 10000 is
+    # 9999.999999999989, which plain decimals to 15 digits write "9999.99999999999"
+    test "label each break turned back rounded to 14 significant digits" do
+      assert axis({:pseudo_log, base: 10, sigma: 2}, {-3.0188688296640893, 4.0188671098683626}) ==
+               {[
+                  {0.0, "0"},
+                  {3.3979400781591376, "5000"},
+                  {3.6989700217077965, "10000"},
+                  {3.8750612711124903, "15000"},
+                  {4.0000000043429447, "20000"}
+                ],
+                [
+                  -1.6989700390795688,
+                  1.6989700390795688,
+                  3.5484550499334668,
+                  3.7870156464101434,
+                  3.9375306377277175
+                ]}
+    end
+
+    # y = c(0, 10) under transform_exp(2): the extent's low end, -50.15, has no logarithm, so R's
+    # extended breaks give its high end, log2(1075.15), five times, as a reciprocal's do
+    test "an exponential's extent reaching below zero is broken on its high end alone" do
+      assert axis({:exp, 2}, {-50.150000000000006, 1075.1500000000001}) ==
+               {List.duplicate({1075.1500000000001, "10.070322236718"}, 5), []}
+    end
+  end
+
+  describe "a base or a sigma" do
+    # R takes a base below 1, falling, and gives garbage or fails at 1, 0, below 0 and NA; a sigma
+    # below 0 flips the axis and 0 places every value at an infinity (`inc4/step3/params.R`).
+    test "a base not above 1 or a sigma not above 0 is refused wherever the name is handed" do
+      for name <- [
+            {:log, 1},
+            {:log, 0.5},
+            {:log, -2},
+            {:log, :infinity},
+            {:log, nil},
+            {:exp, 1.0},
+            {:exp, 0.5},
+            {:pseudo_log, sigma: 0},
+            {:pseudo_log, sigma: -1},
+            {:pseudo_log, base: 1},
+            {:pseudo_log, sigma: 1, base: 0.5},
+            {:pseudo_log, base: 10, sigma: 0}
+          ] do
+        assert_raise FunctionClauseError, fn -> Transform.transform(name, [1.0]) end
+        assert_raise FunctionClauseError, fn -> Transform.breaks(name, {0.0, 1.0}) end
+      end
+    end
+
+    test "a pseudo-logarithm takes sigma:, base: or both, once each, and nothing else" do
+      for name <- [
+            {:pseudo_log, []},
+            {:pseudo_log, sigma: 1, sigma: 2},
+            {:pseudo_log, sigma: 1, bass: 10},
+            {:pseudo_log, %{sigma: 1}}
+          ] do
+        assert_raise FunctionClauseError, fn -> Transform.transform(name, [1.0]) end
+      end
+
+      assert Transform.transform({:pseudo_log, base: :math.exp(1), sigma: 1}, [2.0]) ===
+               Transform.transform(:pseudo_log, [2.0])
+    end
+  end
+
   describe "R's doubles" do
     # Golden: each transformation's `transform`, `d_transform` and `d_inverse` of these values in
     # R (`inc4/step2/probe.R`), a zero's sign read as `1 / x`.
@@ -402,6 +608,460 @@ defmodule Scales.TransformTest do
                 derivatives}
     end
 
+    # Golden: R's for step 3's transformations (`inc4/step3/probe.R`), inverses but at `NA`, the
+    # infinities' and zeros' in R's IEEE arithmetic, a zero of either sign `+0` from log1p,
+    # expm1, asinh, sinh and the pseudo-logarithm, as R's on a vector. Two are the package's own,
+    # agreed departures: log1p(2), by Goldberg's method, 1 ulp above R's 1.0986122886681096, and
+    # the pseudo-logarithm's of 0.5 in sigma 2, base 10, through the platform's asinh, 2 ulps
+    # below R's 0.054146423209630819.
+    @log1p_of_two 1.0986122886681098
+    @pseudo_log_of_half 0.054146423209630812
+    @r_doubles [
+      {:log,
+       {[
+          :nan,
+          :nan,
+          :neg_infinity,
+          :neg_infinity,
+          -0.69314718055994529,
+          0.69314718055994529,
+          :infinity,
+          nil,
+          :nan
+        ],
+        [
+          0.0,
+          0.1353352832366127,
+          1.0,
+          1.0,
+          1.6487212707001282,
+          7.3890560989306495,
+          :infinity,
+          :nan
+        ], [-0.0, -0.5, :neg_infinity, :infinity, 2.0, 0.5, 0.0, nil, :nan],
+        [
+          0.0,
+          0.1353352832366127,
+          1.0,
+          1.0,
+          1.6487212707001282,
+          7.3890560989306495,
+          :infinity,
+          nil,
+          :nan
+        ]}},
+      {:log2,
+       {[:nan, :nan, :neg_infinity, :neg_infinity, -1.0, 1.0, :infinity, nil, :nan],
+        [0.0, 0.25, 1.0, 1.0, 1.4142135623730951, 4.0, :infinity, :nan],
+        [
+          -0.0,
+          -0.72134752044448169,
+          :neg_infinity,
+          :infinity,
+          2.8853900817779268,
+          0.72134752044448169,
+          0.0,
+          nil,
+          :nan
+        ],
+        [
+          0.0,
+          0.17328679513998632,
+          0.69314718055994529,
+          0.69314718055994529,
+          0.98025814346854723,
+          2.7725887222397811,
+          :infinity,
+          nil,
+          :nan
+        ]}},
+      {{:log, 3},
+       {[
+          :nan,
+          :nan,
+          :neg_infinity,
+          :neg_infinity,
+          -0.63092975357145742,
+          0.63092975357145742,
+          :infinity,
+          nil,
+          :nan
+        ], [0.0, 0.1111111111111111, 1.0, 1.0, 1.7320508075688772, 9.0, :infinity, :nan],
+        [
+          -0.0,
+          -0.45511961331341866,
+          :neg_infinity,
+          :infinity,
+          1.8204784532536746,
+          0.45511961331341866,
+          0.0,
+          nil,
+          :nan
+        ],
+        [
+          0.0,
+          0.12206803207423442,
+          1.0986122886681098,
+          1.0986122886681098,
+          1.9028523017926919,
+          9.8875105980129874,
+          :infinity,
+          nil,
+          :nan
+        ]}},
+      {{:log, 10},
+       {[
+          :nan,
+          :nan,
+          :neg_infinity,
+          :neg_infinity,
+          -0.3010299956639812,
+          0.3010299956639812,
+          :infinity,
+          nil,
+          :nan
+        ], [0.0, 0.01, 1.0, 1.0, 3.1622776601683795, 100.0, :infinity, :nan],
+        [
+          -0.0,
+          -0.21714724095162588,
+          :neg_infinity,
+          :infinity,
+          0.86858896380650352,
+          0.21714724095162588,
+          0.0,
+          nil,
+          :nan
+        ],
+        [
+          0.0,
+          0.023025850929940458,
+          2.3025850929940459,
+          2.3025850929940459,
+          7.2814134002118021,
+          230.25850929940458,
+          :infinity,
+          nil,
+          :nan
+        ]}},
+      {:log1p,
+       {[:nan, :nan, 0.0, 0.0, 0.40546510810816438, @log1p_of_two, :infinity, nil, :nan],
+        [
+          -1.0,
+          -0.8646647167633873,
+          0.0,
+          0.0,
+          0.64872127070012819,
+          6.3890560989306504,
+          :infinity,
+          :nan
+        ], [-0.0, -1.0, 1.0, 1.0, 0.66666666666666663, 0.33333333333333331, 0.0, nil, :nan],
+        [
+          0.0,
+          0.1353352832366127,
+          1.0,
+          1.0,
+          1.6487212707001282,
+          7.3890560989306504,
+          :infinity,
+          nil,
+          :nan
+        ]}},
+      {:exp,
+       {[
+          0.0,
+          0.1353352832366127,
+          1.0,
+          1.0,
+          1.6487212707001282,
+          7.3890560989306495,
+          :infinity,
+          nil,
+          :nan
+        ],
+        [
+          :nan,
+          :nan,
+          :neg_infinity,
+          :neg_infinity,
+          -0.69314718055994529,
+          0.69314718055994529,
+          :infinity,
+          :nan
+        ],
+        [
+          0.0,
+          0.1353352832366127,
+          1.0,
+          1.0,
+          1.6487212707001282,
+          7.3890560989306495,
+          :infinity,
+          nil,
+          :nan
+        ], [-0.0, -0.5, :neg_infinity, :infinity, 2.0, 0.5, 0.0, nil, :nan]}},
+      {{:exp, 2},
+       {[0.0, 0.25, 1.0, 1.0, 1.4142135623730951, 4.0, :infinity, nil, :nan],
+        [:nan, :nan, :neg_infinity, :neg_infinity, -1.0, 1.0, :infinity, :nan],
+        [
+          0.0,
+          0.17328679513998632,
+          0.69314718055994529,
+          0.69314718055994529,
+          0.98025814346854723,
+          2.7725887222397811,
+          :infinity,
+          nil,
+          :nan
+        ],
+        [
+          -0.0,
+          -0.72134752044448169,
+          :neg_infinity,
+          :infinity,
+          2.8853900817779268,
+          0.72134752044448169,
+          0.0,
+          nil,
+          :nan
+        ]}},
+      {{:exp, 10},
+       {[0.0, 0.01, 1.0, 1.0, 3.1622776601683795, 100.0, :infinity, nil, :nan],
+        [
+          :nan,
+          :nan,
+          :neg_infinity,
+          :neg_infinity,
+          -0.3010299956639812,
+          0.3010299956639812,
+          :infinity,
+          :nan
+        ],
+        [
+          0.0,
+          0.023025850929940458,
+          2.3025850929940459,
+          2.3025850929940459,
+          7.2814134002118021,
+          230.25850929940458,
+          :infinity,
+          nil,
+          :nan
+        ],
+        [
+          -0.0,
+          -0.21714724095162588,
+          :neg_infinity,
+          :infinity,
+          0.86858896380650352,
+          0.21714724095162588,
+          0.0,
+          nil,
+          :nan
+        ]}},
+      {:asinh,
+       {[
+          :neg_infinity,
+          -1.4436354751788103,
+          0.0,
+          0.0,
+          0.48121182505960347,
+          1.4436354751788103,
+          :infinity,
+          nil,
+          :nan
+        ],
+        [
+          :neg_infinity,
+          -3.626860407847019,
+          0.0,
+          0.0,
+          0.52109530549374738,
+          3.626860407847019,
+          :infinity,
+          :nan
+        ],
+        [
+          0.0,
+          0.44721359549995793,
+          1.0,
+          1.0,
+          0.89442719099991586,
+          0.44721359549995793,
+          0.0,
+          nil,
+          :nan
+        ],
+        [
+          :infinity,
+          3.7621956910836314,
+          1.0,
+          1.0,
+          1.1276259652063807,
+          3.7621956910836314,
+          :infinity,
+          nil,
+          :nan
+        ]}},
+      {:pseudo_log,
+       {[
+          :neg_infinity,
+          -0.88137358701954305,
+          0.0,
+          0.0,
+          0.24746646154726346,
+          0.88137358701954305,
+          :infinity,
+          nil,
+          :nan
+        ],
+        [
+          :neg_infinity,
+          -7.253720815694038,
+          0.0,
+          0.0,
+          1.0421906109874948,
+          7.253720815694038,
+          :infinity,
+          :nan
+        ],
+        [
+          0.0,
+          0.35355339059327373,
+          0.5,
+          0.5,
+          0.48507125007266594,
+          0.35355339059327373,
+          0.0,
+          nil,
+          :nan
+        ],
+        [
+          :infinity,
+          7.5243913821672628,
+          2.0,
+          2.0,
+          2.2552519304127614,
+          7.5243913821672628,
+          :infinity,
+          nil,
+          :nan
+        ]}},
+      {{:pseudo_log, sigma: 2, base: 10},
+       {[
+          :neg_infinity,
+          -0.20898764024997873,
+          0.0,
+          0.0,
+          @pseudo_log_of_half,
+          0.20898764024997873,
+          :infinity,
+          nil,
+          :nan
+        ],
+        [
+          :neg_infinity,
+          -199.98000000000008,
+          0.0,
+          0.0,
+          5.6920997883030831,
+          199.98000000000008,
+          :infinity,
+          :nan
+        ],
+        [
+          0.0,
+          0.097111198378872318,
+          0.10857362047581294,
+          0.10857362047581294,
+          0.10773520159285525,
+          0.097111198378872318,
+          0.0,
+          nil,
+          :nan
+        ],
+        [
+          :infinity,
+          460.56307030066927,
+          9.2103403719761836,
+          9.2103403719761836,
+          16.019109480465964,
+          460.56307030066927,
+          :infinity,
+          nil,
+          :nan
+        ]}},
+      {{:pseudo_log, sigma: 0.5, base: 2},
+       {[
+          :neg_infinity,
+          -2.0827257408918518,
+          0.0,
+          0.0,
+          0.69424191363061738,
+          2.0827257408918518,
+          :infinity,
+          nil,
+          :nan
+        ], [:neg_infinity, -1.875, 0.0, 0.0, 0.35355339059327373, 1.875, :infinity, :nan],
+        [
+          0.0,
+          0.64519283644591208,
+          1.4426950408889634,
+          1.4426950408889634,
+          1.2903856728918242,
+          0.64519283644591208,
+          0.0,
+          nil,
+          :nan
+        ],
+        [
+          :infinity,
+          1.4729377586898837,
+          0.69314718055994529,
+          0.69314718055994529,
+          0.73519360760141028,
+          1.4729377586898837,
+          :infinity,
+          nil,
+          :nan
+        ]}}
+    ]
+
+    test "the logarithms, exponentials, asinh and pseudo-logarithms give R's" do
+      inputs = Enum.reject(@doubles, &is_nil/1)
+
+      for {name, expected} <- @r_doubles do
+        assert {Transform.transform(name, @doubles), Transform.inverse(name, inputs),
+                Transform.derivative(name, @doubles),
+                Transform.inverse_derivative(name, @doubles)} === expected,
+               inspect(name)
+      end
+    end
+
+    # R's asinh's d_transform(1e200) is 0, inverse(-1000) -Inf, d_inverse(-1000) Inf; the
+    # pseudo-logarithm's likewise; exp's transform(800) and d_transform(800) Inf, d_inverse(0)
+    # Inf; log's inverse(800) and d_inverse(800) Inf; log1p's transform(-1) -Inf, d_transform(-1)
+    # Inf, inverse(800) Inf and inverse(-1000) -1 (`inc4/step3/extra.R`)
+    test "past the largest double, an infinity" do
+      assert {Transform.derivative(:asinh, [1.0e200]), Transform.inverse(:asinh, [-1000.0]),
+              Transform.inverse_derivative(:asinh, [-1000.0])} ===
+               {[0.0], [:neg_infinity], [:infinity]}
+
+      assert {Transform.derivative(:pseudo_log, [1.0e200]),
+              Transform.inverse(:pseudo_log, [1000.0]),
+              Transform.inverse_derivative(:pseudo_log, [-1000.0])} ===
+               {[0.0], [:infinity], [:infinity]}
+
+      assert {Transform.transform(:exp, [800.0]), Transform.derivative(:exp, [800.0]),
+              Transform.inverse_derivative(:exp, [0.0]), Transform.inverse(:log, [800.0]),
+              Transform.inverse_derivative(:log, [800.0])} ===
+               {[:infinity], [:infinity], [:infinity], [:infinity], [:infinity]}
+
+      assert {Transform.transform(:log1p, [-1.0]), Transform.derivative(:log1p, [-1.0]),
+              Transform.inverse(:log1p, [800.0, -1000.0]),
+              Transform.inverse_derivative(:log1p, [800.0])} ===
+               {[:neg_infinity], [:infinity], [:infinity, -1.0], [:infinity]}
+    end
+
     test "a date, date-time or time transformation has no derivatives" do
       for name <- [:date, :time, {:datetime, "UTC", Calendar.UTCOnlyTimeZoneDatabase}] do
         assert_raise FunctionClauseError, fn -> Transform.derivative(name, [1.0]) end
@@ -430,6 +1090,30 @@ defmodule Scales.TransformTest do
 
       assert Transform.trim_to_domain(:log10, [0.5, :nan, 2.0]) ===
                {-0.3010299956639812, 0.3010299956639812}
+    end
+
+    # Golden: R's trim_to_domain() of c(-5, 0, 10, 1000, NA), and of c(-5, 0, 10) in base 3 and
+    # c(-3, -2) under log1p (`inc4/step3/extra.R`)
+    test "step 3's domains: every logarithm's from 1e-100, log1p's from -1 + epsilon" do
+      values = [-5.0, 0.0, 10.0, 1000.0, nil]
+
+      assert Enum.map(
+               [:log, :log2, :log1p, :exp, :asinh, :pseudo_log],
+               fn name -> Transform.trim_to_domain(name, values) end
+             ) ===
+               [
+                 {-230.25850929940458, 6.9077552789821368},
+                 {-332.19280948873626, 9.965784284662087},
+                 {-36.043653389117154, 6.9087547793152204},
+                 {0.0067379469990854687, :infinity},
+                 {-2.3124383412727525, 7.6009027095419883},
+                 {-1.6472311463710958, 6.9077562789806368}
+               ]
+
+      assert {Transform.trim_to_domain({:log, 3}, [-5.0, 0.0, 10.0]),
+              Transform.trim_to_domain(:log1p, [-3.0, -2.0])} ===
+               {{-209.59032742893845, 2.0959032742893848},
+                {-36.043653389117154, -36.043653389117154}}
     end
 
     test "values all below the domain are its end" do

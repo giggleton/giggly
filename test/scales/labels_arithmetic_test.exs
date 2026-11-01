@@ -18,15 +18,6 @@ defmodule Scales.Labels.ArithmeticTest do
     end
   end
 
-  describe "logarithm/2" do
-    test "takes base 10 and 2 by their own functions, any other by the ratio" do
-      # log(1000, 10), where log(1000) / log(10) is 2.9999999999999996; log(3, 2), where
-      # log(3) / log(2) is 1.5849625007211563
-      assert Arithmetic.logarithm(1000.0, 10) === 3.0
-      assert Arithmetic.logarithm(3.0, 2) === 1.5849625007211561
-    end
-  end
-
   # The infinities below are R's `-Inf` and `Inf` for the same operations, which Erlang refuses.
   describe "product/2 and quotient/2" do
     test "give the infinity of the result's sign past the largest double" do

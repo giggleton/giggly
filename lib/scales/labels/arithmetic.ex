@@ -1,8 +1,8 @@
 defmodule Scales.Labels.Arithmetic do
   @moduledoc false
 
-  # R's rounding and logarithms as `Scales.Labels` needs them, each in R's order of
-  # floating-point operations, since another order lands a bit away and moves a label:
+  # R's rounding as `Scales.Labels` needs it, each in R's order of floating-point operations,
+  # since another order lands a bit away and moves a label:
   #
   # - `signif/2` is R's `signif()`, `fprec()` in `nmath/fprec.c`: the number scaled by a power
   #   of ten into its significant digits, rounded half to even there and scaled back, multiplying
@@ -18,8 +18,6 @@ defmodule Scales.Labels.Arithmetic do
   #   and are left out.
   # - A power of ten is R's `R_pow_di()`, by repeated squaring, which is exact to 1e22 and lands
   #   on R's own double past it.
-  # - A logarithm is R's `log(x, base)`: base 10 and 2 their own functions, any other the ratio
-  #   of natural ones.
   # - `product/2`, `quotient/2` and `difference/2` are a double's `*`, `/` and `-`, a result
   #   past the largest double the infinity of its sign, `:infinity` or `:neg_infinity`, as R's
   #   is, where Erlang raises; each takes numbers alone, so the rescue never takes a missing or
@@ -139,13 +137,6 @@ defmodule Scales.Labels.Arithmetic do
       _half -> if rem(trunc(floor), 2) == 0, do: floor, else: floor + 1
     end
   end
-
-  # R's `log(value, base)` of a positive number.
-  @doc false
-  @spec logarithm(float(), number()) :: float()
-  def logarithm(value, base) when base == 10, do: :math.log10(value)
-  def logarithm(value, base) when base == 2, do: :math.log2(value)
-  def logarithm(value, base), do: :math.log(value) / :math.log(base)
 
   # R's `R_pow_di(10, power)`: ten to a whole power by repeated squaring, a negative power the
   # reciprocal of the positive.

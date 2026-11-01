@@ -79,6 +79,29 @@ stops the question being reopened from scratch. A new entry is about 150 words: 
 sentence or two of why, and one line per rejected alternative. What a later decision replaces is
 deleted from the entry it was in, never marked superseded; git history keeps every version.
 
+- **A break turned back through an inexact inverse is written to 14 significant digits
+  (2026-11-01, Steve: "A", "A", increment 4's step 3; checked against scales 1.4.0).** Every
+  transformation keeps plain labels (the 2026-10-12 rule, so a natural log's powers of e take 15
+  digits where R's `format()` gives 7), but log1p's, exp's, asinh's and the pseudo-logarithm's
+  labels are written from each break turned back rounded to 14 significant digits first
+  (`Labels.plain_round_tripped/1`): the round trip leaves `10000` as `9999.999999999989` under a
+  pseudo-logarithm in sigma 2, base 10. Against the breaks' own labels in data units, at 15
+  digits up to 40% of random axes showed that error, at 14 none of 28,000. *Rejected: 14 digits
+  in `plain/1` itself*: an identity axis needing 15 (1e14 to 1e14 + 4) would collide.
+  *Rejected: R's `format()`*, for these alone or for all: `:log10` and `{:log, 10}` written two
+  ways, or the agreed plain labels reopened. *Rejected: plain as it was*: the noise.
+
+- **A logarithm's or exponential's base is above 1, a pseudo-logarithm's sigma above 0, and asinh
+  is the platform's (2026-11-01, Steve: "A", "A", "A", increment 4's step 3; checked against
+  scales 1.4.0).** Names: `:log`, `:log2`, `:log10`, `{:log, base}`, `:log1p`, `:exp`,
+  `{:exp, base}`, `:asinh`, `:pseudo_log` and `{:pseudo_log, sigma:, base:}`, either keyword
+  optional, R's defaults. Any other base or sigma is refused by guard; a falling axis is the base
+  above 1 reversed. asinh is `:math.asinh`, within 1 ulp of R's correctly rounded one (369 of
+  3,000 off under glibc 2.39). *Rejected: positional `{:pseudo_log, sigma, base}`*: sigma alone,
+  the usual call, would spell out e. *Rejected: R's bases below 1*: `squish/2` and
+  `Breaks.log/2` would take a falling domain, for an axis nobody draws. *Rejected: an own
+  correctly rounded asinh*: new numerics for one ulp; *one through log1p*: further off (540).
+
 - **A bootstrap example states its departure once, in its notebook's About (2026-11-01, Steve:
   "Your recommendation").** stat_summary's About says that ggplot2's examples set no seed, so R
   draws its `mean_cl_boot` intervals differently on every run, that Giggly draws them from

@@ -43,7 +43,7 @@ defmodule Scales.Breaks do
   # the remainder in doubles, exactly 0, grants; so on ranges over about 3e23 wide reaching zero,
   # about one in six, Giggly's breaks may pass through zero where R's do not.
 
-  alias Scales.{Bounds, DateBreaks, Palette, Transform}
+  alias Scales.{Bounds, DateBreaks, Double, Palette, Transform}
 
   # The number of breaks wanted unless a caller says: `scales::breaks_extended()`'s `n`.
   @wanted 5
@@ -758,7 +758,7 @@ defmodule Scales.Breaks do
   defp log_breaks({low, high}, wanted, base)
        when is_number(low) and low > 0 and is_number(high) and high > 0 do
     [low, high] = Enum.sort([low, high])
-    range = {logarithm(low, base), logarithm(high, base)}
+    range = {Double.logarithm(low, base), Double.logarithm(high, base)}
     {log_low, log_high} = range
     exponents = {Float.floor(log_low), Float.ceil(log_high)}
 
@@ -835,7 +835,7 @@ defmodule Scales.Breaks do
   defp evenness(multiples, base) do
     [base | multiples]
     |> Enum.sort()
-    |> Enum.map(fn multiple -> logarithm(multiple, base) end)
+    |> Enum.map(fn multiple -> Double.logarithm(multiple, base) end)
     |> Enum.chunk_every(2, 1, :discard)
     |> Enum.map(fn [lower, upper] -> upper - lower end)
     |> Enum.min()
@@ -864,10 +864,6 @@ defmodule Scales.Breaks do
   end
 
   # R's `log(x, base)`: base 10's and base 2's own functions, else the ratio of natural logarithms.
-  defp logarithm(value, base) when base == 10, do: :math.log10(value)
-  defp logarithm(value, base) when base == 2, do: :math.log2(value)
-  defp logarithm(value, base), do: :math.log(value) / :math.log(base)
-
   defp power(base, exponent), do: :math.pow(base / 1, exponent)
 
   # On an ordinary range a nice number of nice steps, and on the degenerate ranges what the

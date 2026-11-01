@@ -1584,6 +1584,21 @@ defmodule Scales.LabelsTest do
 
   # `plain/1` writes numbers the Elixir way, not R's, so these labels are worked out from what it
   # promises, not R's output.
+  describe "plain_round_tripped/1" do
+    # 10000 under transform_pseudo_log(2, 10), turned back, is 9999.999999999989, which plain/1
+    # writes "9999.99999999999"; ten 9s after the point are past 14 significant digits
+    test "writes each value rounded to 14 significant digits first" do
+      assert {Labels.plain_round_tripped([9_999.999999999989, 5000.000000000001]),
+              Labels.plain([9_999.999999999989, 5000.000000000001])} ===
+               {["10000", "5000"], ["9999.99999999999", "5000.00000000000"]}
+
+      assert Labels.plain_round_tripped([0.12345678901234, 2.0]) === [
+               "0.12345678901234",
+               "2.00000000000000"
+             ]
+    end
+  end
+
   describe "plain/1" do
     test "every label gets the decimals the most precise needs, rounding error and -0.0 dropped" do
       assert Labels.plain([2.5, 2.75, 0.30000000000000004, -0.0]) ==
