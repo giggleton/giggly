@@ -497,6 +497,13 @@ defmodule Scales.TransformTest do
 
       assert Transform.transform({:pseudo_log, base: :math.exp(1), sigma: 1}, [2.0]) ===
                Transform.transform(:pseudo_log, [2.0])
+
+      # Golden: R's transform_pseudo_log(base = 10), sigma 1, of and back from -2, 0.5 and 2
+      # (`inc4/step3/base_only.R`)
+      assert {Transform.transform({:pseudo_log, base: 10}, [-2.0, 0.5, 2.0]),
+              Transform.inverse({:pseudo_log, base: 10}, [-2.0, 0.5, 2.0])} ===
+               {[-0.38277568533786305, 0.10747331870609976, 0.38277568533786305],
+                [-99.990000000000038, 2.8460498941515415, 99.990000000000038]}
     end
   end
 

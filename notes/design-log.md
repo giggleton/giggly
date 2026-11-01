@@ -3913,6 +3913,9 @@ tells the story (`git show <hash>`). Until 2026-10-15 each milestone also had a 
 - 2026-11-01 — Add Hmisc's summaries to stat_summary(): mean_cl_normal, mean_sdl, median_hilow
   and a seeded mean_cl_boot (summaries, step 5); §4: "`mean_cl_boot` draws its resamples", "The
   Hmisc summaries take Hmisc's arguments"
+- 2026-11-01 — Carry the logarithms, log1p, the exponentials, asinh and the pseudo-logarithm
+  (transforms, step 3) (`f99fb82`); §4: "A break turned back through an inexact inverse", "A
+  logarithm's or exponential's base"
 - 2026-11-01 — Give R's doubles from each transformation, with trim_to_domain() and the
   derivatives (transforms, step 2) (`e1ce0bb`); §4: "A transformation gives R's doubles"
 - 2026-11-01 — Complete R's out-of-range family, with infinities and NaN as R gives them

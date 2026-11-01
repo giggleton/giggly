@@ -114,12 +114,12 @@ defmodule Scales.Transform.PseudoLog do
     |> then(fn sine -> Double.multiply(2 * sigma, sine) end)
   end
 
-  # Sigma, as a float, and the natural logarithm of the base, R's defaults 1 and e.
+  # Sigma and the natural logarithm of the base, R's defaults 1 and e.
   defp parameters(:pseudo_log), do: {1.0, 1.0}
 
   defp parameters({:pseudo_log, options}) do
     sigma = Keyword.get(options, :sigma, 1)
     base = Keyword.get(options, :base, :math.exp(1))
-    {sigma / 1, :math.log(base)}
+    {sigma, :math.log(base)}
   end
 end

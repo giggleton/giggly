@@ -95,13 +95,13 @@ defmodule Scales.Double do
   # below zero or minus infinity NaN.
   @doc false
   @spec logarithm(operand(), number()) :: operand()
-  def logarithm(value, _base) when value in [:infinity, :nan], do: value
+  def logarithm(:infinity, _base), do: :infinity
 
   def logarithm(value, base) when is_number(value) and value > 0,
     do: positive_logarithm(value, base)
 
   def logarithm(value, _base) when value == 0, do: :neg_infinity
-  def logarithm(_negative, _base), do: :nan
+  def logarithm(_negative_or_nan, _base), do: :nan
 
   defp positive_logarithm(value, base) when base == 2, do: :math.log2(value)
   defp positive_logarithm(value, base) when base == 10, do: :math.log10(value)
@@ -159,8 +159,7 @@ defmodule Scales.Double do
   # 1 ulp, nearly all exact.
   @doc false
   @spec exponential_minus_one(operand()) :: operand()
-  def exponential_minus_one(value) when value in [:infinity, :nan], do: value
-  def exponential_minus_one(:neg_infinity), do: -1.0
+  def exponential_minus_one(:nan), do: :nan
   def exponential_minus_one(value) when value == 0, do: 0.0
 
   def exponential_minus_one(value) do
