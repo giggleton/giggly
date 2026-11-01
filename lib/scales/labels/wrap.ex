@@ -6,8 +6,8 @@ defmodule Scales.Labels.Wrap do
   #
   # A label is split into paragraphs at each line holding only whitespace, a break at its start
   # giving an empty paragraph and one at its end none, as R's `strsplit()` splits. A paragraph is
-  # split into words at each whitespace character (space, tab and line break, nothing else), the
-  # last empty word dropped, as `strsplit()` drops it. A word of no width (`Scales.Labels.Width`:
+  # split into words at each whitespace character (space, tab and line break, nothing else). A
+  # word of no width (`Scales.Labels.Width`:
   # an empty one, or one of zero-width characters alone) is dropped, as whitespace is, but for
   # one straight after a word ending a sentence (in `.`, `?` or `!`, then at most one of `)`, `"`
   # and `'`): that one is kept, so two spaces follow a sentence's end where two or more
@@ -47,10 +47,10 @@ defmodule Scales.Labels.Wrap do
   end
 
   # A paragraph's words, each with its width, those of no width dropped but after a sentence's
-  # end.
+  # end. The empty word after a last whitespace character, which `strsplit()` drops, is not
+  # dropped here: of no width, it is dropped as any is, or left off the end of its line.
   defp words(paragraph) do
     pieces = String.split(paragraph, [" ", "\t", "\n"])
-    pieces = if List.last(pieces) == "", do: Enum.drop(pieces, -1), else: pieces
 
     [nil | pieces]
     |> Enum.zip_with(pieces, fn before, word -> {before, word, Width.columns(word)} end)
