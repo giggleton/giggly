@@ -423,8 +423,8 @@ defmodule Giggly.Scale do
   # R's `rescale()`, from 0 to 1; about a midpoint, R's `rescale_mid()`, so the further end is at 0
   # or 1 and the midpoint at the middle; or R's `rescale_max()`, the value over the high end, so 0
   # is at 0 and one value at 1, whatever the low end. Over a high end of 0, a value of 0 is R's
-  # NaN, `nil`, which maps to the missing value, and any other an infinity, which R cannot draw, so
-  # it raises. Without bounds every value is `nil`, and stays so.
+  # NaN, made `nil`, which maps to the missing value, and any other an infinity, which R cannot
+  # draw, so it raises. Without bounds every value is `nil`, and stays so.
   defp rescaled(values, :none, _rescaler), do: values
   defp rescaled(values, bounds, :rescale), do: Bounds.rescale(values, bounds, {0, 1})
 
@@ -438,6 +438,7 @@ defmodule Giggly.Scale do
   end
 
   defp finite_place(place, _value) when is_number(place) or is_nil(place), do: place
+  defp finite_place(:nan, _value), do: nil
 
   defp finite_place(_infinite, value) do
     raise ArgumentError,

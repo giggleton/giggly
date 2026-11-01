@@ -148,10 +148,18 @@ defmodule Giggly.Scale.Continuous do
   end
 
   # Each value, `nil` where it is a number outside the limits, as ggplot2's position scales censor
-  # (`oob = censor`, `Scales.Bounds.censor/2`).
+  # (`oob = censor`, `Scales.Bounds.censor/2`), and NaN `nil` too, as ggplot2's position map
+  # gives `NA` for it.
   @doc false
   @spec censor(t(), list()) :: list()
-  def censor(%__MODULE__{} = scale, values), do: Bounds.censor(values, limits(scale))
+  def censor(%__MODULE__{} = scale, values) do
+    values
+    |> Bounds.censor(limits(scale))
+    |> Enum.map(fn
+      :nan -> nil
+      value -> value
+    end)
+  end
 
   # The scale's limits in transformed space, as ggplot2 transforms a scale's limits when it makes
   # the scale: each end given put through the transformation, `nil` where the data decides, and

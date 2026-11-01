@@ -34,11 +34,11 @@ they are for several; `label_parsed()` reads the labels as R's plotmath expressi
 `label_wrap_gen()` makes a labeller that wraps long labels. Giggly's `Giggly.Plot.facet_grid/2` and
 `Giggly.Plot.facet_wrap/3` take their counterparts as the `labeller:` option, `:value`, `:both`,
 `:context` and `:wrap`, each with its options as a tuple, such as `{:wrap, width: 10}`; Giggly has
-no `label_parsed()` and no plotmath. A plot is described with `Giggly.Plot` and drawn with
-`Giggly.to_svg/2`, which returns an SVG document. The setup cell aliases `Giggly.Plot`, so the cells
-write `Plot.new/2`, and defines `render`, which draws a plot and shows it below the cell with
-`Kino.Image`. The data is `Giggly.Datasets.mtcars/0`, R's `mtcars`: 32 cars from the 1974 *Motor
-Trend* US magazine, which the setup cell binds to `mtcars`, R's name for it.
+no `label_parsed()` and none of R's plotmath expressions. A plot is described with `Giggly.Plot` and
+drawn with `Giggly.to_svg/2`, which returns an SVG document. The setup cell aliases `Giggly.Plot`,
+so the cells write `Plot.new/2`, and defines `render`, which draws a plot and shows it below the
+cell with `Kino.Image`. The data is `Giggly.Datasets.mtcars/0`, R's `mtcars`: 32 cars from the 1974
+*Motor Trend* US magazine, which the setup cell binds to `mtcars`, R's name for it.
 
 ## The default, values alone
 

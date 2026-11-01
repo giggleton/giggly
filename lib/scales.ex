@@ -23,8 +23,9 @@ defmodule Scales do
   ## Conventions
 
     * A range is `{low, high}`.
-    * `nil` is R's `NA`, a missing value, and R's `NaN` where a function would give one;
-      `:infinity` and `:neg_infinity` are R's infinities.
+    * A double is held as R holds one (`t:double/0`): `nil` is R's `NA`, a missing value,
+      `:nan` R's `NaN`, and `:infinity` and `:neg_infinity` R's infinities. A transformation
+      gives `nil` where R gives `NaN`, as R's position scales take it to be missing.
     * A colour is uppercase `#RRGGBB`, or `#RRGGBBAA` with an alpha of its own; `:none` is no
       colour, R's `NA`.
     * A function takes a list where R takes a vector, and its options as a keyword list of R's
@@ -66,4 +67,10 @@ defmodule Scales do
   use Boundary,
     deps: [Color, NimbleOptions],
     exports: [Bounds, ColorOperations, DataRange, Labels, Palette, Transform]
+
+  @typedoc """
+  A double as R holds one: a number; `:infinity` or `:neg_infinity`; `:nan`, R's `NaN`, not a
+  number; or `nil`, R's `NA`, a missing value.
+  """
+  @type double :: number() | :infinity | :neg_infinity | :nan | nil
 end

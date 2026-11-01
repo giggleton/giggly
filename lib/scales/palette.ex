@@ -84,7 +84,7 @@ defmodule Scales.Palette do
   # `approxfun(values, seq(0, 1, length.out = length(values)))` does; equal values take their
   # places' mean, which R takes in long double and here in double.
 
-  alias Scales.{Bounds, ColorOperations}
+  alias Scales.{Bounds, ColorOperations, Double}
 
   @typedoc "A continuous palette."
   @type continuous ::
@@ -230,6 +230,11 @@ defmodule Scales.Palette do
   Each place's value under a continuous palette, a place running from 0 to 1 over the data's
   range; a `nil` place gives `nil`. A discrete palette is converted first, as the moduledoc says.
 
+  A place may be any double (`t:Scales.double/0`), each given R's answer: the numeric palettes
+  carry an infinity or NaN through their arithmetic, the area palettes' square root making NaN
+  below 0, and a colour is `nil` at an infinity or NaN, but one colour's, which an infinity takes
+  too; a manual palette of numbers keeps NaN.
+
   ## Examples
 
       iex> Scales.Palette.continuous({:rescale, {2, 5}}, [0, 0.3, 1, nil])
@@ -249,29 +254,39 @@ defmodule Scales.Palette do
 
       iex> Scales.Palette.continuous({:manual, [1.0, 5.0, 9.0]}, [0.25, 1.5])
       [3.0, nil]
+
+      iex> Scales.Palette.continuous({:area, {1.0, 6.0}}, [-0.5, :infinity])
+      [:nan, :infinity]
   """
-  @spec continuous(t(), [number() | nil]) :: [number() | String.t() | nil]
+  @spec continuous(t(), [Scales.double()]) :: [Scales.double() | String.t()]
   def continuous(:identity, places), do: places
   def continuous({:rescale, to}, places), do: Bounds.rescale(places, {0, 1}, to)
 
   def continuous({:area, to}, places) do
     places
-    |> each_place(&:math.sqrt/1)
+    |> Enum.map(&Double.square_root/1)
     |> Bounds.rescale({0, 1}, to)
   end
 
   # R's `rescale(sqrt(abs(x)), c(0, max), c(0, 1))`.
   def continuous({:abs_area, max}, places) do
     places
-    |> each_place(fn place ->
+    |> Enum.map(fn place ->
       place
-      |> abs()
-      |> :math.sqrt()
+      |> Double.absolute()
+      |> Double.square_root()
     end)
     |> Bounds.rescale({0, 1}, {0, max})
   end
 
-  def continuous({:gradient, [color]}, places), do: each_place(places, fn _place -> color end)
+  # One colour is every place's, an infinity's too, but a missing place's or NaN's, as R's
+  # `ifelse(is.na(x), NA, colour)`.
+  def continuous({:gradient, [color]}, places) do
+    Enum.map(places, fn
+      place when place in [nil, :nan] -> nil
+      _place -> color
+    end)
+  end
 
   def continuous({:gradient, colors}, places) do
     knotted =
@@ -321,7 +336,12 @@ defmodule Scales.Palette do
       |> spread(length(numbers))
       |> Enum.zip(numbers)
 
-    each_place(places, fn place -> joined(knotted, place) end)
+    # NaN is kept, as R's `approxfun()` keeps it, where a gradient's colour is missing.
+    Enum.map(places, fn
+      :nan -> :nan
+      place when is_number(place) -> joined(knotted, place)
+      _missing_or_infinite -> nil
+    end)
   end
 
   # The values, each with its place spread evenly from 0 to 1, as R's `approxfun()` takes them: a
@@ -635,11 +655,12 @@ defmodule Scales.Palette do
     Enum.concat([[low], between, [high]])
   end
 
-  # Each place through `function`, a `nil` left `nil`, as R's arithmetic leaves `NA`.
+  # Each place through `function`, a number's colour or value; a missing place, NaN and the
+  # infinities, outside every colour, give `nil`, as R's `NA`.
   defp each_place(places, function) do
     Enum.map(places, fn
-      nil -> nil
       place when is_number(place) -> function.(place)
+      place when place in [nil, :nan, :infinity, :neg_infinity] -> nil
     end)
   end
 
