@@ -6616,6 +6616,144 @@ defmodule GigglyTest do
     end
   end
 
+  # Golden throughout: ggplot2 4.0.3's `layer_data()` in R 4.6.1 for the same plots, printed to 17
+  # significant digits. They move with how ggplot2's `use_defaults()` puts a position's aesthetics
+  # in, or with what a stat carries.
+  describe "layer_data/2, nudges set and mapped" do
+    @shifted %{"x" => [1.0, 2.0], "y" => [1.0, 2.0], "name" => ["a", "b"], "shift" => [0.5, -0.5]}
+
+    test "a nudge the plot maps moves a nudging layer's marks and rides unused into another's" do
+      plot = Plot.new(@shifted, %{x: :x, y: :y, label: :name, nudge_x: :shift})
+
+      text =
+        plot
+        |> Plot.geom_text()
+        |> Giggly.layer_data()
+
+      points =
+        plot
+        |> Plot.geom_point()
+        |> Giggly.layer_data()
+
+      assert Enum.map([{text, :x}, {text, :nudge_x}, {points, :x}, {points, :nudge_x}], fn
+               {frame, name} -> DataFrame.pull(frame, name)
+             end) === [[1.5, 1.5], [0.5, -0.5], [1.0, 2.0], [0.5, -0.5]]
+    end
+
+    test "a nudge the layer sets wins over one mapped" do
+      frame =
+        @shifted
+        |> Plot.new(%{x: :x, y: :y, label: :name, nudge_x: :shift})
+        |> Plot.geom_text(nudge_x: 0.25)
+        |> Giggly.layer_data()
+
+      assert {DataFrame.pull(frame, :x), DataFrame.pull(frame, :nudge_x)} ===
+               {[1.25, 2.25], [0.25, 0.25]}
+    end
+
+    test "a layer's own mapped nudge moves each mark its own way, along its axis alone" do
+      frame =
+        @shifted
+        |> Plot.new(%{x: :x, y: :y})
+        |> Plot.geom_point(%{nudge_x: :shift}, position: :nudge)
+        |> Giggly.layer_data()
+
+      assert Enum.map([:x, :y, :nudge_x, :nudge_y], fn name -> DataFrame.pull(frame, name) end) ===
+               [[1.5, 1.5], [1.0, 2.0], [0.5, -0.5], [+0.0, +0.0]]
+    end
+
+    # R warns that the varying nudge "was dropped during statistical transformation".
+    test "a stat keeps a mapped nudge constant in each group and drops one that varies" do
+      bars = %{"g" => ["a", "a", "b"], "each" => [0.1, 0.2, 0.3], "group" => [0.25, 0.25, -0.25]}
+
+      varying =
+        bars
+        |> Plot.new(%{x: :g})
+        |> Plot.geom_bar(%{nudge_y: :each}, position: :nudge)
+        |> Giggly.layer_data()
+
+      constant =
+        bars
+        |> Plot.new(%{x: :g, fill: :g})
+        |> Plot.geom_bar(%{nudge_y: :group}, position: :nudge)
+        |> Giggly.layer_data()
+
+      assert {DataFrame.pull(varying, :y), DataFrame.pull(varying, :nudge_y)} ===
+               {[2.0, 1.0], [+0.0, +0.0]}
+
+      assert Enum.map([:y, :ymin, :ymax], fn name -> DataFrame.pull(constant, name) end) ===
+               [[2.25, 0.75], [0.25, -0.25], [2.25, 0.75]]
+    end
+
+    test "a nudge mapped after the stat reads what it computed" do
+      frame =
+        %{"x" => [1.0, 1.0, 2.0], "y" => [1.0, 1.0, 2.0]}
+        |> Plot.new(%{x: :x, y: :y})
+        |> Plot.geom_count(%{nudge_y: {:after_stat, [{&Kernel.//2, [:n, 10]}]}}, position: :nudge)
+        |> Giggly.layer_data()
+
+      assert {DataFrame.pull(frame, :y), DataFrame.pull(frame, :nudge_y)} ===
+               {[1.2, 2.1], [0.2, 0.1]}
+    end
+
+    # R gives the row a missing position beside a nudge that is not 0, and fails ("missing value
+    # where TRUE/FALSE needed") where every other nudge along the axis is 0, where Giggly departs.
+    test "a missing nudge leaves its row's position missing, and an infinite one sends it there" do
+      for {nudges, nudged} <- [
+            {[0.1, nil, 0.3], [1.1, nil, 3.3]},
+            {[0.1, :infinity, 0.3], [1.1, :infinity, 3.3]},
+            {[0.0, nil, 0.0], [1.0, nil, 3.0]}
+          ] do
+        frame =
+          %{"x" => [1, 2, 3], "y" => [1.0, 2.0, 3.0], "name" => ["a", "b", "c"], "n" => nudges}
+          |> Plot.new(%{x: :x, y: :y, label: :name})
+          |> Plot.geom_text(%{nudge_y: :n})
+          |> Giggly.layer_data()
+
+        assert {nudges, DataFrame.pull(frame, :y)} === {nudges, nudged}
+      end
+    end
+
+    # R fails at a string ("non-numeric argument to binary operator"), warns at a factor and
+    # draws none of its marks, and moves a logical's by 0 or 1.
+    test "a nudge mapped to a column that is not numbers is refused when run" do
+      for {values, dtype} <- [
+            {["p", "q"], ":string"},
+            {[true, false], ":boolean"},
+            {Giggly.Factor.new(["p", "q"]), ":category"},
+            {[~D[2020-01-01], ~D[2020-01-02]], ":date"}
+          ] do
+        plot =
+          %{"x" => [1.0, 2.0], "y" => [1.0, 2.0], "name" => ["a", "b"], "n" => values}
+          |> Plot.new(%{x: :x, y: :y, label: :name})
+          |> Plot.geom_text(%{nudge_y: :n})
+
+        error = assert_raise ArgumentError, fn -> Giggly.layer_data(plot) end
+
+        assert error.message ==
+                 "the layer at index 0 maps :nudge_y to \"n\", a #{dtype} column, but a nudge is " <>
+                   "a distance along its axis, so it takes numbers"
+      end
+    end
+
+    test "a reference line is nudged along its own axis, set or mapped" do
+      plot = Plot.new(@shifted, %{x: :x, y: :y})
+
+      horizontal =
+        plot
+        |> Plot.geom_hline(yintercept: 2, position: :nudge, nudge_y: 0.5)
+        |> Giggly.layer_data()
+
+      vertical =
+        plot
+        |> Plot.geom_vline(%{xintercept: :x, nudge_x: :shift}, position: :nudge)
+        |> Giggly.layer_data()
+
+      assert {DataFrame.pull(horizontal, :yintercept), DataFrame.pull(vertical, :xintercept)} ===
+               {[2.5], [1.5, 1.5]}
+    end
+  end
+
   # Golden throughout: ggplot2 4.0.3's `layer_data()` in R 4.6.1 for the same plots of mpg. They
   # move with how a continuous scale's limits censor a position.
   describe "layer_data/2, under a scale's limits" do

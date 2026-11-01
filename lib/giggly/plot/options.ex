@@ -403,6 +403,26 @@ defmodule Giggly.Plot.Options do
     :height
   ]
 
+  # How far every mark moves from its place, as ggplot2's `nudge_x` and `nudge_y` move it, read
+  # only by nudging, so options of every layer function whose marks it moves.
+  @nudge_x_option [
+    type: {:custom, __MODULE__, :validate_nudge, []},
+    doc:
+      "How far every mark moves along x from its place, in the units of the x axis, beside " <>
+        "`position: :nudge`, which reads it, and refused beside another position; 0 when not " <>
+        "given."
+  ]
+
+  @nudge_y_option [
+    type: {:custom, __MODULE__, :validate_nudge, []},
+    doc:
+      "How far every mark moves along y from its place, in the units of the y axis, beside " <>
+        "`position: :nudge`, which reads it, and refused beside another position; 0 when not " <>
+        "given."
+  ]
+
+  @nudge_options [nudge_x: @nudge_x_option, nudge_y: @nudge_y_option]
+
   # How every point of a layer looks, set by its options.
   @point_look_options [
     alpha: @alpha_option,
@@ -613,7 +633,7 @@ defmodule Giggly.Plot.Options do
                    [
                      data: @data_option,
                      position: @point_position_option
-                   ] ++ @point_look_options
+                   ] ++ @point_look_options ++ @nudge_options
                  )
 
   # `geom_jitter/3`'s options, validated at the call: a point's, and how far its points move,
@@ -632,12 +652,13 @@ defmodule Giggly.Plot.Options do
                             "refused beside `width:` or `height:`. They move as `width:` and " <>
                             "`height:` say when not given."
                       ]
-                    ] ++ @point_look_options
+                    ] ++ @point_look_options ++ @nudge_options
                   )
 
   # `geom_count/3`'s and `stat_sum/3`'s options, validated at the call.
   @sum_options NimbleOptions.new!(
-                 [data: @data_option, position: @point_position_option] ++ @point_look_options
+                 [data: @data_option, position: @point_position_option] ++
+                   @point_look_options ++ @nudge_options
                )
 
   # How every bar of a layer looks, set by its options.
@@ -687,7 +708,7 @@ defmodule Giggly.Plot.Options do
                    position: @bar_position_option,
                    width: @bar_width_option,
                    just: @bar_just_option
-                 ] ++ @bar_look_options
+                 ] ++ @bar_look_options ++ @nudge_options
                )
 
   # `geom_bar/3`'s options, validated at the call: a bar's, and the axis its counting runs along.
@@ -698,7 +719,7 @@ defmodule Giggly.Plot.Options do
                      orientation: @runs_along_option,
                      width: @bar_width_option,
                      just: @bar_just_option
-                   ] ++ @bar_look_options
+                   ] ++ @bar_look_options ++ @nudge_options
                  )
 
   # How a binning layer cuts its axis into bins, options of every function that adds one.
@@ -760,7 +781,7 @@ defmodule Giggly.Plot.Options do
                  [
                    data: @data_option,
                    position: @bar_position_option
-                 ] ++ @binning_options ++ @bar_look_options
+                 ] ++ @binning_options ++ @bar_look_options ++ @nudge_options
                )
 
   # `geom_hex/3`'s and `stat_bin_hex/3`'s options, validated at the call: how the plane is cut into
@@ -822,7 +843,7 @@ defmodule Giggly.Plot.Options do
                      doc:
                        "How a border turns a corner: pointed (`:mitre`), rounded (`:round`) or " <>
                          "cut off (`:bevel`)."
-                   )
+                   ) ++ @nudge_options
                )
 
   # `geom_path/3`'s options, validated at the call.
@@ -835,7 +856,7 @@ defmodule Giggly.Plot.Options do
                     linewidth: @linewidth_option,
                     linetype: @linetype_option,
                     arrow: @arrow_option
-                  ] ++ @line_style_options
+                  ] ++ @line_style_options ++ @nudge_options
                 )
 
   # Which position a line's rows are put in order of, ggplot2's `orientation`.
@@ -858,7 +879,7 @@ defmodule Giggly.Plot.Options do
                     linewidth: @linewidth_option,
                     linetype: @linetype_option,
                     arrow: @arrow_option
-                  ] ++ @line_style_options
+                  ] ++ @line_style_options ++ @nudge_options
                 )
 
   # How a layer's segments are drawn at their ends and corners: a line's but `linemitre`, which
@@ -875,7 +896,7 @@ defmodule Giggly.Plot.Options do
                        linewidth: @linewidth_option,
                        linetype: @linetype_option,
                        arrow: @arrow_option
-                     ] ++ @segment_line_style_options
+                     ] ++ @segment_line_style_options ++ @nudge_options
                    )
 
   # Which way a layer's ranges run, ggplot2's `orientation`, taken from the ranges given when not
@@ -903,7 +924,7 @@ defmodule Giggly.Plot.Options do
                          data: @data_option,
                          position: @identity_position_without_width_option,
                          orientation: @range_orientation_option
-                       ] ++ @range_look_options
+                       ] ++ @range_look_options ++ @nudge_options
                      )
 
   # How every point of a point range layer looks, set by its options: a point's, but its size and
@@ -939,7 +960,9 @@ defmodule Giggly.Plot.Options do
                           data: @data_option,
                           position: @identity_position_without_width_option,
                           orientation: @range_orientation_option
-                        ] ++ Keyword.merge(@range_look_options, @pointrange_point_options)
+                        ] ++
+                          Keyword.merge(@range_look_options, @pointrange_point_options) ++
+                          @nudge_options
                       )
 
   # How wide every error bar's or crossbar's whiskers or box are, set by its options.
@@ -958,7 +981,7 @@ defmodule Giggly.Plot.Options do
                         position: @identity_position_with_width_option,
                         orientation: @range_orientation_option,
                         width: @range_width_option
-                      ] ++ @range_look_options
+                      ] ++ @range_look_options ++ @nudge_options
                     )
 
   # A crossbar's parts drawn as lines, each with a look of its own, and how its options' docs name
@@ -1060,7 +1083,8 @@ defmodule Giggly.Plot.Options do
                         width: @range_width_option
                       ] ++
                         @crossbar_look_options ++
-                        @crossbar_line_look_options ++ @crossbar_line_style_options
+                        @crossbar_line_look_options ++
+                        @crossbar_line_style_options ++ @nudge_options
                     )
 
   # The sides a rug may be drawn along.
@@ -1115,7 +1139,7 @@ defmodule Giggly.Plot.Options do
                        :doc,
                        fn doc -> doc <> " Jittering needs both `:x` and `:y`." end
                      )
-                 ] ++ @rug_look_options ++ @rug_drawing_options
+                 ] ++ @rug_look_options ++ @rug_drawing_options ++ @nudge_options
                )
 
   # How every band of a ribbon or area layer looks, set by its options.
@@ -1177,7 +1201,7 @@ defmodule Giggly.Plot.Options do
                             "y `:xmin` or `:xmax`."
                       ],
                       outline_type: [default: :both] ++ @outline_type_option
-                    ] ++ @band_look_options ++ @line_style_options
+                    ] ++ @band_look_options ++ @line_style_options ++ @nudge_options
                   )
 
   # `geom_area/3`'s options, validated at the call.
@@ -1193,7 +1217,7 @@ defmodule Giggly.Plot.Options do
                           "from 0 across to its `x`, for areas that run up the panel."
                     ],
                     outline_type: [default: :upper] ++ @outline_type_option
-                  ] ++ @band_look_options ++ @line_style_options
+                  ] ++ @band_look_options ++ @line_style_options ++ @nudge_options
                 )
 
   # The geoms `stat_summary/3` draws with, as `geom:` names them, its default first.
@@ -1273,12 +1297,15 @@ defmodule Giggly.Plot.Options do
       NimbleOptions.new!(
         @summary_stat_options ++
           [position: @identity_position_without_width_option] ++
-          Keyword.merge(@range_look_options, @pointrange_point_options)
+          Keyword.merge(@range_look_options, @pointrange_point_options) ++
+          @nudge_options
       ),
     point:
       NimbleOptions.new!(
         @summary_stat_options ++
-          [position: @identity_position_without_width_option] ++ @point_look_options
+          [position: @identity_position_without_width_option] ++
+          @point_look_options ++
+          @nudge_options
       ),
     line:
       NimbleOptions.new!(
@@ -1290,7 +1317,9 @@ defmodule Giggly.Plot.Options do
             linewidth: @linewidth_option,
             linetype: @linetype_option,
             arrow: @arrow_option
-          ] ++ @line_style_options
+          ] ++
+          @line_style_options ++
+          @nudge_options
       ),
     bar:
       NimbleOptions.new!(
@@ -1299,24 +1328,32 @@ defmodule Giggly.Plot.Options do
             position: @identity_position_with_width_option,
             width: @bar_width_option,
             just: @bar_just_option
-          ] ++ @bar_look_options
+          ] ++
+          @bar_look_options ++
+          @nudge_options
       ),
     crossbar:
       NimbleOptions.new!(
         @summary_stat_options ++
           [position: @identity_position_with_width_option, width: @range_width_option] ++
-          @crossbar_look_options ++ @crossbar_line_look_options ++ @crossbar_line_style_options
+          @crossbar_look_options ++
+          @crossbar_line_look_options ++
+          @crossbar_line_style_options ++
+          @nudge_options
       ),
     errorbar:
       NimbleOptions.new!(
         @summary_stat_options ++
           [position: @identity_position_with_width_option, width: @range_width_option] ++
-          @range_look_options
+          @range_look_options ++
+          @nudge_options
       ),
     linerange:
       NimbleOptions.new!(
         @summary_stat_options ++
-          [position: @identity_position_without_width_option] ++ @range_look_options
+          [position: @identity_position_without_width_option] ++
+          @range_look_options ++
+          @nudge_options
       ),
     ribbon:
       NimbleOptions.new!(
@@ -1325,7 +1362,7 @@ defmodule Giggly.Plot.Options do
             position: @identity_position_without_width_option,
             outline_type: [default: :both] ++ @outline_type_option
           ] ++
-          @band_look_options ++ @line_style_options
+          @band_look_options ++ @line_style_options ++ @nudge_options
       )
   }
 
@@ -1429,7 +1466,8 @@ defmodule Giggly.Plot.Options do
                        position: @identity_position_without_width_option,
                        outline_type: [default: :upper] ++ @outline_type_option
                      ] ++
-                       @density_estimate_options ++ @density_look_options ++ @line_style_options
+                       @density_estimate_options ++
+                       @density_look_options ++ @line_style_options ++ @nudge_options
                    )
 
   # How an area of densities' outline is drawn, `stat_density/3`'s: a line's, its corners given no
@@ -1452,7 +1490,8 @@ defmodule Giggly.Plot.Options do
                             outline_type: [default: :both] ++ @outline_type_option
                           ] ++
                             @density_estimate_options ++
-                            @band_look_options ++ @stat_density_line_style_options
+                            @band_look_options ++
+                            @stat_density_line_style_options ++ @nudge_options
                         )
 
   # `geom_smooth/3`'s and `stat_smooth/3`'s options, validated at the call: how each curve is
@@ -1537,7 +1576,7 @@ defmodule Giggly.Plot.Options do
                             "`base_line_size` when not given, 1 at its default sizes."
                       ],
                       linetype: @linetype_option
-                    ] ++ @line_style_options
+                    ] ++ @line_style_options ++ @nudge_options
                   )
 
   # How a frequency polygon cuts its axis into bins: binning's options but `pad`, which a frequency
@@ -1554,7 +1593,7 @@ defmodule Giggly.Plot.Options do
                           linewidth: @linewidth_option,
                           linetype: @linetype_option,
                           arrow: @arrow_option
-                        ] ++ @line_style_options
+                        ] ++ @line_style_options ++ @nudge_options
                     )
 
   # A box plot's parts drawn as lines, each with a look of its own, and how its options' docs name
@@ -1781,7 +1820,7 @@ defmodule Giggly.Plot.Options do
                              "How big every box's outliers are, in millimetres, as " <>
                                "`outlier_size:` takes it, which wins over it."
                          ]
-                       ]
+                       ] ++ @nudge_options
                    )
 
   # Whether text leaves out the labels that would cross one drawn before it.
@@ -1824,23 +1863,6 @@ defmodule Giggly.Plot.Options do
           ~s(of the generic families `"sans"`, `"serif"` and `"mono"`; the theme's ) <>
           "`base_family` when not given, the default sans-serif at its default. How a label " <>
           "is measured and drawn in it: the [fonts guide](fonts.md)."
-    ]
-  ]
-
-  # How far every label moves from its place, as ggplot2's `nudge_x` and `nudge_y` move it, options
-  # of `geom_text/3` and `geom_label/3`.
-  @nudge_options [
-    nudge_x: [
-      type: {:custom, __MODULE__, :validate_nudge, []},
-      doc:
-        "How far every label moves along x from its place, in the units of the x axis; 0 when " <>
-          "not given."
-    ],
-    nudge_y: [
-      type: {:custom, __MODULE__, :validate_nudge, []},
-      doc:
-        "How far every label moves along y from its place, in the units of the y axis; 0 when " <>
-          "not given."
     ]
   ]
 
@@ -1938,8 +1960,7 @@ defmodule Giggly.Plot.Options do
                      ]
                    ] ++
                      @text_style_options ++
-                     @nudge_options ++
-                     @label_box_options
+                     @label_box_options ++ @nudge_options
                  )
 
   @rect_color_option [
@@ -2021,7 +2042,9 @@ defmodule Giggly.Plot.Options do
                     doc:
                       "How tall every tile is, in the units of the y axis, as `width:` sets a " <>
                         "width."
-                  ]
+                  ],
+                  nudge_x: @nudge_x_option,
+                  nudge_y: @nudge_y_option
                 )
 
   # Where every raster cell sits against its position, along one axis: an option of
@@ -2058,7 +2081,9 @@ defmodule Giggly.Plot.Options do
                       doc:
                         "Whether a viewer blends neighbouring cells' colours, smoothing the " <>
                           "image, rather than drawing each cell as a block of its colour."
-                    ]
+                    ],
+                    nudge_x: @nudge_x_option,
+                    nudge_y: @nudge_y_option
                   )
 
   # A rectangle's corner set for every rectangle of a layer, as ggplot2's `xmin = 3` sets it.
@@ -2101,7 +2126,9 @@ defmodule Giggly.Plot.Options do
                   ymax: [
                     type: @corner_type,
                     doc: "Every rectangle's `ymax`, as `ymin:` sets one."
-                  ]
+                  ],
+                  nudge_x: @nudge_x_option,
+                  nudge_y: @nudge_y_option
                 )
 
   # An annotation's position, a value or a list of values, one per annotation, as ggplot2's
@@ -2294,7 +2321,8 @@ defmodule Giggly.Plot.Options do
                          "Where each line crosses the y axis, in its units: a value, or a " <>
                            "list of them, a line for each, drawn in every panel. Given, the " <>
                            "layer takes no mapping and no `data:`."
-                       )
+                       ),
+                     nudge_y: @nudge_y_option
                    ] ++ @reference_line_look_options
                  )
 
@@ -2317,7 +2345,8 @@ defmodule Giggly.Plot.Options do
                          "Where each line crosses the x axis, in its units: a value, or a " <>
                            "list of them, a line for each, drawn in every panel. Given, the " <>
                            "layer takes no mapping and no `data:`."
-                       )
+                       ),
+                     nudge_x: @nudge_x_option
                    ] ++ @reference_line_look_options
                  )
 

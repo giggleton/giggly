@@ -8,8 +8,7 @@ defmodule Giggly.PositionTest do
 
   describe "compute_layer/3 for nudging" do
     # Golden: ggplot2 4.0.3's `layer_data()` in R 4.6.1 for `geom_rect()` of the same edges under
-    # `position_nudge(x = 1, y = -0.5)`. No geom Giggly nudges has edges yet, so the table is built
-    # here.
+    # `position_nudge(x = 1, y = -0.5)`.
     test "every column in an axis's family moves by that axis's nudge" do
       frame =
         DataFrame.new(
@@ -25,6 +24,25 @@ defmodule Giggly.PositionTest do
 
       assert Enum.map([:xmin, :xmax, :ymin, :ymax], fn name -> DataFrame.pull(nudged, name) end) ===
                [[2.0, 3.0], [2.5, 4.0], [-0.5, 0.5], [0.5, 1.5]]
+    end
+
+    # ggplot2 4.0.3's `layer_data()` positions are doubles, whatever the types mapped; R misses a
+    # position beside a missing nudge where another nudge along the axis is not 0, and fails where
+    # all are, where this departs.
+    test "an integer position nudged by an integer comes out a double, missing where it or its " <>
+           "nudge is" do
+      frame =
+        DataFrame.new(
+          x: [1, 2, nil],
+          y: [1, 2, 3],
+          nudge_x: [0.5, nil, 0.5],
+          nudge_y: [0, nil, 0]
+        )
+
+      nudged = Position.compute_layer(%Position.Nudge{}, frame, @continuous)
+
+      assert {DataFrame.pull(nudged, :x), DataFrame.pull(nudged, :y)} ===
+               {[1.5, nil, nil], [1.0, nil, 3.0]}
     end
   end
 

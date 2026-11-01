@@ -18,7 +18,8 @@ defprotocol Giggly.Position do
   # each pile to reach 1, as `position = "fill"` does. Dodging (`Giggly.Position.Dodge`)
   # sets them side by side, and dodging by clusters (`Giggly.Position.Dodge2`) does so for bars
   # whose spans overlap, whatever their groups and widths. Nudging (`Giggly.Position.Nudge`) moves
-  # every mark a set distance, as `geom_text()` defaults `position = "nudge"`, and jittering
+  # each mark the distance its layer sets or maps, as `geom_text()` defaults `position = "nudge"`,
+  # and jittering
   # (`Giggly.Position.Jitter`) a small random one, as `geom_jitter()` defaults `position =
   # "jitter"`.
   #

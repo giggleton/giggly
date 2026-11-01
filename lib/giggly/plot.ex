@@ -135,10 +135,21 @@ defmodule Giggly.Plot do
 
   ### Nudging marks: `:nudge`
 
-  Every position a mark has along x moves by its layer's `nudge_x:` and every one along y by its
-  `nudge_y:`, in the units of each axis, options `geom_text/3` and `geom_label/3` take; a layer
-  that gives neither moves nothing. Text and labels are nudged unless `position:` says otherwise,
-  and a nudge beside another position raises. It takes no options.
+  Every position a mark has along x moves by its `nudge_x` and every one along y by its
+  `nudge_y`, in the units of each axis: set for every mark by the layer's `nudge_x:` and
+  `nudge_y:`, which every layer function but `geom_abline/3` takes, a reference line only along
+  its own axis, or mapped from a column, each mark its own way, a value set winning over one
+  mapped. A mark given neither stays where it is, and one whose nudge is missing is not drawn.
+  Text and labels are nudged unless `position:` says otherwise. A nudge set or mapped beside
+  another position raises, which would move nothing, and so does a mapped one that is not numbers,
+  when the plot is run. It takes no options.
+
+      iex> plot =
+      ...>   %{"x" => [1.0, 2.0], "y" => [1.0, 2.0], "shift" => [0.5, -0.5]}
+      ...>   |> Giggly.Plot.new(%{x: :x, y: :y})
+      ...>   |> Giggly.Plot.geom_point(%{nudge_x: :shift}, position: :nudge)
+      iex> Giggly.DataFrame.pull(Giggly.layer_data(plot), :x)
+      [1.5, 1.5]
 
   ### Moving marks a random distance: `:jitter`
 
@@ -1783,7 +1794,8 @@ defmodule Giggly.Plot do
       [:yintercept],
       "Plot.geom_hline/3",
       accepted: Geom.Hline.accepted_aesthetics(),
-      required: Geom.Hline.required_aesthetics()
+      required: Geom.Hline.required_aesthetics(),
+      nudges: [:nudge_y]
     )
   end
 
@@ -1840,7 +1852,8 @@ defmodule Giggly.Plot do
       [:xintercept],
       "Plot.geom_vline/3",
       accepted: Geom.Vline.accepted_aesthetics(),
-      required: Geom.Vline.required_aesthetics()
+      required: Geom.Vline.required_aesthetics(),
+      nudges: [:nudge_x]
     )
   end
 
@@ -2246,9 +2259,10 @@ defmodule Giggly.Plot do
 
   Text uses `:x`, `:y`, `:label`, `:group`, `:alpha` and `:color`, and needs `:x`, `:y` and
   `:label`; a label never groups the rows. `nudge_x:` and `nudge_y:` move every label, in the
-  units of each axis, as its position, `:nudge` unless `position:` says otherwise, reads them, and
-  the axes reach the labels where they are drawn. Raises `ArgumentError` for a nudge beside
-  another position, which moves no label by it.
+  units of each axis, and a mapped `:nudge_x` or `:nudge_y` each its own way, as its position,
+  `:nudge` unless `position:` says otherwise, reads them, and the axes reach the labels where they
+  are drawn. Raises `ArgumentError` for a nudge beside another position, which moves no label by
+  it.
 
   ## Options
 
@@ -2299,7 +2313,7 @@ defmodule Giggly.Plot do
     layer = %Layer{
       geom: text_geom(validated),
       stat: %Stat.Identity{},
-      position: nudging_position(validated, "Plot.geom_text/3"),
+      position: position(Keyword.fetch!(validated, :position)),
       data: data,
       mapping: resolve(mapping, plot, data, "Plot.geom_text/3"),
       fixed: fixed(validated),
@@ -2325,9 +2339,10 @@ defmodule Giggly.Plot do
 
   Labels use `:x`, `:y`, `:label`, `:group`, `:alpha`, `:color`, `:fill`, `:linetype` and
   `:linewidth`, and need `:x`, `:y` and `:label`; a label never groups the rows. `nudge_x:` and
-  `nudge_y:` move every label, in the units of each axis, as its position, `:nudge` unless
-  `position:` says otherwise, reads them, and the axes reach each label's place, though not its
-  box. Raises `ArgumentError` for a nudge beside another position, which moves no label by it.
+  `nudge_y:` move every label, in the units of each axis, and a mapped `:nudge_x` or `:nudge_y`
+  each its own way, as its position, `:nudge` unless `position:` says otherwise, reads them, and
+  the axes reach each label's place, though not its box. Raises `ArgumentError` for a nudge
+  beside another position, which moves no label by it.
 
   ## Options
 
@@ -2366,7 +2381,7 @@ defmodule Giggly.Plot do
     layer = %Layer{
       geom: label_geom(validated),
       stat: %Stat.Identity{},
-      position: nudging_position(validated, "Plot.geom_label/3"),
+      position: position(Keyword.fetch!(validated, :position)),
       data: data,
       mapping: resolve(mapping, plot, data, "Plot.geom_label/3"),
       fixed: fixed(validated),
@@ -5628,6 +5643,7 @@ defmodule Giggly.Plot do
   # unused, as ggplot2 carries one, since the plot's mapping reaches every layer and not every
   # layer can use all of it. At the front, so adding a layer never walks the list.
   defp add_layer(plot, layer, function, facts) do
+    layer = with_nudges(layer, function, facts)
     combined_mapping = computed_mapping(plot, layer)
 
     {after_stat, before_stat} =
@@ -5650,6 +5666,64 @@ defmodule Giggly.Plot do
 
     %{plot | reversed_layers: [layer | plot.reversed_layers]}
   end
+
+  # The layer with the nudges its marks move by accepted where its position nudges, as ggplot2's
+  # `position_nudge()` alone declares `nudge_x` and `nudge_y`: each of those its options set or its
+  # own mapping maps, `nudges` among them (`:nudges`, both unless a reference line moves along one
+  # axis alone), is refused beside any other position, as ggplot2 warns "Ignoring unknown
+  # parameters" or "aesthetics" and moves nothing; and one its own mapping maps before the stat is
+  # refused where the stat drops it (`:drops_nudges`), as counting at each place counts by the
+  # aesthetics it draws and keeps no nudge, which an after_stat reaches. One the plot's mapping
+  # carries rides along unused beside another position, as any aesthetic a layer cannot use does.
+  defp with_nudges(layer, function, facts) do
+    nudges = Keyword.get(facts, :nudges, [:nudge_x, :nudge_y])
+    set = Enum.filter(nudges, fn nudge -> Map.has_key?(layer.fixed, nudge) end)
+    mapped = Enum.filter(nudges, fn nudge -> Map.has_key?(layer.mapping, nudge) end)
+
+    case {layer.position, set, mapped} do
+      {%Position.Nudge{}, _set, mapped} ->
+        if Keyword.get(facts, :drops_nudges, false),
+          do: check_kept_nudges(layer, mapped, function)
+
+        %{layer | accepted: layer.accepted ++ nudges}
+
+      {_position, [], []} ->
+        layer
+
+      {position, [_nudge | _others] = set, _mapped} ->
+        raise ArgumentError,
+              "#{function} takes #{Enum.map_join(set, " and ", fn nudge -> "#{nudge}:" end)} " <>
+                "only beside position: :nudge, the one position that reads a nudge, but its " <>
+                "position is #{inspect(position_name(position))}"
+
+      {position, [], mapped} ->
+        raise ArgumentError,
+              "#{function} maps #{inspect_all(mapped)} only beside position: :nudge, the one " <>
+                "position that reads a nudge, but its position is " <>
+                inspect(position_name(position))
+    end
+  end
+
+  defp check_kept_nudges(layer, mapped, function) do
+    case Enum.reject(mapped, fn nudge -> Mapping.stage(layer.mapping[nudge]) == :after_stat end) do
+      [] ->
+        :ok
+
+      [nudge | _others] ->
+        raise ArgumentError,
+              "#{function} maps #{inspect(nudge)} to #{inspect(layer.mapping[nudge])}, but its " <>
+                "stat counts each place by the aesthetics it draws and keeps no nudge, so it " <>
+                "would move nothing; map it to an after_stat to nudge the counted points"
+    end
+  end
+
+  # The name of a position's kind, as `position:` names it, for a refusal.
+  defp position_name(%Position.Identity{}), do: :identity
+  defp position_name(%Position.Stack{fill: true}), do: :fill
+  defp position_name(%Position.Stack{}), do: :stack
+  defp position_name(%Position.Dodge{}), do: :dodge
+  defp position_name(%Position.Dodge2{}), do: :dodge2
+  defp position_name(%Position.Jitter{}), do: :jitter
 
   # The layer `geom_smooth/3` and `stat_smooth/3` add, a curve fitted to each group, its mistakes
   # named as `function`'s: its method, `:none` when not given, and how its curves are worked out
@@ -5764,7 +5838,8 @@ defmodule Giggly.Plot do
     |> add_layer(layer, function,
       required: Stat.Sum.required_aesthetics(),
       computed: Stat.Sum.computed_variables(),
-      dropped: Stat.Sum.dropped_aesthetics()
+      dropped: Stat.Sum.dropped_aesthetics(),
+      drops_nudges: true
     )
     |> check_weight(layer, function)
   end
@@ -5955,27 +6030,6 @@ defmodule Giggly.Plot do
           "Plot.geom_boxplot/3 with varwidth: true takes position: :dodge2 alone or with its " <>
             "options, got: #{inspect(position)}, since each box keeps its own width, which only " <>
             "dodging by clusters lays side by side"
-  end
-
-  # A text or label layer's position: the one given, nudging its marks by `nudge_x:` and
-  # `nudge_y:` unless another is, beside which a nudge is refused, as ggplot2's `geom_text()`
-  # ignores a nudge whose position reads none.
-  defp nudging_position(validated, function) do
-    nudges = Keyword.take(validated, [:nudge_x, :nudge_y])
-
-    case {Keyword.fetch!(validated, :position), nudges} do
-      {position, []} ->
-        position(position)
-
-      {position, _nudges} when position in [:nudge, {:nudge, []}] ->
-        position(position)
-
-      {position, nudges} ->
-        raise ArgumentError,
-              "#{function} takes #{Enum.map_join(Keyword.keys(nudges), " and ", fn name -> "#{name}:" end)} " <>
-                "only beside position: :nudge, its default, got: #{inspect(position)}, which " <>
-                "moves no mark by a nudge"
-    end
   end
 
   # The box geom's struct from `geom_boxplot/3`'s validated options, each part's look holding only

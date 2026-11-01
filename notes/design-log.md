@@ -79,6 +79,19 @@ stops the question being reopened from scratch. A new entry is about 150 words: 
 sentence or two of why, and one line per rejected alternative. What a later decision replaces is
 deleted from the entry it was in, never marked superseded; git history keeps every version.
 
+- **A nudge is an aesthetic only, set or mapped on any layer that nudges, and `:nudge` takes no
+  options (2026-11-01, Steve: design 3, then "A", "A").** As ggplot2 4.0 made them: every layer
+  function but a diagonal line's takes `nudge_x:` and `nudge_y:` and maps them, a reference line
+  only along its own axis, beside `position: :nudge` alone; beside another a set or mapped one is
+  refused, where R warns "Ignoring unknown parameters" and moves nothing, and counting at each
+  place refuses one mapped before its stat, which drops it. A set one wins over a mapped one, as in
+  R. A missing nudge makes its row's position missing, where R fails if every other nudge along
+  the axis is 0; a column that is not numbers is refused when run, where R fails at a string,
+  draws no factor's marks and moves a logical's by 0 or 1. *Rejected: `{:nudge, x:, y:}` beside
+  the aesthetics*, R's two ways, one of them history; *raising at a missing nudge*, stricter than
+  R where R draws; *moving by a boolean's 0 or 1*, R's arithmetic, where Giggly reads a boolean
+  as discrete.
+
 - **Filling is stacking with `fill: true`, and a pile whose total is NaN is not drawn, where R
   fails; `vjust:` is one number (2026-11-01, Steve: "A", "A").** `:fill` and `{:fill, vjust:,
   reverse:}` record `%Position.Stack{fill: true}`, as ggplot2's `PositionFill` is `PositionStack`
@@ -2522,14 +2535,11 @@ deleted from the entry it was in, never marked superseded; git history keeps eve
 
 - **A position declares the aesthetics it reads, with their defaults, and the assembly writes them
   into every row just before the position runs, as ggplot2 4.0's `Position$use_defaults()`
-  (2026-10-17, Steve).** Nudging reads `nudge_x` and `nudge_y`, which `geom_text/3` sets; the
-  stage writes the layer's value or else the default, 0, so every text layer's table carries both,
-  as R's `layer_data()` does, though no geom's defaults are written yet. No layer maps a nudge yet,
-  so a nudge the plot maps, carried into a text layer, is replaced and moves nothing. *Rejected:
-  writing only a set nudge*, the position reading 0 where the column is absent, which keeps tables
-  free of defaults but differs from R's and gives the position a missing-column case; *writing only
-  where no column exists*, as R does, which lets a plot's nudge mapping move each label while a
-  layer's own is refused: half of a deferred feature, with no check of the column's type.
+  (2026-10-17, Steve).** Nudging reads `nudge_x` and `nudge_y`; the stage writes the value the
+  layer sets, else keeps the column it maps, its own or the plot's, else writes the default, 0, so
+  every nudging layer's table carries both, as R's `layer_data()` does. *Rejected: writing only a
+  set nudge*, the position reading 0 where the column is absent, which keeps tables free of
+  defaults but differs from R's and gives the position a missing-column case.
 
 - **An aesthetic a layer takes from the plot and cannot use rides along unused, as ggplot2 carries
   one (2026-10-17, Steve, settling §7's question as the second geom drawn beside points arrived).**
@@ -3901,6 +3911,9 @@ tells the story (`git show <hash>`). Until 2026-10-15 each milestone also had a 
 `git log -S "<title>" -- notes/design-log.md` finds it in this file's history. The phases are
 §1's roadmap.
 
+- 2026-11-01 — Make nudge_x and nudge_y aesthetics, set or mapped on every layer that nudges
+  (positions, step 4); §4: "A nudge is an aesthetic only", "A position declares the aesthetics it
+  reads"
 - 2026-11-01 — Give stacking its vjust: and reverse:, and fill each pile to 1 with :fill
   (positions, step 3); §4: "Filling is stacking with `fill: true`"
 - 2026-11-01 — Give every layer function the positions that move its marks in ggplot2, refusing

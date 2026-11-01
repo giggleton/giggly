@@ -2871,7 +2871,7 @@ defmodule Giggly.PlotTest do
                  data: :none,
                  mapping: %{label: "model"},
                  fixed: %{},
-                 accepted: [:alpha, :color, :group, :label, :x, :y],
+                 accepted: [:alpha, :color, :group, :label, :x, :y, :nudge_x, :nudge_y],
                  annotation: false,
                  inherit: true
                }
@@ -3011,7 +3011,19 @@ defmodule Giggly.PlotTest do
                  data: :none,
                  mapping: %{label: "model"},
                  fixed: %{},
-                 accepted: [:alpha, :color, :fill, :group, :label, :linetype, :linewidth, :x, :y],
+                 accepted: [
+                   :alpha,
+                   :color,
+                   :fill,
+                   :group,
+                   :label,
+                   :linetype,
+                   :linewidth,
+                   :x,
+                   :y,
+                   :nudge_x,
+                   :nudge_y
+                 ],
                  annotation: false,
                  inherit: true
                }
@@ -5434,25 +5446,129 @@ defmodule Giggly.PlotTest do
       assert %Plot.Layer{annotation: true, position: %Position.Nudge{}} = layer
     end
 
-    test "text and labels take a nudge only beside nudging, which reads it" do
-      plot = Plot.new(@placed, %{x: :x, y: :y, label: :g})
+    # The nudges each family's marks move by: a reference line's along its own axis alone, as R
+    # moves no horizontal line across.
+    defp nudges(:hline), do: [:nudge_y]
+    defp nudges(:vline), do: [:nudge_x]
+    defp nudges(_family), do: [:nudge_x, :nudge_y]
 
-      for {add, function} <- [
-            {&Plot.geom_text/2, "Plot.geom_text/3"},
-            {&Plot.geom_label/2, "Plot.geom_label/3"}
-          ] do
-        assert [%Plot.Layer{position: %Position.Nudge{}}] =
-                 add.(plot, nudge_y: 0.1, position: :nudge).reversed_layers
+    # A reference line given its intercepts is an annotation, which takes no mapping.
+    defp maps?(function, given), do: function not in [:geom_hline, :geom_vline] or given == []
 
+    test "each layer function takes a nudge set beside nudging, which reads it, as a float" do
+      for {function, plot, mapping, given, family, _default} <- positioned_layers() do
+        nudges = nudges(family)
+        set = Enum.map(nudges, fn nudge -> {nudge, 1} end)
+        layer = added(function, plot, mapping, given, [position: :nudge] ++ set)
+
+        assert {function, given, Map.take(layer.fixed, nudges)} ==
+                 {function, given, Map.new(nudges, fn nudge -> {nudge, 1.0} end)}
+      end
+    end
+
+    test "each layer function maps a nudge beside nudging, which it then accepts" do
+      for {function, plot, mapping, given, family, _default} <- positioned_layers(),
+          maps?(function, given),
+          function not in [:geom_count, :stat_sum],
+          nudge <- nudges(family) do
+        layer = added(function, plot, Map.put(mapping, nudge, :y), given, position: :nudge)
+        assert {function, nudge, nudge in layer.accepted} == {function, nudge, true}
+      end
+    end
+
+    # R warns "Ignoring unknown parameters: `nudge_y`", or "aesthetics", and moves nothing.
+    test "each layer function refuses a nudge set or mapped beside a position that reads none" do
+      for {function, plot, mapping, given, family, _default} <- positioned_layers(),
+          nudge = hd(nudges(family)) do
+        set =
+          assert_raise ArgumentError, fn ->
+            added(function, plot, mapping, given, [{nudge, 1}, position: :identity])
+          end
+
+        assert set.message ==
+                 "Plot.#{function}/3 takes #{nudge}: only beside position: :nudge, the one " <>
+                   "position that reads a nudge, but its position is :identity"
+
+        if maps?(function, given) do
+          mapped =
+            assert_raise ArgumentError, fn ->
+              added(function, plot, Map.put(mapping, nudge, :y), given, position: :identity)
+            end
+
+          assert mapped.message ==
+                   "Plot.#{function}/3 maps #{inspect(nudge)} only beside position: :nudge, the " <>
+                     "one position that reads a nudge, but its position is :identity"
+        end
+      end
+    end
+
+    test "a refusal of a nudge names the position beside it" do
+      plot = Plot.new(@placed, %{x: :g, y: :y})
+
+      for position <- [:stack, :fill, :dodge, :dodge2, :jitter] do
         error =
           assert_raise ArgumentError, fn ->
-            add.(plot, nudge_x: 0.1, nudge_y: 0.1, position: :stack)
+            Plot.geom_col(plot, nudge_x: 0.1, nudge_y: 0.1, position: position)
+          end
+
+        assert error.message =~ "but its position is #{inspect(position)}"
+      end
+    end
+
+    # R's `stat_sum()` counts over the aesthetics it lists, which hold no nudge, and drops the rest
+    # without a warning.
+    test "counting at each place refuses a nudge mapped before its stat, which drops it, and " <>
+           "maps one after it" do
+      plot = Plot.new(@placed, %{x: :x, y: :y})
+
+      for function <- [:geom_count, :stat_sum] do
+        error =
+          assert_raise ArgumentError, fn ->
+            added(function, plot, %{nudge_y: :y}, [], position: :nudge)
           end
 
         assert error.message ==
-                 "#{function} takes nudge_x: and nudge_y: only beside position: :nudge, its " <>
-                   "default, got: :stack, which moves no mark by a nudge"
+                 "Plot.#{function}/3 maps :nudge_y to \"y\", but its stat counts each place by " <>
+                   "the aesthetics it draws and keeps no nudge, so it would move nothing; map it " <>
+                   "to an after_stat to nudge the counted points"
+
+        layer = added(function, plot, %{nudge_y: {:after_stat, [:n]}}, [], position: :nudge)
+        assert :nudge_y in layer.accepted
       end
+    end
+
+    test "a reference line takes no nudge across its own axis, which moves none of it" do
+      plot = Plot.new(@placed)
+
+      for {function, across, intercept} <- [
+            {:geom_hline, :nudge_x, :yintercept},
+            {:geom_vline, :nudge_y, :xintercept}
+          ] do
+        option =
+          assert_raise NimbleOptions.ValidationError, fn ->
+            added(function, plot, %{}, [{intercept, 2}], [{across, 1}, position: :nudge])
+          end
+
+        assert option.message =~ "unknown options [#{inspect(across)}]"
+
+        mapped =
+          assert_raise ArgumentError, fn ->
+            added(function, plot, %{intercept => :y, across => :y}, [], position: :nudge)
+          end
+
+        assert mapped.message =~ "Plot.#{function}/3 cannot use #{inspect(across)}"
+      end
+    end
+
+    test "a diagonal line takes no nudge, as it takes no position" do
+      error =
+        assert_raise NimbleOptions.ValidationError, fn ->
+          @placed
+          |> Plot.new()
+          |> Plot.geom_abline(nudge_y: 1)
+        end
+
+      assert error.message =~ "unknown options [:nudge_y]"
     end
 
     test "beside varwidth: a box plot dodges by clusters alone, each box at its own width" do

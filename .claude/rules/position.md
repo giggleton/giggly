@@ -75,9 +75,13 @@ the entry beginning "Each facet, coordinate system, geom, stat and position is a
   beginning "A position declares the aesthetics it reads"); a position reading none declares an
   empty map.
 - **Nudging is ggplot2's `position_nudge()`, `x = NULL`, `y = NULL`**, the text geom's default
-  position, as in ggplot2 4.0, and a position every layer but a diagonal line's takes: every column
+  position, as in ggplot2 4.0, and a position every layer but a diagonal line's takes, its nudges
+  set or mapped (design-log §4, the entry beginning "A nudge is an aesthetic only"): every column
   in the x family moves by its row's `nudge_x` and every one in the y family by its `nudge_y`, both
-  0 by default; a position comes out a double, as R's do, and a missing one stays missing.
+  0 by default, through the frame's `+` (`Giggly.DataFrame.Arithmetic`), so a position comes out a
+  double, as R's do, an infinite nudge sends its mark to that infinity, and a row missing its
+  position or its nudge is missing that position. **It departs from R where R fails**: a missing
+  nudge in a layer whose other nudges along that axis are all 0, where R fails.
 - **Jittering is ggplot2's `position_jitter()`, its seed fixed** (design-log §4, the entries
   beginning "`geom_jitter` is Phase 3's fourteenth" and "A jitter's distances are Erlang's"):
   every column of the x family moves by its row's distance across and every one of the y family

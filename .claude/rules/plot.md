@@ -368,8 +368,14 @@ stat and position" and "Each facet, coordinate system, geom, stat and position i
   plots, jittering for `geom_jitter/3`, the identity elsewhere. `geom_boxplot/3` with `varwidth:
   true` records `{:dodge2, preserve: :single}`, keeping the padding and order given, and refuses
   any other position and `preserve: :total`, where R ignores a name, moves no box of its own width
-  by dodging and drops the total. **Text and labels take `nudge_x:` and `nudge_y:` only beside
-  `:nudge`**, refused beside another position, as R ignores a nudge no position reads.
+  by dodging and drops the total. **Every layer function but `geom_abline/3` takes `nudge_x:` and
+  `nudge_y:` and maps `nudge_x` and `nudge_y` only beside `:nudge`**, the one position that reads
+  them (design-log §4, the entry beginning "A nudge is an aesthetic only"), a reference line only
+  along its own axis, `geom_hline/3` `nudge_y` and `geom_vline/3` `nudge_x`, as R moves none
+  across; a set nudge or one the layer's own mapping maps is refused beside another position,
+  where R warns and moves nothing, while one the plot's mapping carries rides along unused; and
+  `geom_count/3` and `stat_sum/3` refuse one mapped before their stat, which drops it, and map one
+  after it.
   `geom_jitter/3`'s own `width:` and `height:` are recorded as jittering's and refused beside
   `position:`, as ggplot2's `geom_jitter()` refuses both, and it takes no `seed:`, as ggplot2's
   does not (design-log §4, the entry beginning "`geom_jitter` is Phase 3's fourteenth").
@@ -384,8 +390,9 @@ stat and position" and "Each facet, coordinate system, geom, stat and position i
   the line, segment, rug, reference line, bar, rectangle, ribbon, area, density, smooth and label
   functions `linewidth:`, in millimetres, and `linetype:`, a line's, a border's or an outline's,
   and `geom_text/3` and `geom_label/3` `size:`, in millimetres, `angle:`, in degrees,
-  `hjust:` and `vjust:`, a number or one of ggplot2's words as an atom (`:inward`), `family:`,
-  and `nudge_x:` and `nudge_y:`, in the units of each axis, which its position reads, and
+  `hjust:` and `vjust:`, a number or one of ggplot2's words as an atom (`:inward`), and
+  `family:`, and every layer function but `geom_abline/3` `nudge_x:` and `nudge_y:`, a reference
+  line one of them, in the units of each axis, which nudging reads, and
   `geom_rect/3` its corners, `xmin:`, `xmax:`, `ymin:` and `ymax:`, a number or `:infinity` or
   `:neg_infinity`, in the units of each axis, and `geom_bar/3` and `geom_col/3` `width:`, any
   number, as R takes it, and `geom_tile/3` `width:` and `height:`, any numbers, and `geom_boxplot/3` `fill:`, `linewidth:`, `linetype:`, `shape:` and
