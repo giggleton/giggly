@@ -31,10 +31,10 @@ continuous data drawn from a smooth distribution; `stat_density()` computes it. 
 density, the stat computes counts, the density times the number of rows, for stacking densities.
 Giggly has both, `Giggly.Plot.geom_density/3` and `Giggly.Plot.stat_density/3`, which take
 ggplot2's options as keyword options (`bw:`, `adjust:`, `kernel:`, `n:`, `trim:`, `bounds:` and
-`orientation:`), stack curves with `position: :stack`, and map what the stat computes, such as the
-count, with `{:after_stat, [:count]}`. It has no `position_fill()`, and of the bandwidth rules `bw`
-names, only R's `"nrd0"` and `"nrd"`, as `:nrd0` and `:nrd`, not `"ucv"`, `"bcv"` or `"SJ"`. A plot
-is described with `Giggly.Plot` and drawn with `Giggly.to_svg/2`, which returns an SVG document.
+`orientation:`), stack curves with `position: :stack` and fill them with `position: :fill`, and
+map what the stat computes, such as the count, with `{:after_stat, [:count]}`. Of the bandwidth
+rules `bw` names, it has only R's `"nrd0"` and `"nrd"`, as `:nrd0` and `:nrd`, not `"ucv"`, `"bcv"`
+or `"SJ"`. A plot is described with `Giggly.Plot` and drawn with `Giggly.to_svg/2`, which returns an SVG document.
 The setup cell aliases `Giggly.Plot`, so the cells write `Plot.new/2`, and defines `render`, which
 draws a plot and shows it below the cell with `Kino.Image`. Every example uses ggplot2's
 `diamonds`, `Giggly.Datasets.diamonds/0`, which the setup cell binds to `diamonds`, ggplot2's name
@@ -189,4 +189,12 @@ ggplot(diamonds, aes(carat, after_stat(count), fill = cut)) +
   geom_density(position = "fill")
 ```
 
-Not in Giggly yet: `position_fill()`.
+R's `position = "fill"` is `position: :fill`: at each carat, the cuts' counts pile to 1, so each
+band shows that cut's share of the diamonds there.
+
+```elixir
+diamonds
+|> Plot.new(%{x: :carat, y: {:after_stat, [:count]}, fill: :cut})
+|> Plot.geom_density(position: :fill)
+|> render.()
+```

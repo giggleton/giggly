@@ -50,8 +50,9 @@ defmodule Giggly.Plot do
   A layer takes every position that can move its marks. Marks with a width of their own, such as
   bars, tiles and error bars, take them all. Marks with none, such as points, lines, text, line
   ranges and areas, are dodged only within a width given, `{:dodge, width: 0.9}`, and never by
-  clusters, since neither would move them. Box plots and rectangles are neither stacked nor
-  jittered, and a horizontal or vertical line is only nudged; a diagonal line takes no position.
+  clusters, since neither would move them. Box plots and rectangles are neither stacked, filled
+  nor jittered, and a horizontal or vertical line is only nudged; a diagonal line takes no
+  position.
 
   A position a layer's marks do not take raises from the layer function given it, saying why, and
   so do an option the position does not take and a value it cannot use, naming the position.
@@ -63,8 +64,35 @@ defmodule Giggly.Plot do
   ### Piling marks up: `:stack`
 
   Marks that share an `x` are piled on one another, the highest group at the bottom, so the pile
-  matches the legend's order; those reaching below zero pile downward from it.
-  Bars and areas pile this way by default. It takes no options.
+  matches the legend's order, or the lowest given `reverse: true`; those reaching below zero pile
+  downward from it. Each mark takes the stretch of its pile as long as its `y`, and its `y` moves
+  to the stretch's top, or as far up it as `vjust:` says, so `vjust: 0.5` sets a label in the
+  middle of the bar it labels. Bars and areas pile this way by default.
+
+  #{NimbleOptions.docs(Giggly.Plot.Options.position_kind(:stack))}
+
+      iex> frame =
+      ...>   %{"x" => ["a", "a"], "y" => [2.0, 3.0], "g" => ["p", "q"]}
+      ...>   |> Giggly.Plot.new(%{x: :x, y: :y, label: :g, colour: :g})
+      ...>   |> Giggly.Plot.geom_text(position: {:stack, vjust: 0.5})
+      ...>   |> Giggly.layer_data()
+      iex> Giggly.DataFrame.pull(frame, :y)
+      [4.0, 1.5]
+
+  ### Piling marks to one height: `:fill`
+
+  Marks are piled as `:stack` piles them, then each pile is scaled to reach 1, so the marks at an
+  `x` show their shares of its total; a pile below zero reaches -1. A pile whose total is 0 is
+  left as it is, and one holding both infinities, whose total is no number, is not drawn. It
+  takes stacking's options.
+
+      iex> frame =
+      ...>   %{"x" => ["a", "a", "b"], "y" => [1.0, 3.0, 2.0], "g" => ["p", "q", "p"]}
+      ...>   |> Giggly.Plot.new(%{x: :x, y: :y, fill: :g})
+      ...>   |> Giggly.Plot.geom_col(position: :fill)
+      ...>   |> Giggly.layer_data()
+      iex> Giggly.DataFrame.pull(frame, :ymax)
+      [1.0, 0.75, 1.0]
 
   ### Setting marks side by side: `:dodge`
 
@@ -5865,7 +5893,8 @@ defmodule Giggly.Plot do
     do: position_struct(kind, NimbleOptions.validate!(options, Options.position_kind(kind)))
 
   defp position_struct(:identity, []), do: %Position.Identity{}
-  defp position_struct(:stack, []), do: %Position.Stack{}
+  defp position_struct(:stack, options), do: struct!(Position.Stack, options)
+  defp position_struct(:fill, options), do: struct!(Position.Stack, [fill: true] ++ options)
   defp position_struct(:dodge, options), do: %Position.Dodge{width: width_given(options)}
   defp position_struct(:dodge2, options), do: struct!(Position.Dodge2, options)
   defp position_struct(:nudge, []), do: %Position.Nudge{}

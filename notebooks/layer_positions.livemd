@@ -21,14 +21,15 @@ carries its options, or through `layer()`; for many layers it is `position_ident
 them where they are. Giggly takes a layer's position by name, `position: :jitter`, or by name with
 its options in a tuple, `position: {:jitter, seed: 1}`, where ggplot2 calls a `position_*()`
 function. Every layer function takes the positions that can move its marks, as ggplot2's do:
-`:identity`, stacking (`:stack`), dodging (`:dodge`, `{:dodge, width: width}`, and `:dodge2` or
+`:identity`, stacking (`:stack` or `{:stack, options}`), filling (`:fill` or `{:fill, options}`,
+as `position_fill()` does), dodging (`:dodge`, `{:dodge, width: width}`, and `:dodge2` or
 `{:dodge2, options}`, as `position_dodge2()` does), jittering (`:jitter` or `{:jitter, options}`)
 and nudging (`:nudge`). Marks with no width of their own, such as points, text and line ranges,
-are dodged only within a width given; box plots and rectangles are neither stacked nor jittered,
-and horizontal and vertical lines are only nudged. Bars and histograms stack by default, as do
+are dodged only within a width given; box plots and rectangles are neither stacked, filled nor
+jittered, and horizontal and vertical lines are only nudged. Bars and histograms stack by default, as do
 `Giggly.Plot.geom_area/3`, and box plots dodge as `position_dodge2()` does;
 `Giggly.Plot.geom_jitter/3` jitters its points, and `Giggly.Plot.geom_text/3` nudges every label
 by its `nudge_x:` and `nudge_y:` options, as ggplot2's `geom_text()` does. Not in Giggly yet:
-`position_fill()`, `position_jitterdodge()`, `position_nudge()`'s `x` and `y` options, the options
-of `position_stack()`, `position_dodge()`'s `preserve`, `orientation` and `reverse` options,
-`position_dodge2()`'s `width` option, and `layer()`.
+`position_jitterdodge()`, `position_nudge()`'s `x` and `y` options, `position_dodge()`'s
+`preserve`, `orientation` and `reverse` options, `position_dodge2()`'s `width` option, and
+`layer()`.

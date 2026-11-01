@@ -12962,6 +12962,49 @@ defmodule GigglyTest do
       assert golden?(plot, "density_stacked")
     end
 
+    # Golden: test/golden/bars_filled.svg, checked as test/golden/smooth_lm.svg is, made by
+    # test/golden/bars_filled.R. Each cylinder count's cars by engine shape, each pile filled to 1.
+    # It moves with filling, or the y axis's breaks between 0 and 1.
+    test "filled bars reach 1, each its share of its pile" do
+      plot =
+        Giggly.Datasets.mtcars()
+        |> Plot.new(%{x: {:factor, [:cyl]}, fill: {:factor, [:vs]}})
+        |> Plot.geom_bar(position: :fill)
+
+      assert golden?(plot, "bars_filled")
+    end
+
+    # Golden: test/golden/labels_stacked_middle.svg, checked as test/golden/smooth_lm.svg is, made
+    # by test/golden/labels_stacked_middle.R. Columns stacked, one piling down from zero, each
+    # labelled in the middle of its part. It moves with stacking's vjust, or a pile below zero.
+    test "labels stacked with vjust 0.5 sit in the middle of the columns they label" do
+      plot =
+        %{
+          "x" => ["a", "a", "b", "b", "b"],
+          "y" => [1, 2, 1, 3, -1],
+          "grp" => ["x", "y", "x", "y", "y"]
+        }
+        |> Plot.new(%{x: :x, y: :y, group: :grp})
+        |> Plot.geom_col(%{fill: :grp})
+        |> Plot.geom_hline(yintercept: 0)
+        |> Plot.geom_text(%{label: :grp}, position: {:stack, vjust: 0.5})
+
+      assert golden?(plot, "labels_stacked_middle")
+    end
+
+    # Golden: test/golden/bars_stacked_reversed.svg, checked as test/golden/smooth_lm.svg is, made
+    # by test/golden/bars_stacked_reversed.R. Horizontal bars stacked lowest drive train first,
+    # reading in the legend's order along each bar. It moves with stacking reversed, or along y.
+    test "horizontal bars stacked in reverse run in the legend's order" do
+      plot =
+        Giggly.Datasets.mpg()
+        |> Plot.new(%{y: :class})
+        |> Plot.geom_bar(%{fill: :drv}, position: {:stack, reverse: true})
+        |> Plot.theme(legend_position: :top)
+
+      assert golden?(plot, "bars_stacked_reversed")
+    end
+
     # Golden: test/golden/stat_density.svg, checked as test/golden/smooth_lm.svg is, made by
     # test/golden/stat_density.R. stat_density/3's areas stacked, then each drawn where it is,
     # outlined dashed along both edges; its keys' corners mitred, its outlines' round, as ggplot2

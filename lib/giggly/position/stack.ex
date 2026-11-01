@@ -2,21 +2,31 @@ defmodule Giggly.Position.Stack do
   @moduledoc false
 
   # Stacking, ggplot2's `position_stack()`: the bars at one x piled on one another, as `geom_col()`
-  # and `geom_bar()` default `position = "stack"`, and the areas, as `geom_area()` does. It takes
-  # no parameters yet; ggplot2's `vjust = 1`, `reverse = FALSE` and `fill = FALSE` are how it
-  # stacks. Run it through `Giggly.Position`.
+  # and `geom_bar()` default `position = "stack"`, and the areas, as `geom_area()` does, and
+  # filling, ggplot2's `position_fill()`, which is stacking with each pile scaled to reach 1. Its
+  # fields are ggplot2's: `vjust`, where in its stretch each mark's y moves, 0 its bottom and 1 its
+  # top, `reverse`, whether the lowest group is at the bottom of the pile, and `fill`, whether each
+  # pile is scaled. Run it through `Giggly.Position`.
   #
-  # Nothing moves unless two rows of the layer share an x, in any panel, as ggplot2 skips stacking
-  # when every x differs. Otherwise a layer whose rows have no `ymax`, as a point's have none, is
+  # Nothing moves unless two rows of the layer share an x, in any panel, or the marks are filled or
+  # their y moves off the top of its stretch, as ggplot2 skips stacking when every x differs and
+  # neither is asked. Otherwise a layer whose rows have no `ymax`, as a point's have none, is
   # stacked by its y, its `ymax` and `ymin` written as ggplot2's `setup_data()` and `pos_stack()`
   # write them, and a layer whose rows have no `xmin`, as an area's have none, has
   # each row's `xmin` and `xmax` set to its x, as ggplot2's `collide()` sets them, and each panel's
   # bars, or an area's bands from 0 to its y, are stacked by their `xmin`, those reaching
   # below zero separately from the rest, each pile in the order of its x and then of its group,
-  # highest group first, so the pile matches the legend's order, as ggplot2's `collide()` orders
-  # them. Each bar takes the next stretch of its pile, `ymin` to `ymax`, as long as its y, and its
-  # y moves to the stretch's top. A bar reaching below zero piles downward from zero: its `ymax`,
-  # which is 0, is first taken as its `ymin`, as ggplot2 stacks by `ymax`.
+  # highest group first, so the pile matches the legend's order, or lowest first when reversed, as
+  # ggplot2's `collide()` orders them. Each bar takes the next stretch of its pile, `ymin` to
+  # `ymax`, as long as its y, and its y moves to `(1 - vjust) * ymin + vjust * ymax`. A bar
+  # reaching below zero piles downward from zero: its `ymax`, which is 0, is first taken as its
+  # `ymin`, as ggplot2 stacks by `ymax`.
+  #
+  # Filled, each pile's heights are divided by the magnitude of its total, as ggplot2's
+  # `pos_stack()` divides them, so a pile above zero reaches 1 and one below reaches -1; a pile
+  # whose total is no more than R's `sqrt(.Machine$double.eps)` is left as it is. A pile whose
+  # total is NaN, one holding both infinities, is divided by it, so its marks are missing and not
+  # drawn, where ggplot2 fails.
   #
   # A row missing its x, its edges or its y loses its x, its edges and its y, as ggplot2's
   # `detect_missing()` blanks them; it stacks as nothing, its y 0, and its `ymin` and `ymax` are
@@ -25,9 +35,9 @@ defmodule Giggly.Position.Stack do
   # Horizontal bars, those whose `flipped_aes` column says so, are stacked along x, x and y
   # swapped and swapped back (`Giggly.Position.Orientation`).
 
-  defstruct []
+  defstruct vjust: 1.0, reverse: false, fill: false
 
-  @type t :: %__MODULE__{}
+  @type t :: %__MODULE__{vjust: float(), reverse: boolean(), fill: boolean()}
 
   defimpl Giggly.Position, for: __MODULE__ do
     use Boundary, classify_to: Giggly.Position
@@ -36,8 +46,9 @@ defmodule Giggly.Position.Stack do
     alias Giggly.DataFrame.Arithmetic
     alias Giggly.Position.{Collide, Orientation}
 
-    # ggplot2's default: each bar's y at the top of its stretch.
-    @vjust 1
+    # R's `sqrt(.Machine$double.eps)`, the square root of 2^-52: a filled pile whose total is no
+    # more than this is left as it is.
+    @smallest_total 1.4901161193847656e-8
 
     @columns [:panel, :group, :x, :xmin, :xmax, :y, :ymin, :ymax]
     @placed [:x, :xmin, :xmax, :y, :ymin, :ymax]
@@ -47,24 +58,28 @@ defmodule Giggly.Position.Stack do
     def default_aesthetics(_position), do: %{}
 
     @impl Giggly.Position
-    def compute_layer(_position, frame, _axis_kinds) do
+    def compute_layer(position, frame, _axis_kinds) do
       flipped = Orientation.flipped?(frame)
 
       frame
       |> Orientation.flip(flipped)
-      |> moved()
+      |> moved(position)
       |> Orientation.flip(flipped)
     end
 
-    defp moved(frame) do
+    # ggplot2 skips stacking only when every x differs and the marks are neither filled nor moved
+    # off the top of their stretch.
+    defp moved(frame, %{fill: false, vjust: vjust} = position) when vjust == 1 do
       x_positions = DataFrame.pull(frame, :x)
 
       if length(Enum.uniq(x_positions)) == length(x_positions),
         do: frame,
-        else: stacked(frame)
+        else: stacked(frame, position)
     end
 
-    defp stacked(frame) do
+    defp moved(frame, position), do: stacked(frame, position)
+
+    defp stacked(frame, position) do
       frame =
         frame
         |> Collide.with_top()
@@ -77,7 +92,7 @@ defmodule Giggly.Position.Stack do
         |> Enum.zip_with(fn values -> row(values) end)
         |> Enum.with_index(fn row, index -> set_up(row, index) end)
         |> Enum.group_by(fn row -> {row.panel, below_zero?(row)} end)
-        |> Enum.flat_map(fn {_pile, rows} -> collide(rows) end)
+        |> Enum.flat_map(fn {_pile, rows} -> collide(rows, position) end)
         |> Enum.sort_by(fn row -> row.index end)
 
       Enum.reduce(@placed, frame, fn name, placed ->
@@ -117,40 +132,63 @@ defmodule Giggly.Position.Stack do
     defp below_zero?(%{ymax: ymax}), do: Arithmetic.less?(ymax, 0) == true
 
     # ggplot2's `collide()`: the pile's rows by their `xmin`, a missing one last, then by group,
-    # highest first, each run of one `xmin` stacked on its own.
-    defp collide(rows) do
+    # highest first, or lowest first when reversed, each run of one `xmin` stacked on its own.
+    defp collide(rows, position) do
       rows
-      |> Enum.sort_by(fn row -> {xmin_key(row.xmin), -row.group} end)
+      |> Enum.sort_by(fn row -> {xmin_key(row.xmin), group_key(row.group, position)} end)
       |> Enum.chunk_by(fn row -> row.xmin end)
-      |> Enum.flat_map(&pile/1)
+      |> Enum.flat_map(fn pile -> pile(pile, position) end)
     end
+
+    defp group_key(group, %{reverse: true}), do: group
+    defp group_key(group, %{reverse: false}), do: -group
 
     defp xmin_key(xmin) when is_number(xmin), do: {0, xmin}
     defp xmin_key(_missing), do: {1, nil}
 
-    # ggplot2's `pos_stack()`: each bar takes the stretch from the pile's height so far to that
-    # height plus its y, a missing y adding nothing, in order, in R's arithmetic
-    # (`Giggly.DataFrame.Arithmetic`), so an infinite bar takes the pile to its infinity, and a
-    # bar above it stretches from infinity to infinity, its y NaN, as `0 * Inf` is. A bar whose
-    # `ymax` was below its `ymin` keeps them that way round, and one missing either has neither.
-    defp pile(rows) do
-      {stacked, _height} =
+    # ggplot2's `pos_stack()`: the pile's heights, from 0 through each bar's y added in order, a
+    # missing y adding nothing, in R's arithmetic (`Giggly.DataFrame.Arithmetic`), so an infinite
+    # bar takes the pile to its infinity, and a bar above it stretches from infinity to infinity,
+    # its y NaN, as `0 * Inf` is. Filled, each height is divided by the magnitude of the last.
+    # Each bar takes the stretch between its two heights and its y moves `vjust` of the way up it.
+    # A bar whose `ymax` was below its `ymin` keeps them that way round, and one missing either has
+    # neither.
+    defp pile(rows, position) do
+      {stretches, total} =
         Enum.map_reduce(rows, 0.0, fn row, height ->
-          next = Arithmetic.add(height, y_value(row.y))
-          low = Arithmetic.lesser(height, next)
-          high = Arithmetic.greater(height, next)
-
-          y =
-            Arithmetic.add(
-              Arithmetic.multiply(1 - @vjust, low),
-              Arithmetic.multiply(@vjust, high)
-            )
-
-          {edges(row, y, low, high), next}
+          top = Arithmetic.add(height, y_value(row.y))
+          {{row, height, top}, top}
         end)
 
-      stacked
+      scale = scaled(total, position)
+
+      Enum.map(stretches, fn {row, bottom, top} ->
+        bottom = scale.(bottom)
+        top = scale.(top)
+        low = Arithmetic.lesser(bottom, top)
+        high = Arithmetic.greater(bottom, top)
+
+        y =
+          Arithmetic.add(
+            Arithmetic.multiply(1 - position.vjust, low),
+            Arithmetic.multiply(position.vjust, high)
+          )
+
+        edges(row, y, low, high)
+      end)
     end
+
+    # How a pile's heights are scaled: divided by the magnitude of `total` when filled and it is
+    # more than the smallest total, or NaN, which compares with nothing, and as they are otherwise.
+    defp scaled(total, %{fill: true}) do
+      magnitude = Arithmetic.magnitude(total)
+
+      if Arithmetic.less?(@smallest_total, magnitude) == false,
+        do: fn height -> height end,
+        else: fn height -> Arithmetic.divide(height, magnitude) end
+    end
+
+    defp scaled(_total, %{fill: false}), do: fn height -> height end
 
     defp y_value(missing) when missing in [nil, :nan], do: 0.0
     defp y_value(y), do: y

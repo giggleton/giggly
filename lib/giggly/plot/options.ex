@@ -432,12 +432,30 @@ defmodule Giggly.Plot.Options do
         "of the closest spacing of each panel's `y` positions when not given."
   ]
 
+  # Stacking's options, which filling shares, as ggplot2's `position_fill()` takes
+  # `position_stack()`'s.
+  @stack_options [
+    vjust: [
+      type: {:custom, __MODULE__, :validate_number, []},
+      default: 1.0,
+      doc:
+        "Where in its stretch of the pile each mark's `y` moves, any number: 0 its bottom, 0.5 " <>
+          "its middle, 1 its top."
+    ],
+    reverse: [
+      type: :boolean,
+      default: false,
+      doc: "Whether the pile runs from the lowest group at the bottom to the highest."
+    ]
+  ]
+
   # Each position's options, by its name, as a layer's `position:` takes it: the name alone, or the
   # name in a tuple with a keyword list of its options, as ggplot2's `position_dodge(width = 0.9)`
   # gives them. A position with no options takes an empty list.
   @position_kind_options %{
     identity: [],
-    stack: [],
+    stack: @stack_options,
+    fill: @stack_options,
     dodge: [
       width: [
         type: {:custom, __MODULE__, :validate_width, []},
@@ -490,12 +508,12 @@ defmodule Giggly.Plot.Options do
   # The positions each family of layers takes, as ggplot2's take them, and those it refuses, each
   # with why R fails or moves nothing (`validate_position/2`). Marks with a width of their own,
   # bars, bins, error bars, crossbars, tiles and frequency polygons' bins, take every position.
-  @positions_with_width [takes: [:identity, :stack, :dodge, :dodge2, :jitter, :nudge]]
+  @positions_with_width [takes: [:identity, :stack, :fill, :dodge, :dodge2, :jitter, :nudge]]
 
   # Marks with no width of their own, points, lines, text, line ranges, areas and the rest, are
   # dodged only within a width given, where ggplot2 warns "Width not defined" and moves none.
   @positions_without_width [
-    takes: [:identity, :stack, :dodge, :jitter, :nudge],
+    takes: [:identity, :stack, :fill, :dodge, :jitter, :nudge],
     refuses: [
       dodge2:
         "the marks have no width of their own, by which dodging by clusters sets them side by " <>
@@ -509,6 +527,7 @@ defmodule Giggly.Plot.Options do
     takes: [:identity, :dodge, :dodge2, :nudge],
     refuses: [
       stack: "a box plot's rows have no y once its stat has run, which stacking piles",
+      fill: "a box plot's rows have no y once its stat has run, which filling piles",
       jitter: "a box plot's rows have no y once its stat has run, which jittering moves"
     ]
   ]
@@ -518,6 +537,7 @@ defmodule Giggly.Plot.Options do
     takes: [:identity, :dodge, :dodge2, :nudge],
     refuses: [
       stack: "a rectangle has no x, at which stacking piles marks, so none would move",
+      fill: "a rectangle has no x, at which filling piles marks",
       jitter: "a rectangle has no x or y, which jittering moves"
     ]
   ]
@@ -528,6 +548,7 @@ defmodule Giggly.Plot.Options do
     takes: [:identity, :nudge],
     refuses: [
       stack: "a horizontal line has no y, which stacking piles, so none would move",
+      fill: "a horizontal line has no y, which filling piles",
       dodge: "a horizontal line has no x, along which dodging sets marks side by side",
       dodge2: "a horizontal line has no x, along which dodging sets marks side by side",
       jitter: "a horizontal line has no x or y, which jittering moves"
@@ -538,6 +559,7 @@ defmodule Giggly.Plot.Options do
     takes: [:identity, :nudge],
     refuses: [
       stack: "a vertical line has no y, which stacking piles, so none would move",
+      fill: "a vertical line has no y, which filling piles, so none would move",
       dodge: "a vertical line has no x, along which dodging sets marks side by side",
       dodge2: "a vertical line has no x, along which dodging sets marks side by side",
       jitter: "a vertical line has no x or y, which jittering moves"
@@ -550,11 +572,11 @@ defmodule Giggly.Plot.Options do
     type: {:custom, __MODULE__, :validate_position, [@positions_with_width]},
     doc:
       "Where the marks are moved once the stat has run: left at their positions (`:identity`), " <>
-        "piled on one another (`:stack`), set side by side within the width one mark takes or " <>
-        "the width given (`:dodge`), set side by side, each its share of their widths, with a " <>
-        "gap between them (`:dodge2`), each moved a small random distance (`:jitter`), or " <>
-        "nudged (`:nudge`), each alone or with its options, as [Positions](#module-positions) " <>
-        "says."
+        "piled on one another (`:stack`), piled to the same height (`:fill`), set side by side " <>
+        "within the width one mark takes or the width given (`:dodge`), set side by side, each " <>
+        "its share of their widths, with a gap between them (`:dodge2`), each moved a small " <>
+        "random distance (`:jitter`), or nudged (`:nudge`), each alone or with its options, as " <>
+        "[Positions](#module-positions) says."
   ]
 
   # The same for marks with no width of their own.
@@ -562,7 +584,8 @@ defmodule Giggly.Plot.Options do
     type: {:custom, __MODULE__, :validate_position, [@positions_without_width]},
     doc:
       "Where the marks are moved once the stat has run: left at their positions (`:identity`), " <>
-        "piled on one another (`:stack`), set side by side within the width given, " <>
+        "piled on one another (`:stack`), piled to the same height (`:fill`), set side by side " <>
+        "within the width given, " <>
         "`{:dodge, width: width}`, having no width of their own to share, each moved a small " <>
         "random distance (`:jitter`), or nudged (`:nudge`), each alone or with its options, as " <>
         "[Positions](#module-positions) says."

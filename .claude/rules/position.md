@@ -28,21 +28,27 @@ the entry beginning "Each facet, coordinate system, geom, stat and position is a
   and each axis's kind (`axis_kinds`, as a geom's `setup_data/3` is), which jittering first read,
   as R's `compute_jitter()` reads a mapped discrete position: stacking splits the table by the
   `panel` column itself and reads no scale. A position's own
-  parameters (a dodge's width, stacking's `vjust` and `reverse`) arrive with the option that sets
-  them, as dodging by clusters' `preserve`, `padding` and `reverse` arrived with
-  `{:dodge2, options}` and dodging's `width` with `{:dodge, width: width}`, the first reader
-  a line range, which has no edges; dodging by clusters' `width` waits, and the panel's scales
+  parameters arrive with the option that sets them, as dodging by clusters' `preserve`, `padding`
+  and `reverse` arrived with `{:dodge2, options}`, dodging's `width` with `{:dodge, width: width}`,
+  the first reader a line range, which has no edges, and stacking's `vjust`, `reverse` and `fill`
+  with `{:stack, options}` and `:fill`; dodging by clusters' `width` waits, and the panel's scales
   with the first position that reads one.
-- **Stacking is ggplot2's `position_stack()`, `vjust = 1`**: nothing moves unless two rows of the
-  layer share an x, in any panel; then a layer with no `ymax`, a point's, is stacked by its y, given
-  a `ymax` and then a `ymin` in R's order, as `setup_data()` and `pos_stack()` write them, and a
-  layer with no `xmin`, an area's, has its `xmin` and `xmax` set to its x, as ggplot2's `collide()`
-  sets them, and each panel's bars or bands pile by their `xmin`, those below zero downward and
-  apart from the rest, ordered by group, highest first, each bar's y moving to the top of its
-  stretch. A row missing its x, edges or y loses them all and stacks as nothing. The heights add and
-  compare in R's arithmetic (`Giggly.DataFrame.Arithmetic`), so an infinite bar takes its pile to
-  its infinity and a bar above it runs from infinity to infinity, its y R's `0 * Inf`, NaN, which
-  the scale's second mapping makes missing.
+- **Stacking is ggplot2's `position_stack()`, and filling its `position_fill()`, one kind with
+  `fill: true`** (design-log §4, the entry beginning "Filling is stacking"): nothing moves unless
+  two rows of the layer share an x, in any panel, or it fills or its `vjust` is not 1; then a layer
+  with no `ymax`, a point's, is stacked by its y, given a `ymax` and then a `ymin` in R's order, as
+  `setup_data()` and `pos_stack()` write them, and a layer with no `xmin`, an area's, has its
+  `xmin` and `xmax` set to its x, as ggplot2's `collide()` sets them, and each panel's bars or
+  bands pile by their `xmin`, those below zero downward and apart from the rest, ordered by group,
+  highest first, lowest first when reversed, each bar's y moving `vjust` of the way up its
+  stretch, `(1 - vjust) * low + vjust * high`. Filled, each pile's heights are divided by its
+  total's magnitude, as R's `pos_stack()` divides them, where that is above R's
+  `sqrt(.Machine$double.eps)`. A row missing its x, edges or y loses them all and stacks as nothing.
+  The heights add, divide and compare in R's arithmetic (`Giggly.DataFrame.Arithmetic`), so an
+  infinite bar takes its pile to its infinity and a bar above it runs from infinity to infinity,
+  its y R's `0 * Inf`, NaN, which the scale's second mapping makes missing; filled, the bars below
+  an infinity reach 0 and it NaN. **It departs from R where R fails**: a filled pile whose total is
+  NaN, holding both infinities, is divided by it, so its marks are missing, where R fails.
 - **Dodging is ggplot2's `position_dodge()`, `preserve = "total"`**: a mark with sides and no x, a
   rectangle, is first given their middle as its x, which it keeps, as `setup_data()` gives it; a
   mark with no `xmin` and `xmax`, a line range's or a point range's, is given them, its x ∓ half the

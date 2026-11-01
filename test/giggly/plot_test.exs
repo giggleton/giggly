@@ -5227,6 +5227,7 @@ defmodule Giggly.PlotTest do
     @kinds %{
       identity: Position.Identity,
       stack: Position.Stack,
+      fill: Position.Stack,
       dodge: Position.Dodge,
       dodge2: Position.Dodge2,
       jitter: Position.Jitter,
@@ -5292,8 +5293,11 @@ defmodule Giggly.PlotTest do
 
     # The positions each family takes, as a layer gives them, the dodging of marks with no width
     # within a width given.
-    defp taken(:with_width), do: [:identity, :stack, :dodge, :dodge2, :jitter, :nudge]
-    defp taken(:without_width), do: [:identity, :stack, {:dodge, width: 0.9}, :jitter, :nudge]
+    defp taken(:with_width), do: [:identity, :stack, :fill, :dodge, :dodge2, :jitter, :nudge]
+
+    defp taken(:without_width),
+      do: [:identity, :stack, :fill, {:dodge, width: 0.9}, :jitter, :nudge]
+
     defp taken(family) when family in [:boxplot, :rect], do: [:identity, :dodge, :dodge2, :nudge]
     defp taken(family) when family in [:hline, :vline], do: [:identity, :nudge]
 
@@ -5317,6 +5321,9 @@ defmodule Giggly.PlotTest do
         {:stack,
          "got: :stack, since a box plot's rows have no y once its stat has run, which " <>
            "stacking piles"},
+        {:fill,
+         "got: :fill, since a box plot's rows have no y once its stat has run, which " <>
+           "filling piles"},
         {:jitter,
          "got: :jitter, since a box plot's rows have no y once its stat has run, " <>
            "which jittering moves"}
@@ -5328,12 +5335,22 @@ defmodule Giggly.PlotTest do
         {:stack,
          "got: :stack, since a rectangle has no x, at which stacking piles marks, so " <>
            "none would move"},
+        {:fill, "got: :fill, since a rectangle has no x, at which filling piles marks"},
         {:jitter, "got: :jitter, since a rectangle has no x or y, which jittering moves"}
       ]
     end
 
-    defp refused(:hline), do: line_refusals("a horizontal line")
-    defp refused(:vline), do: line_refusals("a vertical line")
+    defp refused(:hline),
+      do:
+        [{:fill, "got: :fill, since a horizontal line has no y, which filling piles"}] ++
+          line_refusals("a horizontal line")
+
+    defp refused(:vline),
+      do:
+        [
+          {:fill,
+           "got: :fill, since a vertical line has no y, which filling piles, so none would move"}
+        ] ++ line_refusals("a vertical line")
 
     defp line_refusals(line) do
       [
@@ -5380,19 +5397,19 @@ defmodule Giggly.PlotTest do
     test "a refusal names the positions the marks take" do
       for {function, plot, mapping, given, taken} <- [
             {:geom_point, Plot.new(@placed, %{x: :x, y: :y}), %{}, [],
-             ":identity, :stack, :dodge, :jitter or :nudge"},
+             ":identity, :stack, :fill, :dodge, :jitter or :nudge"},
             {:geom_boxplot, Plot.new(@placed, %{x: :g, y: :y}), %{}, [],
              ":identity, :dodge, :dodge2 or :nudge"},
             {:geom_hline, Plot.new(@placed), %{}, [yintercept: 1], ":identity or :nudge"}
           ] do
         error =
           assert_raise NimbleOptions.ValidationError, fn ->
-            added(function, plot, mapping, given, position: :fill)
+            added(function, plot, mapping, given, position: :jitterdodge)
           end
 
         assert error.message =~
                  "expected #{taken}, alone or in a tuple with a keyword list of its options, " <>
-                   "got: :fill"
+                   "got: :jitterdodge"
       end
     end
 
@@ -5486,13 +5503,46 @@ defmodule Giggly.PlotTest do
       plot = Plot.new(@rows, %{x: :cyl, y: :mpg})
 
       for {named, struct} <- [
-            {:stack, %Position.Stack{}},
+            {:stack, %Position.Stack{vjust: 1.0, reverse: false, fill: false}},
+            {:fill, %Position.Stack{vjust: 1.0, reverse: false, fill: true}},
             {:dodge, %Position.Dodge{width: :none}},
             {:dodge2, %Position.Dodge2{preserve: :total, padding: 0.1, reverse: false}}
           ],
           position <- [named, {named, []}] do
         assert [%Plot.Layer{position: ^struct}] =
                  Plot.geom_col(plot, position: position).reversed_layers
+      end
+    end
+
+    test "stacking and filling record their vjust:, any number, as a float, and reverse:" do
+      plot = Plot.new(@rows, %{x: :cyl, y: :mpg})
+
+      for {position, struct} <- [
+            {{:stack, vjust: 0.5}, %Position.Stack{vjust: 0.5, reverse: false, fill: false}},
+            {{:stack, vjust: 2, reverse: true},
+             %Position.Stack{vjust: 2.0, reverse: true, fill: false}},
+            {{:fill, vjust: -1, reverse: true},
+             %Position.Stack{vjust: -1.0, reverse: true, fill: true}}
+          ] do
+        assert [%Plot.Layer{position: ^struct}] =
+                 Plot.geom_col(plot, position: position).reversed_layers
+      end
+    end
+
+    # R takes a vector of vjust, handed out down each pile by rank, failing on a pile shorter
+    # than it.
+    test "stacking and filling refuse a vjust: that is no number, a list of them included" do
+      plot = Plot.new(@rows, %{x: :cyl, y: :mpg})
+
+      for kind <- [:stack, :fill], vjust <- [[0, 1], :middle] do
+        error =
+          assert_raise NimbleOptions.ValidationError, fn ->
+            Plot.geom_col(plot, position: {kind, vjust: vjust})
+          end
+
+        assert error.message =~
+                 "in #{inspect(kind)}'s options, invalid value for :vjust option: expected a " <>
+                   "number, got: #{inspect(vjust)}"
       end
     end
 
@@ -5507,9 +5557,10 @@ defmodule Giggly.PlotTest do
             {{:dodge, width: 0.5, width: 0.9},
              "expected :dodge's options to be a keyword list naming each at most once, got: " <>
                "[width: 0.5, width: 0.9]"},
-            {{:stack, reverse: true}, "in :stack's options, unknown options [:reverse]"},
+            {{:nudge, x: 0.1}, "in :nudge's options, unknown options [:x]"},
+            {{:stack, fill: true}, "in :stack's options, unknown options [:fill]"},
             {{:dodge, :wide},
-             "expected :identity, :stack, :dodge, :dodge2, :jitter or :nudge, alone or in a " <>
+             "expected :identity, :stack, :fill, :dodge, :dodge2, :jitter or :nudge, alone or in a " <>
                "tuple with a keyword list of its options, got: {:dodge, :wide}"},
             {{"dodge", []}, "got: {\"dodge\", []}"}
           ] do

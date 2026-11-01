@@ -346,18 +346,22 @@ stat and position" and "Each facet, coordinate system, geom, stat and position i
   given (R's `preserve`, `orientation` and `reverse` wait), dodging by clusters' `preserve:`,
   `padding:` 0 to 1 and `reverse:`, its `width:` waiting, and jittering's `width:` and `height:`,
   each 0 or more, a float, `:none` when not given, where R moves nothing for a negative one, and
-  `seed:`, any integer, 0 when not given; stacking, nudging and the identity take none. Its
+  `seed:`, any integer, 0 when not given, and stacking's and filling's `vjust:`, any number, a
+  float, 1 when not given, never a list, which R hands out down each pile by rank (design-log §4,
+  the entry beginning "Filling is stacking"), and `reverse:`, `false` when not given, `:fill`
+  recorded as stacking with `fill: true`; nudging and the identity take none. Its
   options never become the geom's (design-log §4, the entry beginning "Dodging by clusters takes
   `preserve:`"). **Every layer function takes every position that moves its marks in ggplot2,
   found by sweeping each function against each position in R, and refuses the rest, saying why**
   (design-log §4, the entry beginning "Every layer takes the positions"), by the family of
   positions its option names (`Options.validate_position/2`'s argument): marks with a width of
   their own (bars, bins, frequency polygons, error bars, crossbars, tiles, rasters, a summary's
-  bars) take all six; marks with none (points, lines, paths, segments, rugs, text, labels, counts,
+  bars) take every one; marks with none (points, lines, paths, segments, rugs, text, labels, counts,
   line and point ranges, ribbons, areas, densities, smooths, hexagons, a summary's other geoms)
   take `:dodge` only with its `width:` and refuse `:dodge2`, as R warns "Width not defined" and
-  moves none; a box plot and a rectangle refuse stacking and jittering, R failing at a box's
-  missing y and stacking no rectangle, which has no x; a horizontal or vertical line takes only
+  moves none; a box plot and a rectangle refuse stacking, filling and jittering, R failing at a
+  box's missing y and stacking no rectangle, which has no x, and failing to fill one; and filling
+  is taken and refused wherever stacking is; a horizontal or vertical line takes only
   `:identity` and `:nudge`; a diagonal line and an annotation take no `position:`, as R's
   `geom_abline()` and `annotate()` take none. Each function's default is ggplot2's: stacking for
   bars, bins, areas and `stat_density/3`, nudging for text and labels, dodging by clusters for box

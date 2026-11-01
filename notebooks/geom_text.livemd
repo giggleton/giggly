@@ -334,7 +334,16 @@ ggplot(data = df, aes(x, y, group = grp)) +
  geom_text(aes(label = y), position = position_stack(vjust = 0.5))
 ```
 
-Not in Giggly yet: `position_stack()`'s `vjust` option.
+The columns stack, as `Giggly.Plot.geom_col/3` does by default, and `position_stack(vjust = 0.5)`,
+`{:stack, vjust: 0.5}`, moves each label to the middle of its column's part of the stack.
+
+```elixir
+df
+|> Plot.new(%{x: :x, y: :y, group: :grp})
+|> Plot.geom_col(%{fill: :grp})
+|> Plot.geom_text(%{label: :y}, position: {:stack, vjust: 0.5})
+|> render.()
+```
 
 ## Justification
 

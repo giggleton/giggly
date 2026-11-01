@@ -117,7 +117,17 @@ ggplot(mpg, aes(y = class)) +
  theme(legend.position = "top")
 ```
 
-Not in Giggly yet: `position_stack()`'s `reverse` option.
+`class` mapped to `y` turns the bars, which stack along x. `position_stack(reverse = TRUE)` is
+`{:stack, reverse: true}`: the first drive train's part comes first along each bar, as the legend
+above the panel reads.
+
+```elixir
+mpg
+|> Plot.new(%{y: :class})
+|> Plot.geom_bar(%{fill: :drv}, position: {:stack, reverse: true})
+|> Plot.theme(legend_position: :top)
+|> render.()
+```
 
 ## Columns
 

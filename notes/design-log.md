@@ -79,6 +79,18 @@ stops the question being reopened from scratch. A new entry is about 150 words: 
 sentence or two of why, and one line per rejected alternative. What a later decision replaces is
 deleted from the entry it was in, never marked superseded; git history keeps every version.
 
+- **Filling is stacking with `fill: true`, and a pile whose total is NaN is not drawn, where R
+  fails; `vjust:` is one number (2026-11-01, Steve: "A", "A").** `:fill` and `{:fill, vjust:,
+  reverse:}` record `%Position.Stack{fill: true}`, as ggplot2's `PositionFill` is `PositionStack`
+  with one field changed, and take and refuse what stacking does, as R's sweep found. R fails
+  ("missing value where TRUE/FALSE needed") filling a pile holding both infinities, whose total is
+  NaN; Giggly divides by it, so the pile's marks are missing and not drawn, as dodging by clusters
+  keeps marks missing where R fails, and as R itself gives a pile holding one infinity.
+  *Rejected:* leaving that pile unfilled, a stack drawn among filled ones; raising when the plot is
+  run, a failure on data the call cannot see. `vjust:` is any number, as R moves for any, and never
+  a list: R's documents one number, and a vector, which its arithmetic hands out down each pile by
+  rank, failing on a pile shorter than it, is an accident. *Rejected:* taking a list, as R does.
+
 - **Every layer takes the positions that move its marks in ggplot2, and refuses the rest, saying
   why (2026-11-01, Steve: "B", then "Refuse", "Keep", "Refuse", "Refuse", each call walked with
   R's output).** An R sweep of every layer function against every position (`layer_data()` and
@@ -1246,7 +1258,7 @@ deleted from the entry it was in, never marked superseded; git history keeps eve
   R on one case of four and further on two. *Rejected: deferring `bounds:`* — on the reference
   page, and its fold is the curve's own interpolation. *Rejected: the Gaussian kernel alone* —
   each other kernel is one formula on the kernel's grid. *Deferred:* the `ucv`, `bcv` and `SJ`
-  bandwidths, `position_fill()`, a density given to another geom by name.
+  bandwidths, a density given to another geom by name.
 
 - **A full-range smooth spans the axis it runs along, its y axis along y, where ggplot2 spans the x
   axis's extent (2026-10-25, Steve: "B").** ggplot2's `StatSmooth` flips its data to fit along y
@@ -1311,7 +1323,7 @@ deleted from the entry it was in, never marked superseded; git history keeps eve
   beginning "gam is Giggly's own").
   *Deferred:* `formula:`, `method_args:`, `xseq:`, `method: :glm`, a function as a method; the
   `ucv`, `bcv` and `SJ` bandwidths; a gradient fill along a ribbon, refused when drawn;
-  `position_fill()`; `stat_align()` as a function; a geom given a stat by name; ggplot2's messages;
+  `stat_align()` as a function; a geom given a stat by name; ggplot2's messages;
   a stat's `finish_layer()` (Steve: "B"), which in ggplot2 only `StatAlign` overrides, to drop a
   padding row a limit cuts, so such a row keeps its missing x in `layer_data/2`, the drawing R's;
   `annotate("ribbon")` and `annotate("area")`; a ribbon's positions set as options
@@ -2776,7 +2788,7 @@ deleted from the entry it was in, never marked superseded; git history keeps eve
   and retraining the continuous range bars give it. A bar's width follows R's `resolution()`.
   *Deferred:* bars under
   `coord_radial()` (Steve), with `Coord.munch/3` and the radial options every radial bar example
-  needs; `position_fill`; `geom_bar`'s options; histograms.
+  needs; `geom_bar`'s options; histograms.
 
 - **A geom says where its marks sit in data space during the build (`Geom.setup_data/2`), and
   the assembly calls only the families' build functions (2026-10-15, Steve).** ggplot2 calls a
@@ -3889,6 +3901,8 @@ tells the story (`git show <hash>`). Until 2026-10-15 each milestone also had a 
 `git log -S "<title>" -- notes/design-log.md` finds it in this file's history. The phases are
 §1's roadmap.
 
+- 2026-11-01 — Give stacking its vjust: and reverse:, and fill each pile to 1 with :fill
+  (positions, step 3); §4: "Filling is stacking with `fill: true`"
 - 2026-11-01 — Give every layer function the positions that move its marks in ggplot2, refusing
   the rest with R's reason (positions, step 2); §4: "Every layer takes the positions", "A box
   layer dodges by clusters"

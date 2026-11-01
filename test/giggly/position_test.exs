@@ -299,6 +299,114 @@ defmodule Giggly.PositionTest do
     end
   end
 
+  # Golden: ggplot2 4.0.3 in R 4.6.1, `position_stack()` and `position_fill()` run through their
+  # own `setup_params()`, `setup_data()` and `compute_panel()` on the same rows, so a NaN stays
+  # NaN, where `layer_data()`'s scales make it missing. They move with a pile's order, where its
+  # vjust sets a y, or filling's division and its threshold.
+  describe "compute_layer/3 for stacking with its options, and for filling" do
+    test "vjust moves each bar's y up its stretch, its edges where they were" do
+      for {vjust, y} <- [{0.5, [3.5, 1.5, 3.0, 1.0]}, {2.0, [5.0, 6.0, 6.0, 4.0]}] do
+        stacked = stacked_columns(%Position.Stack{vjust: vjust}, bar_rows([1.0, 3.0, 2.0, 2.0]))
+        assert stacked == [y, [3.0, 0.0, 2.0, 0.0], [4.0, 3.0, 4.0, 2.0]]
+      end
+    end
+
+    test "reversed, the lowest group is at the bottom of the pile" do
+      assert stacked_columns(%Position.Stack{reverse: true}, bar_rows([1.0, 3.0, 2.0, 2.0])) ===
+               [[1.0, 4.0, 2.0, 4.0], [0.0, 1.0, 0.0, 2.0], [1.0, 4.0, 2.0, 4.0]]
+    end
+
+    test "filled, each pile reaches 1, and its options move it as stacking's do" do
+      rows = bar_rows([1.0, 3.0, 2.0, 2.0])
+
+      assert stacked_columns(%Position.Stack{fill: true}, rows) ===
+               [[1.0, 0.75, 1.0, 0.5], [0.75, 0.0, 0.5, 0.0], [1.0, 0.75, 1.0, 0.5]]
+
+      assert stacked_columns(%Position.Stack{fill: true, vjust: 0.5, reverse: true}, rows) ===
+               [[0.125, 0.625, 0.25, 0.75], [0.0, 0.25, 0.0, 0.5], [0.25, 1.0, 0.5, 1.0]]
+    end
+
+    test "a point's y moves up the stretch stacking gives it" do
+      frame = DataFrame.new(panel: [1, 1], group: [1, 2], x: [1.0, 1.0], y: [2.0, 3.0])
+      stacked = Position.compute_layer(%Position.Stack{vjust: 0.5}, frame, @continuous)
+
+      assert Enum.map([:y, :ymin, :ymax], fn name -> DataFrame.pull(stacked, name) end) ===
+               [[4.0, 1.5], [3.0, 0.0], [5.0, 3.0]]
+    end
+
+    test "with every x apart, only filling and a vjust other than 1 stack the bars" do
+      rows =
+        DataFrame.new(
+          panel: [1, 1, 1],
+          group: [1, 2, 1],
+          x: [1.0, 2.0, 3.0],
+          xmin: [0.55, 1.55, 2.55],
+          xmax: [1.45, 2.45, 3.45],
+          y: [2.0, -3.0, 4.0],
+          ymin: [0.0, 0.0, 0.0],
+          ymax: [2.0, -3.0, 4.0]
+        )
+
+      for {position, columns} <- [
+            {%Position.Stack{reverse: true},
+             [[2.0, -3.0, 4.0], [0.0, 0.0, 0.0], [2.0, -3.0, 4.0]]},
+            {%Position.Stack{vjust: 0.5}, [[1.0, -1.5, 2.0], [0.0, 0.0, 0.0], [2.0, -3.0, 4.0]]},
+            {%Position.Stack{fill: true}, [[1.0, 0.0, 1.0], [0.0, 0.0, 0.0], [1.0, -1.0, 1.0]]}
+          ] do
+        assert {position, stacked_columns(position, rows)} === {position, columns}
+      end
+    end
+
+    test "filled, a pile below zero reaches -1 and one totalling no more than R's " <>
+           "sqrt(.Machine$double.eps) is left as it is" do
+      signs =
+        bar_rows([1.0, 1.0, 1.0], [1, 2, 3], [1.0, -2.0, -2.0])
+
+      assert stacked_columns(%Position.Stack{fill: true}, signs) ===
+               [[1.0, -0.5, 0.0], [0.0, -0.5, 0.0], [1.0, -1.0, -0.5]]
+
+      zero = bar_rows([1.0, 1.0], [1, 2], [0.0, 0.0])
+
+      assert stacked_columns(%Position.Stack{fill: true}, zero) ===
+               [[0.0, 0.0], [0.0, 0.0], [0.0, 0.0]]
+
+      for {height, filled} <- [
+            {1.0e-9, [[2.0e-9, 1.0e-9], [1.0e-9, 0.0], [2.0e-9, 1.0e-9]]},
+            {1.0e-7, [[1.0, 0.5], [0.5, 0.0], [1.0, 0.5]]}
+          ] do
+        tiny = bar_rows([1.0, 1.0], [1, 2], [height, height])
+        assert {height, stacked_columns(%Position.Stack{fill: true}, tiny)} === {height, filled}
+      end
+    end
+
+    test "filled, a pile reaching infinity leaves its bars below at 0, the infinite one NaN" do
+      infinite = bar_rows([1.0, 1.0], [1, 2], [:infinity, 2.0])
+
+      assert stacked_columns(%Position.Stack{fill: true}, infinite) ===
+               [[:nan, 0.0], [:nan, 0.0], [:nan, 0.0]]
+    end
+
+    # A departure: R fails ("missing value where TRUE/FALSE needed") filling a pile whose total
+    # is NaN; Giggly divides by it, so its marks are missing and not drawn.
+    test "filled, a pile holding both infinities, its total NaN, has every height NaN" do
+      both =
+        DataFrame.new(
+          panel: [1, 1],
+          group: [1, 2],
+          x: [1.0, 1.0],
+          y: [:infinity, :neg_infinity],
+          ymin: [0.0, 0.0],
+          ymax: [1.0, 1.0]
+        )
+
+      assert stacked_columns(%Position.Stack{}, both) ===
+               [[:nan, :nan], [:nan, :neg_infinity], [:nan, 0.0]]
+
+      assert stacked_columns(%Position.Stack{fill: true}, both) ===
+               [[:nan, :nan], [:nan, :nan], [:nan, :nan]]
+    end
+  end
+
   # R's jitter is drawn from R's own random numbers, which Giggly does not reproduce, so these pin
   # the distances to Erlang's `exsss` numbers from the seed (`draws/2`), and R's own rules, each
   # checked in ggplot2 4.0.3 with R 4.6.1: a distance is `-amount + 2 * amount * u`, as R's
@@ -482,6 +590,29 @@ defmodule Giggly.PositionTest do
 
   # Two groups of areas at x 1 and 2, in the order the area geom sets them up in, each band from 0
   # to its y.
+  # Bars at 1 and 2 of the groups 1 and 2, as a column layer hands them over, each `heights` high.
+  defp bar_rows(heights), do: bar_rows([1.0, 1.0, 2.0, 2.0], [1, 2, 1, 2], heights)
+
+  # Bars at `x` of `group`, each `y` high and 0.9 wide.
+  defp bar_rows(x, group, y) do
+    DataFrame.new(
+      panel: Enum.map(x, fn _x -> 1 end),
+      group: group,
+      x: x,
+      xmin: Enum.map(x, fn position -> position - 0.45 end),
+      xmax: Enum.map(x, fn position -> position + 0.45 end),
+      y: y,
+      ymin: Enum.map(y, fn _y -> 0.0 end),
+      ymax: y
+    )
+  end
+
+  # `rows` moved by `position`, its y, ymin and ymax.
+  defp stacked_columns(position, rows) do
+    stacked = Position.compute_layer(position, rows, @continuous)
+    Enum.map([:y, :ymin, :ymax], fn name -> DataFrame.pull(stacked, name) end)
+  end
+
   defp area_rows(heights) do
     DataFrame.new(
       x: [1.0, 2.0, 1.0, 2.0],

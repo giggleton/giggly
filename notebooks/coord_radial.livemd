@@ -109,7 +109,7 @@ doh + geom_bar(width = 0.9, position = "fill") +
 ```
 
 Not in Giggly yet: the `movies` dataset, `cut_interval()` and `cut_number()`, bars in radial
-coordinates, `position_fill()`, and `coord_radial()`'s `theta` and `expand` options.
+coordinates, and `coord_radial()`'s `theta` and `expand` options.
 
 ## A partial circle
 
