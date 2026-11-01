@@ -2850,10 +2850,89 @@ defmodule Giggly.PlotTest do
         Plot.stat_summary(plot, fun_min: fn left, right -> left + right end)
       end
 
-      for fun_data <- [:mean_sdl, {:mean_se, mult: "2"}, {:mean_se, [mult: 2, extra: 1]}] do
+      for fun_data <- [:mean_sd, "mean_cl_boot", {:mean_sdl, 1}, {:mean_cl_boot}] do
         assert_raise NimbleOptions.ValidationError,
-                     ~r/expected :mean_se or {:mean_se, mult: mult}, mult a number, got: /,
+                     ~r/expected :mean_se, :mean_cl_normal, :mean_sdl, :median_hilow or :mean_cl_boot, alone or in a tuple with a keyword list of its arguments, got: /,
                      fn -> Plot.stat_summary(plot, fun_data: fun_data) end
+      end
+    end
+
+    test "a whole summary records every argument it takes, given or its default, in one order" do
+      plot = Plot.new(@summarised, %{x: :cyl, y: :mpg})
+
+      recorded =
+        for fun_data <- [
+              :mean_cl_normal,
+              {:mean_cl_normal, conf_int: 0},
+              {:mean_cl_normal, mult: 1},
+              :mean_sdl,
+              {:mean_sdl, mult: 1},
+              :median_hilow,
+              {:median_hilow, conf_int: 1},
+              :mean_cl_boot,
+              {:mean_cl_boot, seed: -3, resamples: 1, conf_int: 0.5},
+              {:mean_cl_boot, []}
+            ] do
+          [layer] = Plot.stat_summary(plot, fun_data: fun_data).reversed_layers
+          layer.stat.fun_data
+        end
+
+      assert recorded === [
+               {:mean_cl_normal, conf_int: 0.95},
+               {:mean_cl_normal, conf_int: 0.0},
+               {:mean_cl_normal, mult: 1.0},
+               {:mean_sdl, mult: 2.0},
+               {:mean_sdl, mult: 1.0},
+               {:median_hilow, conf_int: 0.95},
+               {:median_hilow, conf_int: 1.0},
+               {:mean_cl_boot, conf_int: 0.95, resamples: 1000, seed: 0},
+               {:mean_cl_boot, conf_int: 0.5, resamples: 1, seed: -3},
+               {:mean_cl_boot, conf_int: 0.95, resamples: 1000, seed: 0}
+             ]
+    end
+
+    test "a whole summary's arguments are its own, each once, and each value is checked" do
+      plot = Plot.new(@summarised, %{x: :cyl, y: :mpg})
+
+      refused = [
+        {{:mean_se, mult: "2"}, "expected :mean_se's mult: to be a number, got: \"2\""},
+        {{:mean_sdl, [2]},
+         "expected {:mean_sdl, arguments}'s arguments to be a keyword list of mult: each at " <>
+           "most once, got: [2]"},
+        {{:median_hilow, mult: 1},
+         "expected {:median_hilow, arguments}'s arguments to be a keyword list of conf_int: " <>
+           "each at most once, got: [mult: 1]"},
+        {{:mean_cl_boot, seed: 1, seed: 2},
+         "expected {:mean_cl_boot, arguments}'s arguments to be a keyword list of conf_int:, " <>
+           "resamples:, seed: each at most once, got: [seed: 1, seed: 2]"},
+        {{:mean_cl_normal, resamples: 10},
+         "expected {:mean_cl_normal, arguments}'s arguments to be a keyword list of " <>
+           "conf_int:, mult: each at most once, got: [resamples: 10]"},
+        {{:mean_cl_normal, conf_int: 0.9, mult: 2},
+         "expected {:mean_cl_normal, arguments} to give conf_int: or mult:, not both, got: " <>
+           "[conf_int: 0.9, mult: 2]"},
+        {{:mean_cl_normal, conf_int: 1},
+         "expected :mean_cl_normal's conf_int: to be a number from 0, below 1, got: 1"},
+        {{:mean_cl_normal, conf_int: -0.1},
+         "expected :mean_cl_normal's conf_int: to be a number from 0, below 1, got: -0.1"},
+        {{:median_hilow, conf_int: 1.5},
+         "expected :median_hilow's conf_int: to be a number from 0 to 1, got: 1.5"},
+        {{:mean_cl_boot, conf_int: -0.5},
+         "expected :mean_cl_boot's conf_int: to be a number from 0 to 1, got: -0.5"},
+        {{:mean_cl_boot, resamples: 0},
+         "expected :mean_cl_boot's resamples: to be a whole number, 1 or more, got: 0"},
+        {{:mean_cl_boot, resamples: 10.0},
+         "expected :mean_cl_boot's resamples: to be a whole number, 1 or more, got: 10.0"},
+        {{:mean_cl_boot, seed: 1.5}, "expected :mean_cl_boot's seed: to be an integer, got: 1.5"}
+      ]
+
+      for {fun_data, message} <- refused do
+        error =
+          assert_raise NimbleOptions.ValidationError, fn ->
+            Plot.stat_summary(plot, fun_data: fun_data)
+          end
+
+        assert Exception.message(error) =~ message
       end
     end
 

@@ -12408,13 +12408,16 @@ defmodule GigglyTest do
 
     # Goldens: test/golden/summary.svg, summary_flipped.svg, summary_point.svg,
     # summary_minmax.svg, summary_line.svg, summary_line_flipped.svg, summary_bar.svg,
-    # summary_crossbar.svg, summary_ribbon.svg and summary_fun_only.svg, each checked against
-    # ggplot2's drawing of the same plot, made by the R script of its name: every element and clip
-    # path matches, the x axis drawn before the y as in test/golden/point.svg. The reference page's
+    # summary_crossbar.svg, summary_ribbon.svg, summary_fun_only.svg, summary_normal.svg,
+    # summary_sdl.svg, summary_hilow.svg and summary_boot.svg, each checked against ggplot2's
+    # drawing of the same plot, made by the R script of its name: every element and clip path
+    # matches, the x axis drawn before the y as in test/golden/point.svg. The reference page's
     # summaries over mtcars' points: its default mean_se as point ranges, up the panel and across
     # it, medians as points, the mean and range as point ranges, and means as lines, up and
-    # across; bars of means with error bars, crossbars, a ribbon under a line, and point ranges
-    # given only their y.
+    # across; bars of means with error bars, crossbars, a ribbon under a line, point ranges given
+    # only their y; and Hmisc's summaries, mean_cl_normal's point ranges, mean_sdl's and
+    # median_hilow's crossbars, and mean_cl_boot's point ranges, which R draws at Giggly's ends,
+    # its random numbers not Giggly's.
     test "summaries draw as ggplot2 draws them, through each geom" do
       mtcars = Giggly.Datasets.mtcars()
       by_cylinder = Plot.new(mtcars, %{x: :cyl, y: :mpg})
@@ -12457,7 +12460,35 @@ defmodule GigglyTest do
           by_cylinder
           |> Plot.stat_summary(geom: :ribbon, alpha: 0.3)
           |> Plot.stat_summary(fun: :mean, geom: :line),
-        summary_fun_only: Plot.stat_summary(by_cylinder, fun: :mean, colour: "red", size: 1)
+        summary_fun_only: Plot.stat_summary(by_cylinder, fun: :mean, colour: "red", size: 1),
+        summary_normal:
+          Plot.stat_summary(with_points,
+            fun_data: :mean_cl_normal,
+            colour: "red",
+            linewidth: 2,
+            size: 3
+          ),
+        summary_sdl:
+          Plot.stat_summary(with_points, %{group: :cyl},
+            fun_data: {:mean_sdl, mult: 1},
+            colour: "red",
+            geom: :crossbar,
+            width: 0.2
+          ),
+        summary_hilow:
+          Plot.stat_summary(with_points, %{group: :cyl},
+            fun_data: :median_hilow,
+            colour: "red",
+            geom: :crossbar,
+            width: 0.2
+          ),
+        summary_boot:
+          Plot.stat_summary(with_points,
+            fun_data: :mean_cl_boot,
+            colour: "red",
+            linewidth: 2,
+            size: 3
+          )
       ]
 
       for {name, drawn} <- plots do

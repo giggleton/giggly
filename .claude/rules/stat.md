@@ -55,7 +55,9 @@ the entry beginning "Each facet, coordinate system, geom, stat and position is a
   through the frame**, its arithmetic the frame's `+ - * /`, pulling a row a group; **its loess
   pulls each group's rows**, by the frame's `list` aggregate, since no engine could run it; **its
   gam sums each group's rows by knot interval through the frame**, each group split off and cut at
-  its own knots, pulling a row an interval. **A
+  its own knots, pulling a row an interval. **A bootstrap summary pulls each position's
+  values**, by the frame's `list` aggregate, as a summary function does, since resampling has
+  no frame operation, and hands its resample means back to the frame for their quantiles. **A
   density is four passes
   through the frame**, its grid points `floor` in an expression, pulling a row a group and its
   totals at each grid point.
@@ -134,10 +136,16 @@ the entry beginning "Each facet, coordinate system, geom, stat and position is a
   row missing its x or y, or at an infinite one, is not counted. size takes `n` by default; it
   computes `n` and `prop` and consumes `weight`.
 - **Summarising is ggplot2's `stat_summary()`** (design-log §4, the entries beginning "A
-  summary's values are names" and "A summary carries a column cell by cell"): per panel, group
+  summary's values are names", "A summary carries a column cell by cell", "The Hmisc summaries
+  take" and "`mean_cl_boot` draws its resamples"): per panel, group
   and x, in that order, the rows at a finite x and y; `y`, `ymin` and `ymax` from `fun_data`,
   `{:mean_se, mult: mult}`, the frame's `mean`, and its `variance` over its `count`,
-  square-rooted and times `mult` in R's order, missing for one value; or from `fun`, `fun_min`
+  square-rooted and times `mult` in R's order, missing for one value; Hmisc's `:mean_sdl` and
+  `:mean_cl_normal`, centred on the frame's `sum` over its `count`, their squared distances from
+  it the frame's, the normal's t `Giggly.Stat.TDistribution`'s; `:median_hilow`, the frame's
+  quantiles; `:mean_cl_boot`, the frame's `mean` and the quantiles, the frame's, of each
+  position's resample means, drawn by `:rand`'s `exsss` from its seed afresh, never R's numbers;
+  the ends missing for one value but the median's; or from `fun`, `fun_min`
   and `fun_max`, each a frame aggregate by name (`:median` the type 7 quantile at one half), a
   function of the values the frame's `list` pulls, which must return a number, or missing;
   `flipped_aes`, along y by `orientation` or where y alone is discrete, flipped and flipped back.

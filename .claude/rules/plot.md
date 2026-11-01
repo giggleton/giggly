@@ -117,7 +117,10 @@ stat and position" and "Each facet, coordinate system, geom, stat and position i
   "`stat_summary/3` draws with eight geoms"): `fun_data:`, `fun:`, `fun_min:`, `fun_max:` and
   `orientation:` the stat's, a summary by name or a function of one argument
   (`validate_summary_function/1`, `validate_summary_data/1`), `fun_data:` recorded `{:mean_se,
-  mult: 1.0}` given no summary and refused beside the others; the geom's options its function's
+  mult: 1.0}` given no summary and refused beside the others, a whole summary recorded as a
+  tuple of every argument it takes, in one order, given or its default (design-log §4, the
+  entries beginning "The Hmisc summaries take" and "`mean_cl_boot` draws its resamples"), each
+  argument checked at the call, its own, once; the geom's options its function's
   (`Options.summary/1`), its orientation `:none`. It needs `:x` and `:y`, accepts no range, which
   it writes, and checks a mapped width only where its geom draws one.
   **A range layer's range is checked at the call, a line range's, point range's, error bar's

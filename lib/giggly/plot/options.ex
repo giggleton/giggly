@@ -1061,6 +1061,17 @@ defmodule Giggly.Plot.Options do
   # The geoms `stat_summary/3` draws with, as `geom:` names them, its default first.
   @summary_geoms [:pointrange, :point, :line, :bar, :crossbar, :errorbar, :linerange, :ribbon]
 
+  # The whole summaries `fun_data:` names, each with the arguments it takes and their defaults,
+  # Hmisc's and ggplot2's, in the order it records them; `:mean_cl_normal` takes `mult:` too, in
+  # place of `conf_int:`, and R's `B` is `resamples:`.
+  @summary_data_arguments %{
+    mean_se: [mult: 1.0],
+    mean_cl_normal: [conf_int: 0.95],
+    mean_sdl: [mult: 2.0],
+    median_hilow: [conf_int: 0.95],
+    mean_cl_boot: [conf_int: 0.95, resamples: 1000, seed: 0]
+  }
+
   # One of a summary's values, `fun:`, `fun_min:` or `fun_max:`.
   @summary_function_type {:custom, __MODULE__, :validate_summary_function, []}
 
@@ -1081,10 +1092,17 @@ defmodule Giggly.Plot.Options do
     fun_data: [
       type: {:custom, __MODULE__, :validate_summary_data, []},
       doc:
-        "The whole summary at each position, its `y`, `ymin` and `ymax`, by name: " <>
-          "`:mean_se`, the mean and the mean less and plus one standard error, or " <>
-          "`{:mean_se, mult: mult}`, `mult` standard errors, any number. Refused beside " <>
-          "`fun:`, `fun_min:` or `fun_max:`; `:mean_se` when none of them is given."
+        "The whole summary at each position, its `y`, `ymin` and `ymax`, by name, alone or in " <>
+          "a tuple with its arguments, `{:mean_sdl, mult: 1}`: `:mean_se`, the mean less and " <>
+          "plus `mult:` standard errors (1); `:mean_cl_normal`, the mean and its confidence " <>
+          "interval at `conf_int:` (0.95, from 0, below 1) from the t distribution, or `mult:` " <>
+          "standard errors in place of the t; `:mean_sdl`, the mean less and plus `mult:` " <>
+          "standard deviations (2); `:median_hilow`, the median and the quantiles holding " <>
+          "`conf_int:` (0.95, 0 to 1) of the values between them, as many either side; and " <>
+          "`:mean_cl_boot`, the mean and its bootstrap interval at `conf_int:` (0.95, 0 to " <>
+          "1), from `resamples:` (1000) resamples drawn from `seed:` (0), any integer. A " <>
+          "`mult:` is any number. Refused beside `fun:`, `fun_min:` or `fun_max:`; `:mean_se` " <>
+          "when none of them is given."
     ],
     fun: [
       type: @summary_function_type,
@@ -4733,18 +4751,111 @@ defmodule Giggly.Plot.Options do
        inspect(summary)}
   end
 
-  # NimbleOptions' check of a summary's `fun_data:`: a whole summary by name, with its options,
-  # recorded with each, its `mult` a float.
+  # NimbleOptions' check of a summary's `fun_data:`: a whole summary by name, alone or in a tuple
+  # with a keyword list of its arguments, each given at most once, recorded with every argument
+  # it takes, in `@summary_data_arguments`' order, a number a float; `:mean_cl_normal` takes
+  # `conf_int:` or `mult:`, never both, and records the one it is given.
   @doc false
-  @spec validate_summary_data(term()) :: {:ok, {:mean_se, [mult: float()]}} | {:error, String.t()}
-  def validate_summary_data(:mean_se), do: {:ok, {:mean_se, mult: 1.0}}
+  @spec validate_summary_data(term()) ::
+          {:ok, Giggly.Stat.Summary.summary_data()} | {:error, String.t()}
+  def validate_summary_data(summary) when is_map_key(@summary_data_arguments, summary),
+    do: validate_summary_data({summary, []})
 
-  def validate_summary_data({:mean_se, [mult: mult]}) when is_number(mult),
-    do: {:ok, {:mean_se, mult: mult / 1}}
+  def validate_summary_data({summary, arguments})
+      when is_map_key(@summary_data_arguments, summary) and is_list(arguments) do
+    with :ok <- check_summary_data_names(summary, arguments),
+         {:ok, checked} <- check_summary_data_values(summary, arguments) do
+      {:ok, {summary, summary_data_recorded(summary, checked)}}
+    end
+  end
 
   def validate_summary_data(summary) do
     {:error,
-     "expected :mean_se or {:mean_se, mult: mult}, mult a number, got: " <> inspect(summary)}
+     "expected :mean_se, :mean_cl_normal, :mean_sdl, :median_hilow or :mean_cl_boot, alone " <>
+       "or in a tuple with a keyword list of its arguments, got: " <> inspect(summary)}
+  end
+
+  defp check_summary_data_names(summary, arguments) do
+    taken = summary_data_taken(summary)
+
+    names = if Keyword.keyword?(arguments), do: Keyword.keys(arguments), else: [:none]
+    distinct = Enum.uniq(names)
+
+    names_taken =
+      Enum.all?(names, fn name -> name in taken end) and length(names) == length(distinct)
+
+    summary_data_names(summary, arguments, taken, names_taken)
+  end
+
+  defp summary_data_names(summary, arguments, taken, false) do
+    listed = Enum.map_join(taken, ", ", fn name -> "#{name}:" end)
+
+    {:error,
+     "expected {#{inspect(summary)}, arguments}'s arguments to be a keyword list of " <>
+       listed <> " each at most once, got: " <> inspect(arguments)}
+  end
+
+  defp summary_data_names(:mean_cl_normal, arguments, _taken, true) do
+    if Keyword.has_key?(arguments, :conf_int) and Keyword.has_key?(arguments, :mult),
+      do:
+        {:error,
+         "expected {:mean_cl_normal, arguments} to give conf_int: or mult:, not both, got: " <>
+           inspect(arguments)},
+      else: :ok
+  end
+
+  defp summary_data_names(_summary, _arguments, _taken, true), do: :ok
+
+  defp check_summary_data_values(summary, arguments) do
+    Enum.reduce_while(arguments, {:ok, []}, fn {name, value}, {:ok, checked} ->
+      case summary_data_value(summary, name, value) do
+        {:ok, value} -> {:cont, {:ok, [{name, value} | checked]}}
+        {:error, message} -> {:halt, {:error, message}}
+      end
+    end)
+  end
+
+  defp summary_data_value(_summary, :mult, mult) when is_number(mult), do: {:ok, mult / 1}
+
+  defp summary_data_value(:mean_cl_normal, :conf_int, level)
+       when is_number(level) and level >= 0 and level < 1,
+       do: {:ok, level / 1}
+
+  defp summary_data_value(summary, :conf_int, level)
+       when summary in [:median_hilow, :mean_cl_boot] and is_number(level) and level >= 0 and
+              level <= 1,
+       do: {:ok, level / 1}
+
+  defp summary_data_value(:mean_cl_boot, :resamples, count) when is_integer(count) and count >= 1,
+    do: {:ok, count}
+
+  defp summary_data_value(:mean_cl_boot, :seed, seed) when is_integer(seed), do: {:ok, seed}
+
+  defp summary_data_value(summary, name, value) do
+    {:error,
+     "expected #{inspect(summary)}'s #{name}: to be " <>
+       summary_data_wanted(summary, name) <> ", got: " <> inspect(value)}
+  end
+
+  defp summary_data_wanted(_summary, :mult), do: "a number"
+  defp summary_data_wanted(:mean_cl_normal, :conf_int), do: "a number from 0, below 1"
+  defp summary_data_wanted(_summary, :conf_int), do: "a number from 0 to 1"
+  defp summary_data_wanted(_summary, :resamples), do: "a whole number, 1 or more"
+  defp summary_data_wanted(_summary, :seed), do: "an integer"
+
+  defp summary_data_taken(:mean_cl_normal), do: [:conf_int, :mult]
+
+  defp summary_data_taken(summary) do
+    @summary_data_arguments
+    |> Map.fetch!(summary)
+    |> Keyword.keys()
+  end
+
+  defp summary_data_recorded(:mean_cl_normal, [mult: _mult] = checked), do: checked
+
+  defp summary_data_recorded(summary, checked) do
+    for {name, default} <- Map.fetch!(@summary_data_arguments, summary),
+        do: {name, Keyword.get(checked, name, default)}
   end
 
   # NimbleOptions' check of a point layer's `position:`: one of the positions it takes by name, or

@@ -538,6 +538,175 @@ defmodule Giggly.StatTest do
                {:category, levels: ["b", "a"], ordered: false}
     end
 
+    # Golden: Hmisc 5.3.0 through ggplot2 4.0.3, `ggplot(mtcars, aes(cyl, mpg)) +
+    # stat_summary(fun.data = mean_sdl)` and with `fun.args = list(mult = 1)`. The centre is the
+    # sum over the count, a bit below R's `mean()` at 6 cylinders.
+    test "mean_sdl is the sum over the count less and plus mult standard deviations, Hmisc's" do
+      frame = summary_frame(x: mtcars(:cyl), y: mtcars(:mpg))
+
+      intervals =
+        for mult <- [2.0, 1.0] do
+          [fun_data: {:mean_sdl, mult: mult}]
+          |> summary()
+          |> Stat.compute_layer(frame, axes([1], false, false))
+          |> columns([:y, :ymin, :ymax])
+        end
+
+      assert intervals === [
+               [
+                 [26.663636363636364, 19.74285714285714, 15.1],
+                 [17.643981058793401, 16.835723060736303, 9.9799038470567165],
+                 [35.683291668479328, 22.649991224977978, 20.220096152943285]
+               ],
+               [
+                 [26.663636363636364, 19.74285714285714, 15.1],
+                 [22.153808711214882, 18.289290101796723, 12.539951923528358],
+                 [31.173464016057846, 21.196424183917557, 17.660048076471639]
+               ]
+             ]
+    end
+
+    # Golden: Hmisc 5.3.0 through ggplot2 4.0.3, `stat_summary(fun.data = mean_cl_normal)` over
+    # mtcars with `fun.args` `list(conf.int = 0.5)`, `list(mult = 1)`, `list(conf.int = 0)` and
+    # none; at 0.95 Hmisc's lower end at 8 cylinders is 13.621872247577503, a unit in the last
+    # place below Giggly's, its t and its rounding not quite Giggly's.
+    test "mean_cl_normal is the centre less and plus t or mult standard errors, Hmisc's" do
+      frame = summary_frame(x: mtcars(:cyl), y: mtcars(:mpg))
+
+      [half, errors, none, default] =
+        for options <- [[conf_int: 0.5], [mult: 1.0], [conf_int: 0.0], [conf_int: 0.95]] do
+          [fun_data: {:mean_cl_normal, options}]
+          |> summary()
+          |> Stat.compute_layer(frame, axes([1], false, false))
+          |> columns([:ymin, :ymax])
+        end
+
+      assert half === [
+               [25.712056976428475, 19.348633037174665, 14.625280860298364],
+               [27.615215750844254, 20.137081248539616, 15.574719139701635]
+             ]
+
+      assert errors === [
+               [25.303872164340785, 19.193460442199157, 14.415798371726675],
+               [28.023400562931943, 20.292253843515123, 15.784201628273324]
+             ]
+
+      assert none === List.duplicate([26.663636363636364, 19.74285714285714, 15.1], 2)
+
+      assert default === [
+               [23.633892921645874, 18.398531845037176, 13.621872247577505],
+               [29.693379805626854, 21.087182440677104, 16.578127752422496]
+             ]
+    end
+
+    # Golden: Hmisc 5.3.0 through ggplot2 4.0.3, `stat_summary(fun.data = median_hilow)` over
+    # mtcars, and with `fun.args = list(conf.int = 0.5)`.
+    test "median_hilow is the median and the quantiles holding conf_int between them, Hmisc's" do
+      frame = summary_frame(x: mtcars(:cyl), y: mtcars(:mpg))
+
+      intervals =
+        for level <- [0.95, 0.5] do
+          [fun_data: {:median_hilow, conf_int: level}]
+          |> summary()
+          |> Stat.compute_layer(frame, axes([1], false, false))
+          |> columns([:y, :ymin, :ymax])
+        end
+
+      assert intervals === [
+               [
+                 [26.0, 19.7, 15.2],
+                 [21.424999999999997, 17.845000000000002, 10.4],
+                 [33.525, 21.339999999999996, 19.0375]
+               ],
+               [
+                 [26.0, 19.7, 15.2],
+                 [22.8, 18.65, 14.400000000000002],
+                 [30.4, 21.0, 16.25]
+               ]
+             ]
+    end
+
+    # Hmisc 5.3.0: `smean.cl.normal(7)`, `smean.sdl(7)` and `smean.cl.boot(7)` leave both ends
+    # `NA` (or NaN), `smedian.hilow(7)` is 7 three times; `smean.cl.normal(c(2, 2, 2))` and
+    # `smean.cl.boot(c(2, 2, 2))` are 2 three times.
+    test "one value leaves the ends missing but the median's, and equal values close them" do
+      frame = summary_frame(x: [1, 2, 2, 2], y: [7.0, 2.0, 2.0, 2.0])
+
+      intervals =
+        for fun_data <- [
+              {:mean_cl_normal, conf_int: 0.95},
+              {:mean_cl_normal, mult: 1.0},
+              {:mean_sdl, mult: 2.0},
+              {:median_hilow, conf_int: 0.95},
+              {:mean_cl_boot, conf_int: 0.95, resamples: 10, seed: 0}
+            ] do
+          [fun_data: fun_data]
+          |> summary()
+          |> Stat.compute_layer(frame, axes([1], false, false))
+          |> columns([:y, :ymin, :ymax])
+        end
+
+      assert intervals === [
+               [[7.0, 2.0], [nil, 2.0], [nil, 2.0]],
+               [[7.0, 2.0], [nil, 2.0], [nil, 2.0]],
+               [[7.0, 2.0], [nil, 2.0], [nil, 2.0]],
+               [[7.0, 2.0], [7.0, 2.0], [7.0, 2.0]],
+               [[7.0, 2.0], [nil, 2.0], [nil, 2.0]]
+             ]
+    end
+
+    # Hmisc 5.3.0: `smean.cl.boot(c(1, 3))` is 2, 1 and 3: a resample of two values has a mean of
+    # 1, 2 or 3, a quarter, a half and a quarter of the time, so the 0.025 and 0.975 quantiles of
+    # a thousand of them are 1 and 3. Its centre is R's `mean()`, not the sum over the count.
+    test "mean_cl_boot is R's mean and the quantiles of its resamples' means" do
+      bootstrap = fn values, options ->
+        x = List.duplicate(1, length(values))
+
+        stat =
+          summary(
+            fun_data:
+              {:mean_cl_boot,
+               conf_int: Keyword.get(options, :conf_int, 0.95),
+               resamples: Keyword.get(options, :resamples, 1000),
+               seed: 0}
+          )
+
+        stat
+        |> Stat.compute_layer(summary_frame(x: x, y: values), axes([1], false, false))
+        |> columns([:y, :ymin, :ymax])
+      end
+
+      assert bootstrap.([1.0, 3.0], []) === [[2.0], [1.0], [3.0]]
+      assert bootstrap.([1.0, 3.0], conf_int: 0.0) === [[2.0], [2.0], [2.0]]
+
+      cylinders = mtcars(:cyl)
+      cars = Enum.zip_with(cylinders, mtcars(:mpg), fn cyl, mpg -> {cyl, mpg} end)
+      sixes = for {cyl, mpg} <- cars, cyl == 6, do: mpg
+
+      assert [[19.742857142857144], _low, _high] = bootstrap.(sixes, [])
+
+      # One resample's mean is both ends, a mean of values drawn from the position's.
+      assert [[_centre], [low], [low]] = bootstrap.(sixes, resamples: 1)
+      assert low > 17.8 and low < 21.4
+    end
+
+    test "a bootstrap draws from its seed, each position afresh, so another changes none" do
+      draw = fn columns, seed ->
+        [fun_data: {:mean_cl_boot, conf_int: 0.95, resamples: 200, seed: seed}]
+        |> summary()
+        |> Stat.compute_layer(summary_frame(columns), axes([1], false, false))
+        |> columns([:ymin, :ymax])
+      end
+
+      alone = [x: List.duplicate(1, 5), y: [1.0, 4.0, 2.0, 8.0, 5.0]]
+      beside = [x: [0, 0, 0 | alone[:x]], y: [9.0, 7.0, 3.0 | alone[:y]]]
+
+      assert [[low], [high]] = draw.(alone, 7)
+      assert draw.(alone, 7) === [[low], [high]]
+      assert [[_other_low, ^low], [_other_high, ^high]] = draw.(beside, 7)
+      refute draw.(alone, 8) === [[low], [high]]
+    end
+
     test "no aesthetic takes a computed column by default" do
       assert Stat.default_mapping(summary()) == %{}
     end

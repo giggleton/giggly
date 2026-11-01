@@ -1510,9 +1510,11 @@ defmodule Giggly.Plot do
   and plus one standard error, which a position holding one value has no interval for. A row
   missing its `x` or `y`, or at an infinite one, is left out.
 
-  `fun_data:` gives the whole summary by name; `fun:`, `fun_min:` and `fun_max:` give its `y`,
-  `ymin` and `ymax` one at a time, by name or as a function of the values, and one not given is
-  missing, so `fun: :mean` alone draws points with no ranges.
+  `fun_data:` gives the whole summary by name, alone or in a tuple with its arguments; `fun:`,
+  `fun_min:` and `fun_max:` give its `y`, `ymin` and `ymax` one at a time, by name or as a
+  function of the values, and one not given is missing, so `fun: :mean` alone draws points with no
+  ranges. A bootstrap's resamples are drawn from its `seed:`, each position's afresh, so a plot
+  draws the same intervals every time it is drawn, and another seed draws others.
 
   Where `y` alone is discrete, the `x` values are summarised at each `y` instead, into `x`,
   `xmin` and `xmax`, and the marks run across the panel; `orientation:` says which way.

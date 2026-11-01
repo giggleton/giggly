@@ -79,6 +79,28 @@ stops the question being reopened from scratch. A new entry is about 150 words: 
 sentence or two of why, and one line per rejected alternative. What a later decision replaces is
 deleted from the entry it was in, never marked superseded; git history keeps every version.
 
+- **`mean_cl_boot` draws its resamples from a `seed:` in its tuple, each position afresh
+  (2026-11-01, Steve: "go").** `{:mean_cl_boot, seed: 7}`, 0 unless given, any integer, as
+  `position_jitter(seed:)` holds the seed of what it draws; `resamples:` is R's `B` (1000).
+  Each position starts `:rand`'s `exsss` from the seed, so its interval depends only on its
+  values, their order and the seed. R's random numbers are never reproduced, so the ends differ
+  from R's by sampling: over 500 seeds on mtcars' cylinders, Giggly's ends have R's mean and
+  spread within sampling error. *Rejected: `seed:` an option of `stat_summary/3`* — refused
+  beside every other summary. *Rejected: one stream per panel, through its positions*, nearer
+  R's single stream: dropping one group would move every other's ends. *Rejected: `Nx.Random`*
+  — slow on `Nx.BinaryBackend`, and a second random source beside jitter's.
+
+- **The Hmisc summaries take Hmisc's arguments, checked at the call (2026-11-01, Steve: "go";
+  checked against Hmisc 5.3.0).** `conf_int:` (0.95) on `:mean_cl_normal`, from 0 and below 1,
+  as a smooth's `level:` refuses R's infinite band at 1, and on `:median_hilow` and
+  `:mean_cl_boot`, 0 to 1, their ends quantiles; `mult:` any number, `:mean_sdl`'s 2;
+  `:mean_cl_normal` takes `conf_int:` or `mult:`, refused together; a tuple records every
+  argument. Each is Hmisc's documented method, measured on 3,003 random vectors: `mean_sdl`
+  digit for digit, `mean_cl_normal` within 4e-13, its t Giggly's own. *Rejected: both
+  `conf_int:` and `mult:`, the `mult` winning*, as R silently ignores `conf.int`. *Rejected:
+  `na.rm` and `reps`* — the stat drops missing rows first, and `reps` returns an attribute a
+  plot never reads.
+
 - **A plotmath piece is a text of its own, start-anchored where its box puts it (2026-10-31,
   Steve: "A"; checked against vdiffr 1.0.9).** vdiffr writes a power as one `<text>` per piece,
   sign, base, exponent's sign, exponent, each at its own size, a label's after the one before; so
@@ -159,8 +181,9 @@ deleted from the entry it was in, never marked superseded; git history keeps eve
   type 7 quantile at one half, which matched R's `median()` on 200,000 random vectors), `:min` and
   `:max`, or a function of a position's values, pulled by the frame's `list` aggregate, as loess
   pulls a group's, since no engine could run it; `fun_data:` takes a whole summary by name, its
-  arguments in a tuple, `{:mean_se, mult: 2}`, the default `{:mean_se, mult: 1.0}`; the Hmisc
-  summaries join it by name. *Rejected: functions alone* — every summary would pull its rows.
+  arguments in a tuple, `{:mean_se, mult: 2}`, the default `{:mean_se, mult: 1.0}`, and Hmisc's
+  `:mean_cl_normal`, `:mean_sdl`, `:median_hilow` and `:mean_cl_boot` beside it. *Rejected:
+  functions alone* — every summary would pull its rows.
   *Rejected: `fun_args:`* — R's list applies to every function at once; a tuple names whose.
 
 - **A summary carries a column cell by cell, ggplot2's `uniquecols()` (2026-10-31; checked
@@ -3795,6 +3818,9 @@ tells the story (`git show <hash>`). Until 2026-10-15 each milestone also had a 
 `git log -S "<title>" -- notes/design-log.md` finds it in this file's history. The phases are
 §1's roadmap.
 
+- 2026-11-01 — Add Hmisc's summaries to stat_summary(): mean_cl_normal, mean_sdl, median_hilow
+  and a seeded mean_cl_boot (summaries, step 5); §4: "`mean_cl_boot` draws its resamples", "The
+  Hmisc summaries take Hmisc's arguments"
 - 2026-10-31 — Summarise y at each x with stat_summary(): mean_se, the frame's summaries or a
   function, drawn by eight geoms (summaries, step 4); §4: "`stat_summary/3` draws with eight
   geoms", "A summary's values are names", "A summary carries a column cell by cell", "The
