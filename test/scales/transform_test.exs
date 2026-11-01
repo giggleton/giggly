@@ -451,15 +451,18 @@ defmodule Scales.TransformTest do
                {{1.0, 3.0}, {-1.0, -0.33333333333333331}}
     end
 
-    # R's range() of -0 and 0 is the first twice, as min() and max() keep the first of equals;
-    # reciprocal of (-0, 4) is -Inf to 0.25, of (-Inf, Inf) -0 twice.
+    # R's range() of -0 and 0 is the first twice, as min() and max() keep the first of equals,
+    # so reciprocal of (-0, 0) is -Inf twice; reciprocal of (-0, 4) is -Inf to 0.25, of
+    # (-Inf, Inf) -0 twice.
     test "of two equal ends, the first is both, so a zero's sign is the first's" do
       assert {Transform.trim_to_domain(:identity, [-0.0, 0.0]),
               Transform.trim_to_domain(:identity, [0.0, -0.0]),
               Transform.trim_to_domain(:reverse, [0.0, 0.0]),
+              Transform.trim_to_domain(:reciprocal, [-0.0, 0.0]),
               Transform.trim_to_domain(:reciprocal, [-0.0, 4.0]),
               Transform.trim_to_domain(:reciprocal, [:neg_infinity, :infinity])} ===
-               {{-0.0, -0.0}, {0.0, 0.0}, {-0.0, -0.0}, {:neg_infinity, 0.25}, {-0.0, -0.0}}
+               {{-0.0, -0.0}, {0.0, 0.0}, {-0.0, -0.0}, {:neg_infinity, :neg_infinity},
+                {:neg_infinity, 0.25}, {-0.0, -0.0}}
     end
 
     # R warns at a range of nothing and gives the transformed Inf and -Inf.

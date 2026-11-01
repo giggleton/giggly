@@ -80,9 +80,9 @@ defmodule Scales.Transform do
           | :reverse
           | :reciprocal
 
-  # A transformation the date, date-time and time transformations are not, whose data are numbers.
-  defguardp is_temporal(name)
-            when name in [:date, :time] or (is_tuple(name) and elem(name, 0) == :datetime)
+  # The date, date-time and time transformations, whose data are not numbers; the date-time one
+  # is the only name a tuple.
+  defguardp is_temporal(name) when name in [:date, :time] or is_tuple(name)
 
   # The values in transformed space: a number, `nil`, `:infinity`, `:neg_infinity` or `:nan` each,
   # a value outside the domain `:nan`, R's NaN.
