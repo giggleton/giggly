@@ -709,6 +709,37 @@ defmodule Giggly.GuideTest do
                {0.0625, 3.46, 0.0625, 3.46, places, List.duplicate(0.5, 4)}
     end
 
+    # Golden: ggplot2 4.0.3 (vdiffr 1.0.9) draws `expression("one", 10^2)` on a colour bar below
+    # the panel with every piece start-anchored, "one" too, as one grob of expressions, where a
+    # character vector's labels are centred on their places.
+    test "a colour bar running across lays its string among powers out as plotmath lays it out" do
+      keys =
+        Enum.zip_with(["one", {:power, "10", "2"}], [0.25, 0.75], fn label, place ->
+          %{label: label, place: place, glyphs: [], sizes: []}
+        end)
+
+      {_width, scene} =
+        Guide.draw(
+          %Guide.Colorbar{bins: 15},
+          %{
+            title: "hwy",
+            keys: keys,
+            decor: [{0.0, "#132B43"}, {1.0, "#56B1F7"}],
+            direction: :horizontal
+          },
+          Theme.complete(%{complete: :none, settings: %{}}),
+          false
+        )
+
+      [_background, _title, _bar, labels] = scene.cells
+
+      assert Enum.map(labels.primitives, fn text -> {text.labels, text.hjust} end) === [
+               {["one"], [0.0]},
+               {["10"], [0.0]},
+               {["2"], [0.0]}
+             ]
+    end
+
     # Golden: ggplot2 4.0.3's colour bar below the panels for mpg's `colour = cty`, with
     # `legend.text = element_text(margin = margin(t = 2, b = 4))`, through vdiffr 1.0.9: its
     # background 116.90 by 42.10 points, the labels' row as deep as the labels and both margins.
