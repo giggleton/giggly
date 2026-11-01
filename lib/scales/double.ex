@@ -10,8 +10,9 @@ defmodule Scales.Double do
   # The operators take a number, an infinity or `:nan` (`t:operand/0`), as their callers hand them
   # once a missing value has been set aside; the square root and the absolute value, which a
   # palette maps over its places, take `nil` too and keep it. The elementary functions R's
-  # transformations are built from are here too, each R's at the infinities, NaN and zero, and the
-  # two Erlang lacks, log1p and expm1, by measured methods, never ported from R's or C's source.
+  # transformations are built from are here too, each R's at the infinities, NaN and zero, and
+  # those Erlang lacks, log1p, expm1 and the normal distribution, quantile and density, by
+  # measured methods, never ported from R's or C's source.
 
   @infinities [:infinity, :neg_infinity]
 
@@ -207,12 +208,185 @@ defmodule Scales.Double do
   def inverse_hyperbolic_sine(value) when value == 0, do: 0.0
   def inverse_hyperbolic_sine(value), do: :math.asinh(value)
 
+  # The hyperbolic tangent, as R's `tanh()`: an infinity's the one of its sign, and a zero of
+  # either sign `0.0`, as R's. The platform's (`:math.tanh/1`), 1 ulp off R's on 1 of 3,000
+  # random values.
+  @doc false
+  @spec hyperbolic_tangent(operand()) :: operand()
+  def hyperbolic_tangent(:infinity), do: 1.0
+  def hyperbolic_tangent(:neg_infinity), do: -1.0
+  def hyperbolic_tangent(:nan), do: :nan
+  def hyperbolic_tangent(value) when value == 0, do: 0.0
+  def hyperbolic_tangent(value), do: :math.tanh(value)
+
+  # The inverse hyperbolic tangent, as R's `atanh()`: 1's plus infinity and -1's minus, NaN past
+  # them and at the infinities, and a zero of either sign `0.0`, as R's. The platform's
+  # (`:math.atanh/1`): R's is correctly rounded, and against it this one was 1 ulp off on 368 of
+  # 3,000 random values under glibc 2.39, exact where the platform's is correctly rounded too.
+  @doc false
+  @spec inverse_hyperbolic_tangent(operand()) :: operand()
+  def inverse_hyperbolic_tangent(value) when value in @infinities or value == :nan, do: :nan
+  def inverse_hyperbolic_tangent(value) when value == 1, do: :infinity
+  def inverse_hyperbolic_tangent(value) when value == -1, do: :neg_infinity
+  def inverse_hyperbolic_tangent(value) when value > 1 or value < -1, do: :nan
+  def inverse_hyperbolic_tangent(value) when value == 0, do: 0.0
+  def inverse_hyperbolic_tangent(value), do: :math.atanh(value)
+
+  # The sine, as R's `sin()`: NaN at the infinities, and a zero of either sign `0.0`, as R's. The
+  # platform's (`:math.sin/1`).
+  @doc false
+  @spec sine(operand()) :: operand()
+  def sine(value) when value in @infinities or value == :nan, do: :nan
+  def sine(value) when value == 0, do: 0.0
+  def sine(value), do: :math.sin(value)
+
+  # The arcsine, as R's `asin()`: NaN past -1 and 1 and at the infinities, and a zero of either
+  # sign `0.0`, as R's. The platform's (`:math.asin/1`).
+  @doc false
+  @spec arc_sine(operand()) :: operand()
+  def arc_sine(value) when value in @infinities or value == :nan, do: :nan
+  def arc_sine(value) when value > 1 or value < -1, do: :nan
+  def arc_sine(value) when value == 0, do: 0.0
+  def arc_sine(value), do: :math.asin(value)
+
+  # 1 / sqrt(2), and its rounding error, 1 / sqrt(2) less the double nearest it.
+  @reciprocal_square_root_of_two 0.7071067811865476
+  @reciprocal_square_root_of_two_error -4.833646656726457e-17
+  @two_over_square_root_of_pi 1.1283791670955126
+  @reciprocal_square_root_of_two_pi 0.3989422804014327
+
+  # The standard normal distribution below `value`, as R's `pnorm()`, which Erlang has no
+  # function for: `erfc(z) / 2` for `z = -value / sqrt(2)`, the rounding error in `z` found
+  # exactly (Dekker's product, and 1 / sqrt(2)'s own rounding) and `erfc` moved by its derivative,
+  # `-2 / sqrt(pi) * exp(-z^2)`, across it. Beyond 40 either side it is 0 or 1, as every double
+  # there is. Measured on 3,000 random values: within 3 ulps of R's, correctly rounded on 88% of
+  # them against a 60-digit truth, R's on 86%.
+  @doc false
+  @spec normal_distribution(operand()) :: operand()
+  def normal_distribution(:nan), do: :nan
+  def normal_distribution(:infinity), do: 1.0
+  def normal_distribution(:neg_infinity), do: 0.0
+  def normal_distribution(value) when value > 40, do: 1.0
+  def normal_distribution(value) when value < -40, do: 0.0
+  def normal_distribution(value), do: distribution_below(value / 1)
+
+  # The standard normal quantile of `probability`, as R's `qnorm()`, which Erlang has no function
+  # for: bisected to neighbouring doubles, the nearer taken. Below 0.25 on the distribution
+  # (`normal_distribution/1`); from 0.25 to 0.5 on `erf(q / sqrt(2)) / 2` against
+  # `probability - 0.5`, exact there, with the rounding of `q / sqrt(2)` corrected as the
+  # distribution's is, since many quantiles near 0 share one distribution value near 0.5; above
+  # 0.5 by symmetry, `1 - probability` exact there. 0's and 1's are the infinities, NaN outside
+  # them. Measured on 3,000 random values: within 5 ulps of R's, correctly rounded on 86% of them
+  # against a 60-digit truth, R's on 31%. Below the smallest normal double, where one distribution
+  # double stands for a stretch of quantiles, it is one of them: at 5e-324, -38.475 where R gives
+  # -38.467; from about 1e-310 up, the stretch is under a double wide.
+  @doc false
+  @spec normal_quantile(operand()) :: operand()
+  def normal_quantile(probability) when probability in @infinities or probability == :nan,
+    do: :nan
+
+  def normal_quantile(probability) when probability < 0 or probability > 1, do: :nan
+  def normal_quantile(probability) when probability == 0, do: :neg_infinity
+  def normal_quantile(probability) when probability == 1, do: :infinity
+  def normal_quantile(probability) when probability == 0.5, do: 0.0
+  def normal_quantile(probability) when probability > 0.5, do: -lower_quantile(1.0 - probability)
+  def normal_quantile(probability), do: lower_quantile(probability / 1)
+
+  # The standard normal density, as R's `dnorm()`: `exp(-value^2 / 2) / sqrt(2 * pi)`, the square
+  # split exactly into two doubles (Dekker's product) so its rounding is not raised to the power,
+  # `exp(-high / 2) * exp(-low / 2)`. 0 at the infinities and beyond 40 either side, as every
+  # double there is. Measured on 3,493 random values: within 7 ulps of R's, as often correctly
+  # rounded against a 60-digit truth, and nearer it between 4 and 5 either side, where R's is up
+  # to 6 off it and this one 2.
+  @doc false
+  @spec normal_density(operand()) :: operand()
+  def normal_density(:nan), do: :nan
+  def normal_density(value) when value in @infinities, do: 0.0
+  def normal_density(value) when value > 40 or value < -40, do: 0.0
+
+  def normal_density(value) do
+    {high, low} = exact_product(value / 1, value / 1)
+    @reciprocal_square_root_of_two_pi * (:math.exp(-high / 2) * :math.exp(-low / 2))
+  end
+
+  defp distribution_below(value) do
+    argument = -value * @reciprocal_square_root_of_two
+    complement = :math.erfc(argument)
+
+    if complement == 0.0,
+      do: 0.0,
+      else: 0.5 * (complement - error_function_step(-value, argument))
+  end
+
+  defp half_error_function(quantile) do
+    argument = quantile * @reciprocal_square_root_of_two
+    0.5 * (:math.erf(argument) + error_function_step(quantile, argument))
+  end
+
+  # The error function's change across the rounding error in `argument`, the double nearest
+  # `value / sqrt(2)`: that error, found exactly, times the derivative, 2 / sqrt(pi) exp(-z^2).
+  defp error_function_step(value, argument) do
+    {product, product_error} = exact_product(value, @reciprocal_square_root_of_two)
+    error = product - argument + product_error + value * @reciprocal_square_root_of_two_error
+    error * @two_over_square_root_of_pi * :math.exp(-argument * argument)
+  end
+
+  defp lower_quantile(probability) when probability >= 0.25,
+    do: bisect(&half_error_function/1, probability - 0.5, -0.7, 0.0)
+
+  defp lower_quantile(probability), do: bisect(&distribution_below/1, probability, -40.0, 0.0)
+
+  # The double between `low` and `high` whose image under the rising `function` is nearest
+  # `target`, halving the interval until no double lies between its ends.
+  defp bisect(function, target, low, high) do
+    middle = (low + high) / 2
+
+    cond do
+      middle == low or middle == high ->
+        if abs(function.(low) - target) <= abs(function.(high) - target), do: low, else: high
+
+      function.(middle) < target ->
+        bisect(function, target, middle, high)
+
+      true ->
+        bisect(function, target, low, middle)
+    end
+  end
+
+  # `left * right` as the double nearest it and that double's error, exactly (Dekker's product,
+  # each split into halves of 26 bits).
+  defp exact_product(left, right) do
+    product = left * right
+    {left_high, left_low} = halves(left)
+    {right_high, right_low} = halves(right)
+
+    error =
+      left_high * right_high - product + left_high * right_low + left_low * right_high +
+        left_low * right_low
+
+    {product, error}
+  end
+
+  defp halves(value) do
+    scaled = 134_217_729.0 * value
+    high = scaled - (scaled - value)
+    {high, value - high}
+  end
+
   # The absolute value, an infinity's `:infinity`.
   @doc false
   @spec absolute(Scales.double()) :: Scales.double()
   def absolute(value) when value in [nil, :nan], do: value
   def absolute(value) when value in @infinities, do: :infinity
   def absolute(value), do: abs(value)
+
+  # `-value`: an infinity's the other, and a zero's the zero of the other sign.
+  @doc false
+  @spec negate(operand()) :: operand()
+  def negate(:nan), do: :nan
+  def negate(:infinity), do: :neg_infinity
+  def negate(:neg_infinity), do: :infinity
+  def negate(value), do: -value
 
   # The smaller of two, R's `min()` on a pair: NaN where either is, and `left` where neither is
   # below the other, so the smaller of `-0.0` and `0.0` is whichever comes first, as R's is.
@@ -253,11 +427,6 @@ defmodule Scales.Double do
   defp rank(:neg_infinity), do: -1
   defp rank(:infinity), do: 1
   defp rank(_number), do: 0
-
-  defp negate(:nan), do: :nan
-  defp negate(:infinity), do: :neg_infinity
-  defp negate(:neg_infinity), do: :infinity
-  defp negate(value), do: -value
 
   defp quotient(left, right) do
     left / right

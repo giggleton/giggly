@@ -1428,10 +1428,12 @@ defmodule Scales.Labels do
   end
 
   # Plain decimals of breaks turned back through an inverse that does not give a break back
-  # exactly, log1p's, exp's, asinh's and the pseudo-logarithm's, so `10000` comes back
-  # `9999.999999999989`: each rounded to 14 significant digits (R's `signif()`) before `plain/1`
-  # writes it. Against the labels of the breaks as found in data units, at 15 digits up to 40% of
-  # random axes showed the round trip's error, at 14 none of 28,000; R hides it by writing 7.
+  # exactly, log1p's, exp's, asinh's, the pseudo-logarithm's and a probability's, so `10000`
+  # comes back `9999.999999999989`, and an axis's `0.0009` under logit `0.0009000000000000006`:
+  # each rounded to 14 significant digits (R's `signif()`) before `plain/1` writes it. Against the
+  # labels of the breaks as found in data units, at 15 digits up to 40% of random axes showed the
+  # round trip's error, at 14 none of 28,000, and of 24,000 under a probability only axes ending
+  # within 5e-12 of 1, whose breaks need 15 digits; R hides it by writing 7.
   @doc false
   @spec plain_round_tripped([float()]) :: [String.t()]
   def plain_round_tripped(values) do

@@ -221,18 +221,104 @@ defmodule Scales.DoubleTest do
               Double.inverse_hyperbolic_sine(:neg_infinity), Double.inverse_hyperbolic_sine(:nan)} ===
                {0.0, 1.4436354751788103, :neg_infinity, :nan}
     end
+  end
+
+  describe "the tangents and sines" do
+    # R's tanh(-Inf) -1, tanh(-0) +0, tanh(-1000) -1, tanh(2) 0.9640275800758169; atanh(-0) +0,
+    # atanh(1) Inf, atanh(-1) -Inf, atanh(-2), atanh(Inf) and atanh(-Inf) NaN, atanh(0.25)
+    # 0.25541281188299536; sin(-0) and asin(-0) +0, sin(Inf) NaN, sin(2) 0.90929742682568171,
+    # asin(-1) -1.5707963267948966, asin(2) and asin(-Inf) NaN (`inc4/step4/edge.R`)
+    test "R's at each edge, a zero of either sign 0.0" do
+      assert {Double.hyperbolic_tangent(:neg_infinity), Double.hyperbolic_tangent(-0.0),
+              Double.hyperbolic_tangent(-1000.0), Double.hyperbolic_tangent(2.0),
+              Double.hyperbolic_tangent(:infinity), Double.hyperbolic_tangent(:nan)} ===
+               {-1.0, 0.0, -1.0, 0.9640275800758169, 1.0, :nan}
+
+      assert {Double.inverse_hyperbolic_tangent(-0.0), Double.inverse_hyperbolic_tangent(1.0),
+              Double.inverse_hyperbolic_tangent(-1), Double.inverse_hyperbolic_tangent(-2.0),
+              Double.inverse_hyperbolic_tangent(1.5),
+              Double.inverse_hyperbolic_tangent(:infinity),
+              Double.inverse_hyperbolic_tangent(:neg_infinity),
+              Double.inverse_hyperbolic_tangent(:nan), Double.inverse_hyperbolic_tangent(0.25)} ===
+               {0.0, :infinity, :neg_infinity, :nan, :nan, :nan, :nan, :nan, 0.25541281188299536}
+
+      assert {Double.sine(-0.0), Double.sine(:infinity), Double.sine(:neg_infinity),
+              Double.sine(:nan), Double.sine(2.0)} ===
+               {0.0, :nan, :nan, :nan, 0.90929742682568171}
+
+      assert {Double.arc_sine(-0.0), Double.arc_sine(-1.0), Double.arc_sine(2.0),
+              Double.arc_sine(-1.5), Double.arc_sine(:neg_infinity), Double.arc_sine(:nan)} ===
+               {0.0, -1.5707963267948966, :nan, :nan, :nan, :nan}
+    end
+  end
+
+  describe "normal_distribution/1, normal_quantile/1 and normal_density/1" do
+    # R's pnorm(-Inf) +0, pnorm(-0) 0.5, pnorm(1e-300) 0.5, pnorm(40.5) and pnorm(Inf) 1,
+    # pnorm(-1000) +0, pnorm(0.25) 0.5987063256829237; qnorm(-0) -Inf, qnorm(0.5) +0, qnorm(1)
+    # Inf, qnorm(-1), qnorm(2) and qnorm(-Inf) NaN, qnorm(1e-300) -37.047096299361201; dnorm(-Inf)
+    # and dnorm(40.5) +0, dnorm(-0) 0.3989422804014327, dnorm(-38.4) 2.5345567631655948e-321,
+    # dnorm(1) 0.24197072451914337 (`inc4/step4/edge.R`)
+    test "R's at each edge, 0 and 1 beyond 40 either side" do
+      assert {Double.normal_distribution(:neg_infinity), Double.normal_distribution(-0.0),
+              Double.normal_distribution(1.0e-300), Double.normal_distribution(40.5),
+              Double.normal_distribution(:infinity), Double.normal_distribution(-1000.0),
+              Double.normal_distribution(-40.5), Double.normal_distribution(0.25),
+              Double.normal_distribution(:nan)} ===
+               {0.0, 0.5, 0.5, 1.0, 1.0, 0.0, 0.0, 0.5987063256829237, :nan}
+
+      assert {Double.normal_quantile(-0.0), Double.normal_quantile(0.5),
+              Double.normal_quantile(1), Double.normal_quantile(-1.0),
+              Double.normal_quantile(2.0), Double.normal_quantile(:neg_infinity),
+              Double.normal_quantile(:infinity), Double.normal_quantile(:nan),
+              Double.normal_quantile(1.0e-300)} ===
+               {:neg_infinity, 0.0, :infinity, :nan, :nan, :nan, :nan, :nan, -37.047096299361201}
+
+      assert {Double.normal_density(:neg_infinity), Double.normal_density(40.5),
+              Double.normal_density(-40.5), Double.normal_density(-0.0),
+              Double.normal_density(-38.4), Double.normal_density(1), Double.normal_density(:nan)} ===
+               {0.0, 0.0, 0.0, 0.3989422804014327, 2.5345567631655948e-321, 0.24197072451914337,
+                :nan}
+    end
+  end
+
+  describe "negate/1" do
+    test "an infinity's is the other, a zero's the zero of the other sign" do
+      assert {Double.negate(:infinity), Double.negate(:neg_infinity), Double.negate(:nan),
+              Double.negate(0.0), Double.negate(-2.5)} ===
+               {:neg_infinity, :infinity, :nan, -0.0, 2.5}
+    end
 
     # Golden: `fixtures/r_elementary_4.6.1.csv` is R 4.6.1's asinh(), log1p() and expm1() at
-    # random doubles, from -1 up, tiny and huge (`inc4/step3/fixture.R`). R's asinh is correctly
-    # rounded, the platform's within 1 ulp of it (369 of 3,000 off under glibc 2.39); Goldberg's
-    # log1p is within 2 ulps of R's, Kahan's expm1 within 1.
-    test "asinh, log1p and expm1 are within their measured ulps of R's" do
-      bounds = %{"asinh" => 1, "log1p" => 2, "expm1" => 1}
+    # random doubles, from -1 up, tiny and huge (`inc4/step3/fixture.R`), and its sin(), tanh(),
+    # atanh(), pnorm(), qnorm() and dnorm(), at proportions near 0, 0.5 and 1 and values to 40
+    # either side (`inc4/step4/fixture.R`). R's asinh and atanh are correctly rounded, the
+    # platform's within 1 ulp of them (369 and 368 of 3,000 off under glibc 2.39); Goldberg's
+    # log1p is within 2 ulps of R's, Kahan's expm1 within 1; the normal's distribution, quantile
+    # and density within 3, 5 and 7, as near a 60-digit truth as R's or nearer: R's density is up
+    # to 6 off it between 4 and 5 either side, this one 2.
+    test "the elementary functions are within their measured ulps of R's" do
+      bounds = %{
+        "asinh" => 1,
+        "log1p" => 2,
+        "expm1" => 1,
+        "sin" => 1,
+        "tanh" => 1,
+        "atanh" => 1,
+        "pnorm" => 3,
+        "qnorm" => 5,
+        "dnorm" => 7
+      }
 
       functions = %{
         "asinh" => &Double.inverse_hyperbolic_sine/1,
         "log1p" => &Double.logarithm_of_one_plus/1,
-        "expm1" => &Double.exponential_minus_one/1
+        "expm1" => &Double.exponential_minus_one/1,
+        "sin" => &Double.sine/1,
+        "tanh" => &Double.hyperbolic_tangent/1,
+        "atanh" => &Double.inverse_hyperbolic_tangent/1,
+        "pnorm" => &Double.normal_distribution/1,
+        "qnorm" => &Double.normal_quantile/1,
+        "dnorm" => &Double.normal_density/1
       }
 
       rows =
@@ -249,7 +335,7 @@ defmodule Scales.DoubleTest do
           {String.trim(quoted, ~s(")), double(value), double(expected)}
         end)
 
-      assert Enum.count(rows) == 1393
+      assert Enum.count(rows) == 4381
 
       far =
         Enum.reject(rows, fn {function, value, expected} ->

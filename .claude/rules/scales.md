@@ -114,8 +114,12 @@ R's regular ones: the entry beginning "The panel's grid lines are placed by the 
   double, NaN for 0/0, Inf − Inf and Inf × 0, a zero's sign read from its bit; its operators take
   no `nil`, which their callers set aside first. **It is the one home too of the elementary
   functions transformations are built from**, a logarithm in a base, a power, log1p, expm1, the
-  hyperbolic sine and cosine and asinh, each R's at the infinities, NaN and zero; `Breaks` and
-  `Labels` take their logarithms from it. Its tests pin R's answers.
+  hyperbolic sine, cosine and tangent, asinh, atanh, the sine and arcsine, and the standard
+  normal's distribution, quantile and density, each R's at the infinities, NaN and zero; `Breaks`
+  and `Labels` take their logarithms from it. What Erlang lacks, log1p, expm1 and the normal's
+  three, is measured methods, never ported (design-log §4, the entries beginning "The scales
+  package carries every transformation" and "A distribution's spread"). Its tests pin R's answers
+  and, in `test/scales/fixtures/r_elementary_4.6.1.csv`, each function's measured ulps from R's.
 - **The rescaling functions are R's `rescale()`, `rescale_mid()` and `rescale_max()` to the last
   digit** (`Scales.Bounds`), on lists as R's are on vectors, a `nil` in giving `nil` out, as R's
   `NA`, and NaN `:nan`, given or worked out; a value, an end or a midpoint may be an infinity,
@@ -176,23 +180,34 @@ R's regular ones: the entry beginning "The panel's grid lines are placed by the 
   turned back into data units, put back into log space, so `:log`'s are powers of e; its test
   pins R's own axis, labels and minor breaks, for each of `breaks_log()`'s branches, and compares
   its breaks with `Breaks.log/2`'s, whose test pins R's figures. log1p, exp, asinh, the
-  pseudo-logarithm, sqrt, reverse and reciprocal take extended breaks on the data range, as R's
-  `extended_breaks()` does; an exponential's extent reaching zero or below is broken on its high
-  end alone, as R's breaks drop its NaN.
+  pseudo-logarithm, sqrt, reverse, reciprocal, asn, atanh and the probabilities take extended
+  breaks on the data range, as R's `extended_breaks()` does; an exponential's extent reaching
+  zero or below is broken on its high end alone, as R's breaks drop its NaN. **A break at an end
+  of a domain the transformation takes to an infinity is that infinity**, logit's 0 and 1, as
+  R's, outside every extent; a caller keeps numbers alone.
 - **Every transformation of scales 1.4.0 is a name** (design-log §4, the entries beginning "The
-  scales package carries every transformation" and "A logarithm's or exponential's base"): a base
-  is a number above 1 and a pseudo-logarithm's sigma above 0, each checked by guard where the name
-  is resolved, so `FunctionClauseError` wherever it is handed, where R also takes a falling base
-  below 1; `{:pseudo_log, ...}` takes `sigma:`, `base:` or both, once each. `{:log, 10}` and
+  scales package carries every transformation", "A logarithm's or exponential's base" and "A
+  distribution's spread"): a base
+  is a number above 1, a pseudo-logarithm's sigma and a distribution's `sd:` or `scale:` above 0,
+  its `mean:` or `location:` a number, each checked by guard where the name is resolved, so
+  `FunctionClauseError` wherever it is handed, where R also takes a falling base below 1 and a
+  spread of 0; `{:pseudo_log, ...}` takes `sigma:`, `base:` or both, once each, and
+  `{:probability, :normal, ...}` and `{:probability, :logistic, ...}` their own two likewise,
+  `:probit` and `:logit` their standard forms. `{:log, 10}` and
   `{:log, 2}` place every value where `:log10` and `:log2` do, as R's `log(x, base)` takes those
   bases by their own functions; R's `exp(1)^x`, not `exp(x)`, is `:log`'s inverse and `:exp`.
-  Every value, derivative, domain and break is R's but where the platform's asinh is not
-  correctly rounded (asinh and the pseudo-logarithm, within 1 and 2 ulps of R's) and log1p's
-  and expm1's measured methods (within 2 and 1); R's `+0` for a negative zero from log1p, expm1,
-  asinh, sinh and the pseudo-logarithm on a vector. The derivatives are in the order that gave
-  R's doubles, the pseudo-logarithm's `1 / (sqrt(1 + x * x / (4 * sigma * sigma)) * 2 * sigma *
-  log(base))` alone of twelve. Their tests pin R's figures over the nine doubles, ggplot2's axes
-  and `test/scales/fixtures/r_elementary_4.6.1.csv`'s bounds.
+  Every value, derivative, domain and break is R's but where the platform's asinh, atanh and sine
+  are not correctly rounded (asinh and atanh within 1 ulp of R's, the pseudo-logarithm and asn's
+  inverse 2), log1p's and expm1's measured methods (within 2 and 1), and the normal's (its
+  quantile within 5, distribution 3, density 7, nearer the truth than R's where they part; a mean
+  or the forward derivative carries the quantile's last bit, the derivative's at the far tail
+  multiplied by about its square, 5.2e-13 relatively); R's `+0` for a negative zero from log1p,
+  expm1, asinh, sinh, the pseudo-logarithm, asin, sin, tanh and atanh on a vector. The
+  derivatives are in the order that gave R's doubles, the pseudo-logarithm's `1 / (sqrt(1 + x *
+  x / (4 * sigma * sigma)) * 2 * sigma * log(base))` alone of twelve; a probability's forward
+  derivative is 1 over its inverse's at the value transformed, as R's. Their tests pin R's
+  figures over the nine doubles, ggplot2's axes and `test/scales/fixtures/r_elementary_4.6.1.csv`'s
+  bounds.
 - **A date scale works in days since 1970-01-01, as R stores a date** (`Transform.Date`, R's
   `transform_date()`): a date is a float of its days, a missing one `nil`, and a position turned
   back the day it falls on, rounded down, as R's `format()` writes it; it trains, expands and
@@ -351,5 +366,6 @@ R's regular ones: the entry beginning "The panel's grid lines are placed by the 
   so a log axis's `1e+05` is written `100000` and a natural one's powers of e to 15 digits. **A
   break turned back through an inverse that does not give it back exactly is rounded to 14
   significant digits first** (`Labels.plain_round_tripped/1`: log1p's, exp's, asinh's, the
-  pseudo-logarithm's), so `10000` under sigma 2, base 10 is not `9999.99999999999`; its test and
-  the axes' pin it.
+  pseudo-logarithm's, a probability's), so `10000` under sigma 2, base 10 is not
+  `9999.99999999999`, nor `0.0009` under logit `0.000900000000000001`; asn's and atanh's showed
+  none and stay plain; its test and the axes' pin it.

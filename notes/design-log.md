@@ -79,28 +79,46 @@ stops the question being reopened from scratch. A new entry is about 150 words: 
 sentence or two of why, and one line per rejected alternative. What a later decision replaces is
 deleted from the entry it was in, never marked superseded; git history keeps every version.
 
+- **A distribution's spread is above 0 and its location a number, and the normal quantile's
+  middle is bisected on `erf` (2026-11-01, Steve: "A", "A", increment 4's step 4; checked against
+  scales 1.4.0).** `{:probability, :normal, mean:, sd:}` and `{:probability, :logistic,
+  location:, scale:}` take either keyword or both, R's defaults 0 and 1, `:probit` and `:logit`
+  their standard forms; any other value is refused by guard, as a base is. The quantile bisected
+  on the distribution was 25% off at p = 0.5 + 1 ulp, many quantiles sharing one distribution
+  double there: from 0.25 to 0.75 it is bisected on `erf(q / sqrt(2)) / 2` against `p - 0.5`,
+  exact there, within 5 ulps of R's, correctly rounded on 86% of 3,000 where R's is on 31%; the
+  density splits `x * x` exactly first (Dekker), within 7 ulps of R's, nearer the truth where
+  they part. *Rejected: R's positional parameters*: sd alone would spell out the mean.
+  *Rejected: R's spread of 0*: every value at the mean. *Rejected: Wichura's AS241*: 50 typed
+  coefficients, R's tails since changed, and R's quantile is the less accurate.
+
 - **A break turned back through an inexact inverse is written to 14 significant digits
   (2026-11-01, Steve: "A", "A", increment 4's step 3; checked against scales 1.4.0).** Every
   transformation keeps plain labels (the 2026-10-12 rule, so a natural log's powers of e take 15
-  digits where R's `format()` gives 7), but log1p's, exp's, asinh's and the pseudo-logarithm's
-  labels are written from each break turned back rounded to 14 significant digits first
-  (`Labels.plain_round_tripped/1`): the round trip leaves `10000` as `9999.999999999989` under a
-  pseudo-logarithm in sigma 2, base 10. Against the breaks' own labels in data units, at 15
-  digits up to 40% of random axes showed that error, at 14 none of 28,000. *Rejected: 14 digits
+  digits where R's `format()` gives 7), but log1p's, exp's, asinh's, the pseudo-logarithm's and,
+  from step 4, logit's, probit's and both probability tuples' labels are written from each break
+  turned back rounded to 14 significant digits first (`Labels.plain_round_tripped/1`): the round
+  trip leaves `10000` as `9999.999999999989` under a pseudo-logarithm in sigma 2, base 10, and
+  `0.0009` written `0.000900000000000001` under logit. Against the breaks' own labels in data
+  units, at 15 digits up to 40% of random axes showed that error, at 14 none of 28,000, and under
+  a probability only axes ending within 5e-12 of 1, whose breaks need 15 digits; asn and atanh
+  showed none and stay plain. *Rejected: 14 digits
   in `plain/1` itself*: an identity axis needing 15 (1e14 to 1e14 + 4) would collide.
   *Rejected: R's `format()`*, for these alone or for all: `:log10` and `{:log, 10}` written two
-  ways, or the agreed plain labels reopened. *Rejected: plain as it was*: the noise.
+  ways, or the agreed plain labels reopened. *Rejected: plain as it was*: the noise. *Rejected:
+  asn and atanh round-tripped too*: their 15-digit axes near 1 lost for nothing.
 
 - **A logarithm's or exponential's base is above 1, a pseudo-logarithm's sigma above 0, and asinh
-  is the platform's (2026-11-01, Steve: "A", "A", "A", increment 4's step 3; checked against
-  scales 1.4.0).** Names: `:log`, `:log2`, `:log10`, `{:log, base}`, `:log1p`, `:exp`,
+  and atanh are the platform's (2026-11-01, Steve: "A", "A", "A", increment 4's step 3, and "A",
+  step 4; checked against scales 1.4.0).** Names: `:log`, `:log2`, `:log10`, `{:log, base}`, `:log1p`, `:exp`,
   `{:exp, base}`, `:asinh`, `:pseudo_log` and `{:pseudo_log, sigma:, base:}`, either keyword
   optional, R's defaults. Any other base or sigma is refused by guard; a falling axis is the base
   above 1 reversed. asinh is `:math.asinh`, within 1 ulp of R's correctly rounded one (369 of
-  3,000 off under glibc 2.39). *Rejected: positional `{:pseudo_log, sigma, base}`*: sigma alone,
+  3,000 off under glibc 2.39), and atanh `:math.atanh` likewise (368). *Rejected: positional `{:pseudo_log, sigma, base}`*: sigma alone,
   the usual call, would spell out e. *Rejected: R's bases below 1*: `squish/2` and
   `Breaks.log/2` would take a falling domain, for an axis nobody draws. *Rejected: an own
-  correctly rounded asinh*: new numerics for one ulp; *one through log1p*: further off (540).
+  correctly rounded asinh or atanh*: new numerics for one ulp; *one through log1p*: further off
+  (asinh's 540).
 
 - **A bootstrap example states its departure once, in its notebook's About (2026-11-01, Steve:
   "Your recommendation").** stat_summary's About says that ggplot2's examples set no seed, so R
@@ -185,7 +203,8 @@ deleted from the entry it was in, never marked superseded; git history keeps eve
   `Scales.Transform.new/2`, R's `new_transform()`: functions of one value (`&Mod.fun/1` keeps it
   readable), a domain, breaks handed limits in data units; built-ins stay names. log1p (Goldberg's
   `log(u) * x / (u - 1)`), expm1 (Kahan's), the normal CDF (`erfc` with its argument's rounding
-  corrected) and quantile (bisection on it) match R to a few ulps, 2.4e-15 relatively at worst.
+  corrected) and quantile (bisection on it, its middle on `erf`: the entry beginning "A
+  distribution's spread") match R to a few ulps.
   `:logit`, `:probit`, and the normal and logistic with R's parameters; other distributions
   through `new/2`. Every numeric transformation has R's derivatives, a composition's by the chain
   rule. *Rejected: a module a user writes*: internal callbacks made API. *Rejected: Nx*: its

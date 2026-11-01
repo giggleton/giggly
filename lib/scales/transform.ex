@@ -41,9 +41,11 @@ defmodule Scales.Transform do
   # log1p, exponentials (`Transform.Exp`: `:exp`, `{:exp, base}`), the inverse hyperbolic sine,
   # the pseudo-logarithm, square root, reverse and reciprocal (`Transform.Log1p`,
   # `Transform.Asinh`, `Transform.PseudoLog`, `Transform.Sqrt`, `Transform.Reverse`,
-  # `Transform.Reciprocal`), which a plot's scale names. A name holding a base or a sigma is
-  # refused where it is resolved unless each is a number in range, so every callback reads them
-  # unchecked. Every callback is
+  # `Transform.Reciprocal`), the arcsine square root and inverse hyperbolic tangent
+  # (`Transform.Asn`, `Transform.Atanh`), and a distribution's quantile (`Transform.Probability`:
+  # `:logit`, `:probit`, `{:probability, distribution, options}`), which a plot's scale names. A
+  # name holding a base, a sigma or a distribution's parameters is refused where it is resolved
+  # unless each is a number in range, so every callback reads them unchecked. Every callback is
   # handed the transformation as the scale records it, so one that holds more than its name reads
   # it, as R's object's functions close over theirs. Each finds its
   # breaks as ggplot2's `get_breaks()` does, on the extent turned back into data units, and returns
@@ -73,16 +75,22 @@ defmodule Scales.Transform do
   R's `transform_exp()`; `:asinh`, R's `transform_asinh()`; `:pseudo_log` and
   `{:pseudo_log, sigma: sigma, base: base}`, either or both, R's
   `transform_pseudo_log(sigma = 1, base = exp(1))`; `:sqrt`, `:reverse` (each value negated) and
-  `:reciprocal`, R's `transform_sqrt()` and its kin; `:date`,
+  `:reciprocal`, R's `transform_sqrt()` and its kin; `:asn`, the arcsine square root, and
+  `:atanh`, R's `transform_asn()` and `transform_atanh()`; `:logit` and `:probit`, R's
+  `transform_logit()` and `transform_probit()`; `{:probability, :normal, mean: mean, sd: sd}` and
+  `{:probability, :logistic, location: location, scale: scale}`, either or both, R's
+  `transform_probability("norm", mean = 0, sd = 1)` and `transform_probability("logis",
+  location = 0, scale = 1)`; `:date`,
   a `Date` as its days since 1970-01-01, R's `transform_date()`; `{:datetime, zone, database}`, a
   `DateTime` or `NaiveDateTime` as its seconds since 1970-01-01 00:00 UTC, its breaks laid on
   the clock of `zone`, read by the time zone database `database`, R's `transform_time(tz)`, the
   zone `:default` until a column settles it and `:naive` for naive date-times; and `:time`, a
   `Time` as its seconds since midnight, R's `transform_hms()`.
 
-  A base is a number above 1 and a sigma a number above 0, and a name holding any other raises
-  `FunctionClauseError` wherever it is handed, where R also takes a base below 1, falling, and
-  gives no axis at 1. A falling axis is the transformation in a base above 1 reversed.
+  A base is a number above 1, a sigma, a standard deviation or a scale a number above 0, and a
+  mean or a location a number, and a name holding any other raises `FunctionClauseError`
+  wherever it is handed, where R also takes a base below 1, falling, and gives no axis at 1 or
+  a scale of 0. A falling axis is the transformation in a base above 1 reversed.
   """
   @type name ::
           :identity
@@ -102,14 +110,33 @@ defmodule Scales.Transform do
           | :sqrt
           | :reverse
           | :reciprocal
+          | :asn
+          | :atanh
+          | :logit
+          | :probit
+          | {:probability, :normal, [mean: number(), sd: number()]}
+          | {:probability, :logistic, [location: number(), scale: number()]}
+
+  @typedoc "A break in transformed space: a number, or an infinity or NaN where R's lands one."
+  @type break :: float() | :infinity | :neg_infinity | :nan
 
   # The date, date-time and time transformations, whose data are not numbers.
   defguardp is_temporal(name)
             when name in [:date, :time] or (is_tuple(name) and elem(name, 0) == :datetime)
 
-  # A base a logarithm, an exponential or a pseudo-logarithm takes, and a pseudo-logarithm's sigma.
+  # A base a logarithm, an exponential or a pseudo-logarithm takes, and a pseudo-logarithm's sigma
+  # or a distribution's spread.
   defguardp is_base(base) when is_number(base) and base > 1
-  defguardp is_sigma(sigma) when is_number(sigma) and sigma > 0
+  defguardp is_positive(value) when is_number(value) and value > 0
+
+  # A distribution's parameter by name: a mean or location a number, a standard deviation or a
+  # scale a number above 0.
+  defguardp is_parameter(distribution, key, value)
+            when (distribution == :normal and
+                    ((key == :mean and is_number(value)) or (key == :sd and is_positive(value)))) or
+                   (distribution == :logistic and
+                      ((key == :location and is_number(value)) or
+                         (key == :scale and is_positive(value))))
 
   # The values in transformed space: a number, `nil`, `:infinity`, `:neg_infinity` or `:nan` each,
   # a value outside the domain `:nan`, R's NaN.
@@ -126,11 +153,12 @@ defmodule Scales.Transform do
   @callback domain(transformation :: name()) :: Scales.Bounds.range()
 
   # The breaks of an axis showing `extent`, in transformed space, in the transformation's order;
-  # some may fall outside it. `options` are `breaks/3`'s, validated, and always `[]` for the time
-  # transformation, which counts no breaks.
+  # some may fall outside it, a break at an end of a domain the transformation takes to an
+  # infinity, logit's 0 and 1, there, as R's. `options` are `breaks/3`'s, validated, and always
+  # `[]` for the time transformation, which counts no breaks.
   @doc false
   @callback breaks(transformation :: name(), extent :: {float(), float()}, options :: keyword()) ::
-              [float()]
+              [break()]
 
   # The minor breaks between `breaks` on an axis showing `extent`; the breaks themselves may be
   # among them, and some may fall outside the extent.
@@ -296,8 +324,9 @@ defmodule Scales.Transform do
 
   @doc """
   The default breaks, in transformed space, of an axis showing `extent` under the transformation
-  `name`, in the order the transformation leaves them: extended breaks (`Scales.Breaks`) on the
-  extent in data units, powers of the base and their multiples under a logarithm in a base
+  `name`, in the order the transformation leaves them, some outside the extent, those at an end
+  of a domain transformed to an infinity there, as logit's 0 and 1, which no extent reaches:
+  extended breaks (`Scales.Breaks`) on the extent in data units, powers of the base and their multiples under a logarithm in a base
   (`Scales.Breaks.log/2`, so powers of e under `:log`), calendar dates under the date
   transformation and clock times under the date-time one, as R's `pretty()` finds them, and
   spans of time under the time one, as `Scales.Breaks.timespan/2` finds them.
@@ -325,7 +354,7 @@ defmodule Scales.Transform do
       iex> Scales.Transform.breaks(:log10, {0.0, 6.0}, n: 2)
       [0.0, 4.0]
   """
-  @spec breaks(name(), {float(), float()}, keyword()) :: [float()]
+  @spec breaks(name(), {float(), float()}, keyword()) :: [break()]
   def breaks(name, extent, options \\ []) do
     validated = counted!(name, options)
     module(name).breaks(name, extent, validated)
@@ -429,16 +458,30 @@ defmodule Scales.Transform do
   defp module({:exp, base}) when is_base(base), do: Transform.Exp
   defp module(:asinh), do: Transform.Asinh
   defp module(:pseudo_log), do: Transform.PseudoLog
-  defp module({:pseudo_log, [sigma: sigma]}) when is_sigma(sigma), do: Transform.PseudoLog
+  defp module({:pseudo_log, [sigma: sigma]}) when is_positive(sigma), do: Transform.PseudoLog
   defp module({:pseudo_log, [base: base]}) when is_base(base), do: Transform.PseudoLog
 
-  defp module({:pseudo_log, [sigma: sigma, base: base]}) when is_sigma(sigma) and is_base(base),
-    do: Transform.PseudoLog
+  defp module({:pseudo_log, [sigma: sigma, base: base]})
+       when is_positive(sigma) and is_base(base),
+       do: Transform.PseudoLog
 
-  defp module({:pseudo_log, [base: base, sigma: sigma]}) when is_sigma(sigma) and is_base(base),
-    do: Transform.PseudoLog
+  defp module({:pseudo_log, [base: base, sigma: sigma]})
+       when is_positive(sigma) and is_base(base),
+       do: Transform.PseudoLog
 
   defp module(:sqrt), do: Transform.Sqrt
   defp module(:reverse), do: Transform.Reverse
   defp module(:reciprocal), do: Transform.Reciprocal
+  defp module(:asn), do: Transform.Asn
+  defp module(:atanh), do: Transform.Atanh
+  defp module(name) when name in [:logit, :probit], do: Transform.Probability
+
+  defp module({:probability, distribution, [{key, value}]})
+       when is_parameter(distribution, key, value),
+       do: Transform.Probability
+
+  defp module({:probability, distribution, [{first, first_value}, {second, second_value}]})
+       when first != second and is_parameter(distribution, first, first_value) and
+              is_parameter(distribution, second, second_value),
+       do: Transform.Probability
 end

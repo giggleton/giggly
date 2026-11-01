@@ -34,9 +34,43 @@ defmodule Scales.TransformTest do
     {Enum.zip(breaks, labels), minor}
   end
 
-  # Those of `positions` inside `{low, high}`, its ends included.
-  defp inside(positions, {low, high}),
-    do: Enum.filter(positions, fn position -> position >= low and position <= high end)
+  # Those of `positions` inside `{low, high}`, its ends included, as numbers: a break at an
+  # infinity or NaN is inside none.
+  defp inside(positions, {low, high}) do
+    Enum.filter(positions, fn position ->
+      is_number(position) and position >= low and position <= high
+    end)
+  end
+
+  # Whether two axes, as `axis/2` gives them, have the same labels and every position within
+  # `bound` doubles of the other's.
+  defp near_axis?({breaks, minor}, {expected_breaks, expected_minor}, bound) do
+    {positions, labels} = Enum.unzip(breaks)
+    {expected_positions, expected_labels} = Enum.unzip(expected_breaks)
+
+    labels == expected_labels and near?(positions, expected_positions, bound) and
+      near?(minor, expected_minor, bound)
+  end
+
+  # Whether two lists of doubles are as long and each within `bound` doubles of the other's.
+  defp near?(values, expected, bound) do
+    length(values) == length(expected) and
+      values
+      |> Enum.zip_with(expected, &ulps/2)
+      |> Enum.all?(fn distance -> distance <= bound end)
+  end
+
+  # A double as R wrote it, for the large ones credo misreads as written (`LargeNumbers` takes a
+  # long fraction before a positive exponent for the whole part).
+  defp r_double(text), do: String.to_float(text)
+
+  # How many doubles apart two finite doubles are, each read from its bits in their order.
+  defp ulps(left, right), do: abs(ordinal(left) - ordinal(right))
+
+  defp ordinal(value) do
+    <<sign::1, magnitude::63>> = <<value::float>>
+    if sign == 1, do: -magnitude, else: magnitude
+  end
 
   # The time-of-day transformation's breaks inside `extent` and their labels.
   defp time_breaks(extent) do
@@ -462,6 +496,194 @@ defmodule Scales.TransformTest do
     end
   end
 
+  describe "asn, atanh and the probabilities" do
+    # Golden: ggplot2's axes, as the log10 ones above (`inc4/step4/golden.R`); 0 and 1 under a
+    # probability and -1 and 1 under atanh are breaks at the infinities, which no axis shows.
+    test "take extended breaks in data units, labelled there" do
+      # y = c(0.01, 0.5, 0.99) and c(0, 1) under "asn"
+      assert axis(:asn, {0.063288693875941854, 3.078303959713852}) ==
+               {[
+                  {1.0471975511965979, "0.25"},
+                  {1.5707963267948968, "0.50"},
+                  {2.0943951023931953, "0.75"}
+                ],
+                [
+                  0.52359877559829893,
+                  0.78539816339744839,
+                  1.3089969389957474,
+                  1.8325957145940461,
+                  2.3561944901923448,
+                  2.617993877991494
+                ]}
+
+      assert axis(:asn, {-0.15707963267948966, 3.2986722862692828}) ==
+               {[
+                  {0.0, "0.00"},
+                  {1.0471975511965979, "0.25"},
+                  {1.5707963267948968, "0.50"},
+                  {2.0943951023931953, "0.75"},
+                  {3.1415926535897931, "1.00"}
+                ],
+                [0.52359877559829893, 1.3089969389957474, 1.8325957145940461, 2.617993877991494]}
+
+      # y = c(0.99, 0.999) under "atanh"
+      assert axis(:atanh, {2.5889749746178481, 3.857878604994597}) ==
+               {[
+                  {2.5987460030278005, "0.989"},
+                  {2.6995838633639879, "0.991"},
+                  {2.8257430855787402, "0.993"},
+                  {2.9944807084449314, "0.995"},
+                  {3.2503945223738522, "0.997"},
+                  {3.8002011672501994, "0.999"}
+                ],
+                [
+                  2.6491649331958942,
+                  2.7626634744713643,
+                  2.910111897011836,
+                  3.1224376154093916,
+                  3.5252978448120258,
+                  3.8506200974182931
+                ]}
+
+      # y = c(0.01, 0.5, 0.99) and c(0.1, 0.5) under "logit"
+      assert axis(:logit, {-5.054631835148049, 5.0546318351480481}) ==
+               {[{-1.0986122886681098, "0.25"}, {0.0, "0.50"}, {1.0986122886681098, "0.75"}],
+                [
+                  -2.1972245773362196,
+                  -1.6479184330021646,
+                  -0.54930614433405489,
+                  0.54930614433405489,
+                  1.6479184330021646,
+                  2.1972245773362196
+                ]}
+
+      assert axis(:logit, {-2.3070858062030299, 0.10986122886681096}) ==
+               {[
+                  {-2.1972245773362191, "0.1"},
+                  {-1.3862943611198906, "0.2"},
+                  {-0.84729786038720345, "0.3"},
+                  {-0.40546510810816427, "0.4"},
+                  {0.0, "0.5"}
+                ],
+                [
+                  -1.791759469228055,
+                  -1.1167961107535471,
+                  -0.62638148424768381,
+                  -0.20273255405408214
+                ]}
+
+      # y = c(0.01, 0.5, 0.99) under transform_probability("logis", location = 1, scale = 2)
+      assert axis(
+               {:probability, :logistic, location: 1, scale: 2},
+               {-9.1092636702960981, 11.109263670296096}
+             ) ==
+               {[{-1.1972245773362196, "0.25"}, {1.0, "0.50"}, {3.1972245773362196, "0.75"}],
+                [
+                  -3.3944491546724391,
+                  -2.2958368660043291,
+                  -0.098612288668109782,
+                  2.09861228866811,
+                  4.2958368660043291,
+                  5.3944491546724391
+                ]}
+    end
+
+    # Golden: as above. The platform's atanh places R's -0.5 and 0.5 a double nearer zero, and the
+    # normal quantile is within 5 doubles of R's: at 0.25 R's is the nearer the truth, at 0.009,
+    # 0.01 and 0.015 the package's.
+    test "atanh's and the normal's positions are within their measured doubles of R's" do
+      # y = c(-0.9, 0, 0.9) under "atanh"
+      assert near_axis?(
+               axis(:atanh, {-1.6194414385415423, 1.6194414385415423}),
+               {[{-0.54930614433405489, "-0.5"}, {0.0, "0.0"}, {0.54930614433405489, "0.5"}],
+                [
+                  -1.0986122886681098,
+                  -0.82395921650108228,
+                  -0.27465307216702745,
+                  0.27465307216702745,
+                  0.82395921650108228,
+                  1.0986122886681098
+                ]},
+               1
+             )
+
+      # y = c(0.01, 0.5, 0.99) under "probit"
+      assert near_axis?(
+               axis(:probit, {-2.5589826614449249, 2.5589826614449249}),
+               {[{-0.67448975019608171, "0.25"}, {0.0, "0.50"}, {0.67448975019608171, "0.75"}],
+                [
+                  -1.3489795003921634,
+                  -1.0117346252941226,
+                  -0.33724487509804085,
+                  0.33724487509804085,
+                  1.0117346252941226,
+                  1.3489795003921634
+                ]},
+               5
+             )
+
+      # y = c(0.01, 0.5, 0.99) under transform_probability("norm", mean = 1, sd = 2)
+      assert near_axis?(
+               axis(
+                 {:probability, :normal, mean: 1, sd: 2},
+                 {-4.1179653228898498, 6.1179653228898498}
+               ),
+               {[{-0.34897950039216341, "0.25"}, {1.0, "0.50"}, {2.3489795003921632, "0.75"}],
+                [
+                  -1.6979590007843268,
+                  -1.0234692505882452,
+                  0.32551024980391829,
+                  1.6744897501960816,
+                  3.0234692505882448,
+                  3.6979590007843264
+                ]},
+               5
+             )
+    end
+
+    # y = c(0.00092, 0.0021) under "logit" and c(0.0091, 0.015) under "probit": turned back,
+    # 0.0009 is 0.0009000000000000006, which plain decimals to 15 digits write
+    # "0.000900000000000001"
+    test "a probability labels each break turned back rounded to 14 significant digits" do
+      assert axis(:logit, {-7.0337318015544819, -6.1342217744039083}) ==
+               {[
+                  {-7.0122153893967987, "0.0009"},
+                  {-6.7242330016116636, "0.0012"},
+                  {-6.5007890447477052, "0.0015"},
+                  {-6.3181669921333894, "0.0018"},
+                  {-6.1637157261608895, "0.0021"}
+                ],
+                [
+                  -6.8682241955042311,
+                  -6.6125110231796844,
+                  -6.4094780184405469,
+                  -6.2409413591471399
+                ]}
+
+      assert near_axis?(
+               axis(:probit, {-2.371006829946066, -2.1615072332909611}),
+               {[
+                  {-2.365618126864292, "0.009"},
+                  {-2.3263478740408408, "0.010"},
+                  {-2.290367877855267, "0.011"},
+                  {-2.257129244486225, "0.012"},
+                  {-2.226211769317175, "0.013"},
+                  {-2.1972863766410513, "0.014"},
+                  {-2.1700903775845601, "0.015"}
+                ],
+                [
+                  -2.3459830004525664,
+                  -2.3083578759480536,
+                  -2.2737485611707458,
+                  -2.2416705069017002,
+                  -2.2117490729791132,
+                  -2.1836883771128059
+                ]},
+               5
+             )
+    end
+  end
+
   describe "a base or a sigma" do
     # R takes a base below 1, falling, and gives garbage or fails at 1, 0, below 0 and NA; a sigma
     # below 0 flips the axis and 0 places every value at an infinity (`inc4/step3/params.R`).
@@ -504,6 +726,51 @@ defmodule Scales.TransformTest do
               Transform.inverse({:pseudo_log, base: 10}, [-2.0, 0.5, 2.0])} ===
                {[-0.38277568533786305, 0.10747331870609976, 0.38277568533786305],
                 [-99.990000000000038, 2.8460498941515415, 99.990000000000038]}
+    end
+  end
+
+  describe "a distribution's parameters" do
+    # R takes an sd or scale of 0, placing every value at the mean, gives NaN below it and
+    # garbage or NA at Inf and NA (`inc4/step4/params.R`).
+    test "a spread not above 0 or a mean not a number is refused wherever the name is handed" do
+      for name <- [
+            {:probability, :normal, sd: 0},
+            {:probability, :normal, sd: -1},
+            {:probability, :normal, sd: :infinity},
+            {:probability, :normal, mean: :infinity},
+            {:probability, :normal, mean: nil, sd: 1},
+            {:probability, :logistic, scale: 0},
+            {:probability, :logistic, location: 1, scale: -2},
+            {:probability, :logistic, location: :neg_infinity}
+          ] do
+        assert_raise FunctionClauseError, fn -> Transform.transform(name, [0.5]) end
+        assert_raise FunctionClauseError, fn -> Transform.breaks(name, {0.0, 1.0}) end
+      end
+    end
+
+    test "a distribution takes its own two names, either or both, once each, and nothing else" do
+      for name <- [
+            {:probability, :normal},
+            {:probability, :normal, []},
+            {:probability, :normal, mean: 1, mean: 2},
+            {:probability, :normal, scale: 2},
+            {:probability, :logistic, sd: 2},
+            {:probability, :logistic, location: 1, scale: 2, location: 3},
+            {:probability, :cauchy, location: 1},
+            {:probability, :normal, %{sd: 2}}
+          ] do
+        assert_raise FunctionClauseError, fn -> Transform.transform(name, [0.5]) end
+      end
+
+      values = [0.0, 1.0e-5, 0.3, 0.5, 1.0]
+
+      assert {Transform.transform({:probability, :normal, sd: 1, mean: 0}, values),
+              Transform.inverse_derivative({:probability, :logistic, location: 0}, values)} ===
+               {Transform.transform(:probit, values),
+                Transform.inverse_derivative(:logit, values)}
+
+      assert Transform.transform({:probability, :normal, mean: 1}, [0.5, 0.75]) ===
+               Transform.transform({:probability, :normal, mean: 1, sd: 1}, [0.5, 0.75])
     end
   end
 
@@ -1069,6 +1336,206 @@ defmodule Scales.TransformTest do
                {[:neg_infinity], [:infinity], [:infinity, -1.0], [:infinity]}
     end
 
+    # Golden: R's for step 4's transformations (`inc4/step4/golden.R`), inverses but at `NA`, a
+    # zero of either sign `+0` from asin, sin, tanh and atanh, as R's, and `-0.0`'s square root
+    # its own, so asn's derivative there minus infinity. Three are the package's own, agreed
+    # departures: atanh's of 0.5, through the platform's, a double below R's correctly rounded
+    # 0.54930614433405489; and the normal distribution's of -2, two doubles below R's
+    # 0.022750131948179212, the nearer the truth, and of 0.5 and -0.5, a double either side of
+    # R's 0.69146246127401301 and 0.30853753872598694, each the nearer the truth.
+    @atanh_of_half 0.5493061443340548
+    @normal_below_minus_two 0.022750131948179205
+    @normal_below_half 0.6914624612740131
+    @normal_below_minus_half 0.3085375387259869
+    @r_proportions [
+      {:asn,
+       {[:nan, :nan, 0.0, 0.0, 1.5707963267948968, :nan, :nan, nil, :nan],
+        [
+          :nan,
+          0.70807341827357118,
+          0.0,
+          0.0,
+          0.061208719054813648,
+          0.70807341827357118,
+          :nan,
+          :nan
+        ], [:nan, :nan, :neg_infinity, :infinity, 2.0, :nan, :nan, nil, :nan],
+        [
+          :nan,
+          -0.45464871341284085,
+          0.0,
+          0.0,
+          0.2397127693021015,
+          0.45464871341284085,
+          :nan,
+          nil,
+          :nan
+        ]}},
+      {:atanh,
+       {[:nan, :nan, 0.0, 0.0, @atanh_of_half, :nan, :nan, nil, :nan],
+        [-1.0, -0.9640275800758169, 0.0, 0.0, 0.46211715726000974, 0.9640275800758169, 1.0, :nan],
+        [
+          -0.0,
+          -0.33333333333333331,
+          1.0,
+          1.0,
+          1.3333333333333333,
+          -0.33333333333333331,
+          -0.0,
+          nil,
+          :nan
+        ],
+        [
+          0.0,
+          0.070650824853164471,
+          1.0,
+          1.0,
+          0.78644773296592752,
+          0.070650824853164471,
+          0.0,
+          nil,
+          :nan
+        ]}},
+      {:logit,
+       {[:nan, :nan, :neg_infinity, :neg_infinity, 0.0, :nan, :nan, nil, :nan],
+        [0.0, 0.11920292202211755, 0.5, 0.5, 0.62245933120185459, 0.88079707797788231, 1.0, :nan],
+        [:nan, :nan, :infinity, :infinity, 4.0, :nan, :nan, nil, :nan],
+        [
+          0.0,
+          0.10499358540350651,
+          0.25,
+          0.25,
+          0.23500371220159449,
+          0.10499358540350651,
+          0.0,
+          nil,
+          :nan
+        ]}},
+      {:probit,
+       {[:nan, :nan, :neg_infinity, :neg_infinity, 0.0, :nan, :nan, nil, :nan],
+        [
+          0.0,
+          @normal_below_minus_two,
+          0.5,
+          0.5,
+          @normal_below_half,
+          0.97724986805182079,
+          1.0,
+          :nan
+        ], [:nan, :nan, :infinity, :infinity, 2.5066282746310002, :nan, :nan, nil, :nan],
+        [
+          0.0,
+          0.053990966513188063,
+          0.3989422804014327,
+          0.3989422804014327,
+          0.35206532676429952,
+          0.053990966513188063,
+          0.0,
+          nil,
+          :nan
+        ]}},
+      {{:probability, :normal, mean: 1, sd: 2},
+       {[:nan, :nan, :neg_infinity, :neg_infinity, 1.0, :nan, :nan, nil, :nan],
+        [
+          0.0,
+          0.066807201268858071,
+          @normal_below_minus_half,
+          @normal_below_minus_half,
+          0.4012936743170763,
+          @normal_below_half,
+          1.0,
+          :nan
+        ], [:nan, :nan, :infinity, :infinity, 5.0132565492620005, :nan, :nan, nil, :nan],
+        [
+          0.0,
+          0.064758797832945872,
+          0.17603266338214976,
+          0.17603266338214976,
+          0.19333405840142462,
+          0.17603266338214976,
+          0.0,
+          nil,
+          :nan
+        ]}},
+      {{:probability, :logistic, location: 1, scale: 2},
+       {[:nan, :nan, :neg_infinity, :neg_infinity, 1.0, :nan, :nan, nil, :nan],
+        [
+          0.0,
+          0.18242552380635635,
+          0.37754066879814541,
+          0.37754066879814541,
+          0.43782349911420193,
+          0.62245933120185459,
+          1.0,
+          :nan
+        ], [:nan, :nan, :infinity, :infinity, 8.0, :nan, :nan, nil, :nan],
+        [
+          0.0,
+          0.074573226035166418,
+          0.11750185610079725,
+          0.11750185610079725,
+          0.12306704136879916,
+          0.11750185610079725,
+          0.0,
+          nil,
+          :nan
+        ]}}
+    ]
+
+    test "asn, atanh and the probabilities give R's" do
+      inputs = Enum.reject(@doubles, &is_nil/1)
+
+      for {name, expected} <- @r_proportions do
+        assert {Transform.transform(name, @doubles), Transform.inverse(name, inputs),
+                Transform.derivative(name, @doubles),
+                Transform.inverse_derivative(name, @doubles)} === expected,
+               inspect(name)
+      end
+    end
+
+    # Golden: R's transform and d_transform of c(-1, 1, 1e-300, 1 - 2^-53) (`inc4/step4/golden.R`)
+    @edges [-1.0, 1.0, 1.0e-300, 0.99999999999999989]
+    test "at the domain's ends and near them, R's" do
+      assert {Transform.transform(:asn, @edges), Transform.derivative(:asn, @edges)} ===
+               {[:nan, 3.1415926535897931, 2.0e-150, 3.1415926237874707],
+                [:nan, :infinity, 1.0e150, 94_906_265.624251544]}
+
+      assert {Transform.transform(:atanh, @edges), Transform.derivative(:atanh, @edges)} ===
+               {[:neg_infinity, :infinity, 1.0e-300, 18.714973875118524],
+                [:infinity, :infinity, 1.0, 4_503_599_627_370_496.0]}
+
+      assert {Transform.transform(:logit, @edges), Transform.derivative(:logit, @edges)} ===
+               {[:nan, :infinity, -690.77552789821368, 36.736800569677101],
+                [:nan, :infinity, r_double("9.9999999999997626e299"), 9_007_199_254_740_990.0]}
+
+      logistic = {:probability, :logistic, location: 1, scale: 2}
+
+      assert {Transform.transform(logistic, @edges), Transform.derivative(logistic, @edges)} ===
+               {[:nan, :infinity, -1380.5510557964274, 74.473601139354201],
+                [:nan, :infinity, r_double("1.9999999999999525e300"), 18_014_398_509_481_980.0]}
+
+      assert Transform.transform(:probit, [-1.0, 1.0, 1.0e-300]) ===
+               [:nan, :infinity, -37.047096299361201]
+
+      assert Transform.derivative(:probit, [1.0e-300]) === [r_double("2.6973044650427405e298")]
+    end
+
+    # Golden: R's d_transform under "probit" at 1 - 2^-53, 1e-20 and 2.54596855398056e-293
+    # (`inc4/step4/probe.R`, `golden.R`): 1 over the density at the quantile moves with the
+    # quantile's last bit times about its square, 5.2e-13 at the last, where R's own is that far
+    # off the truth and the package's 2.3e-15.
+    test "the normal's derivative at its far tails is within its measured relative error of R's" do
+      derivatives =
+        Transform.derivative(:probit, [0.99999999999999989, 1.0e-20, 2.54596855398056e-293])
+
+      expected =
+        Enum.map(~w(1081559575103667.4 1.067472533301376e19 1.0728251456687658e291), &r_double/1)
+
+      assert derivatives
+             |> Enum.zip_with(expected, fn value, r_value -> abs(value - r_value) / r_value end)
+             |> Enum.all?(fn error -> error < 6.0e-13 end)
+    end
+
     test "a date, date-time or time transformation has no derivatives" do
       for name <- [:date, :time, {:datetime, "UTC", Calendar.UTCOnlyTimeZoneDatabase}] do
         assert_raise FunctionClauseError, fn -> Transform.derivative(name, [1.0]) end
@@ -1121,6 +1588,34 @@ defmodule Scales.TransformTest do
               Transform.trim_to_domain(:log1p, [-3.0, -2.0])} ===
                {{-209.59032742893845, 2.0959032742893848},
                 {-36.043653389117154, -36.043653389117154}}
+    end
+
+    # Golden: R's trim_to_domain() of c(-5, 0.3, 0.9, NA), c(0.2, 3) and c(-0.5, 0.25)
+    # (`inc4/step4/golden.R`), but atanh's of -0.5, the platform's, a double nearer zero than
+    # R's -0.54930614433405489.
+    test "step 4's domains: asn's and the probabilities' 0 to 1, atanh's -1 to 1" do
+      ranges = [[-5.0, 0.3, 0.9, nil], [0.2, 3.0], [-0.5, 0.25]]
+
+      assert Enum.map([:asn, :atanh, :logit], fn name ->
+               Enum.map(ranges, fn values -> Transform.trim_to_domain(name, values) end)
+             end) ===
+               [
+                 [
+                   {0.0, 2.4980915447965089},
+                   {0.92729521800161219, 3.1415926535897931},
+                   {0.0, 1.0471975511965979}
+                 ],
+                 [
+                   {:neg_infinity, 1.4722194895832204},
+                   {0.20273255405408219, :infinity},
+                   {-0.5493061443340548, 0.25541281188299536}
+                 ],
+                 [
+                   {:neg_infinity, 2.1972245773362196},
+                   {-1.3862943611198906, :infinity},
+                   {:neg_infinity, -1.0986122886681098}
+                 ]
+               ]
     end
 
     test "values all below the domain are its end" do
