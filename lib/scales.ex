@@ -16,7 +16,7 @@ defmodule Scales do
   | `Scales.Labels` | labels for breaks | `label_*`, `cut_*` |
   | `Scales.Transform` | transformations, with their breaks and labels | `transform_*` |
   | `Scales.Palette` | palettes, from a place or a count to an aesthetic's value | `pal_*`, `palette_*`, `as_*_pal()` |
-  | `Scales.Bounds` | rescaling, zero width, values outside a range | `rescale*`, `oob_*`, `zero_range()` |
+  | `Scales.Bounds` | rescaling, zero width, widening, values outside a range | `rescale*`, `oob_*`, `zero_range()`, `expand_range()` |
   | `Scales.DataRange` | the range of the data a scale has seen | `train_*` |
   | `Scales.ColorOperations` | colours as written and as R's palettes make them | `col_*` |
 

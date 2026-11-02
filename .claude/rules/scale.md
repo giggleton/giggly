@@ -308,7 +308,8 @@ identity transformation: the entry beginning "A layer records its stat and posit
   same widened by the expansion it is handed**, as ggplot2's `dimension(expand)` takes one, which a
   stat reads unwidened, in transformed
   positions: a continuous scale's limits by its `expand`, at each end `width * mult + add` (R's
-  `expand_range4()`; a negative amount narrows it, as R's `expansion()` allows), 5% of the width
+  `expand_range4()`, through `Scales.Bounds.expand_range/2`; a negative amount narrows it, as
+  R's `expansion()` allows), 5% of the width
   by default, a discrete scale's limits (1 to n) by its `expand`, 0.6 by default,
   limits of zero width (R's `zero_range()`, rounding error included) as if their width were 1;
   a discrete scale's extent then reaches as far as its continuous range does, unwidened, as

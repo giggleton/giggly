@@ -130,6 +130,14 @@ R's regular ones: the entry beginning "The panel's grid lines are placed by the 
   `rescale_max()` gives an infinity of the signs' product, a negative zero's sign counting, or
   `:nan`. `rescale_none/1` gives the values back. Its tests pin R's figures; Giggly's rescalers
   call these, and Giggly raises at an infinity.
+- **A range is widened by R's `expand_range()` to the last digit** (`Bounds.expand_range/2`;
+  design-log §4, the entry beginning "A range is widened"): each end by `width * mult + add`,
+  `mult:` and `add:` a number or a pair, one for each end, a zero-wide range taking
+  `zero_width:` as its width, a range high to low widened outward and a negative amount
+  narrowing it, as R's; an infinite end R's IEEE answer, `:nan` where no multiple meets an
+  infinite width; a `nil` or NaN end refused by guard, as R fails, and an infinite amount by
+  NimbleOptions, where R takes one. Its tests pin R's figures; `Giggly.Scale` widens every extent
+  through it.
 - **Values outside a range are R's `oob_*` family** (`Scales.Bounds`; design-log §4, the entries
   beginning "A squished value is R's" and "A NaN is `:nan`"): `censor/2` and `squish/2` move
   finite numbers alone, `censor_any/2` and `squish_any/2` the infinities too, to `nil` or onto

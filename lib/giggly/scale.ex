@@ -492,10 +492,11 @@ defmodule Giggly.Scale do
   # A discrete scale with no limits widens its continuous range alone by its `expand`, such as
   # counts a stat puts on the axis, or else 0 to 1, as ggplot2 widens an axis it has no values
   # for.
-  # Limits of zero width are widened as though their width were 1, as R's `expand_range()` does, so
-  # one value, zero included, spans 0.05 either side of it; a continuous scale that has seen no data
-  # spans 0 to 1 before it is widened, ggplot2's default for an empty axis, unless its limits give
-  # both ends. It is ggplot2's `dimension()`, and the coordinate system maps it onto the panel.
+  # Limits of zero width are widened as though their width were 1, as R's `expand_range()` does
+  # (`Scales.Bounds.expand_range/2`, which widens every extent here), so one value, zero included,
+  # spans 0.05 either side of it; a continuous scale that has seen no data spans 0 to 1 before it
+  # is widened, ggplot2's default for an empty axis, unless its limits give both ends. It is
+  # ggplot2's `dimension()`, and the coordinate system maps it onto the panel.
   #
   # Ends that differ only by rounding error, relative to their size, count as one value.
   #
@@ -517,11 +518,11 @@ defmodule Giggly.Scale do
   def dimension(%Continuous{} = scale, expansion) do
     case limits(scale) do
       :none ->
-        expand({0, 1}, expansion)
+        Bounds.expand_range({0, 1}, expansion)
 
       limits ->
         limits
-        |> expand(expansion)
+        |> Bounds.expand_range(expansion)
         |> collapse_zero_width()
     end
   end
@@ -529,16 +530,16 @@ defmodule Giggly.Scale do
   def dimension(%Discrete{continuous_range: range} = scale, expansion) do
     case {Discrete.limits(scale), range} do
       {[], :none} ->
-        expand({0, 1}, expansion)
+        Bounds.expand_range({0, 1}, expansion)
 
       {[], range} ->
-        expand(range, expansion)
+        Bounds.expand_range(range, expansion)
 
       {limits, :none} ->
-        expand({1, length(limits)}, expansion)
+        Bounds.expand_range({1, length(limits)}, expansion)
 
       {limits, {range_low, range_high}} ->
-        {low, high} = expand({1, length(limits)}, expansion)
+        {low, high} = Bounds.expand_range({1, length(limits)}, expansion)
         {min(low, range_low), max(high, range_high)}
     end
   end
@@ -1152,13 +1153,6 @@ defmodule Giggly.Scale do
   # Whether a position is a number inside `extent`: a value a transformation could not place, or
   # placed at an infinity, is not.
   defp placed_inside?(position, extent), do: is_number(position) and inside?(position, extent)
-
-  # Widens each end by a multiple of the width plus a constant, `expansion` giving each end's: R's
-  # `expand_range4()`, which widens limits of zero width as though their width were 1.
-  defp expand({low, high} = extent, mult: {mult_low, mult_high}, add: {add_low, add_high}) do
-    width = if Bounds.zero_range?(extent), do: 1, else: high - low
-    {low - (width * mult_low + add_low), high + (width * mult_high + add_high)}
-  end
 
   # An extent R's `zero_range()` still calls zero wide, as its middle with both ends equal.
   defp collapse_zero_width({low, high} = extent) do

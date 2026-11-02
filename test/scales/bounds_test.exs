@@ -247,6 +247,77 @@ defmodule Scales.BoundsTest do
     end
   end
 
+  describe "expand_range/2" do
+    # Golden: R 4.6.1's `scales::expand_range()` (scales 1.4.0) on each range and options,
+    # `mul` as `mult:`.
+    test "each end moves by the width times the multiple plus the constant, in R's order" do
+      assert {Bounds.expand_range({1, 3}, mult: 0.05), Bounds.expand_range({1, 3}, add: 0.6),
+              Bounds.expand_range({1, 3}, mult: 0.05, add: 1)} ===
+               {{0.9, 3.1}, {0.4, 3.6}, {-0.10000000000000009, 4.1}}
+    end
+
+    # R's `mul = c(0.05, 0.1)` and `add = c(0, 2)`, a vector of two.
+    test "a pair moves each end by its own" do
+      assert {Bounds.expand_range({1, 3}, mult: {0.05, 0.1}),
+              Bounds.expand_range({1, 3}, mult: {0.05, 0.1}, add: {0, 2})} ===
+               {{0.9, 3.2}, {0.9, 5.2}}
+    end
+
+    test "no options leave the range as it is" do
+      assert Bounds.expand_range({1, 3}) === {1, 3}
+    end
+
+    # `c(1, 1 + 1e-14)` is zero wide by R's tolerance, so widened as though 1 wide.
+    test "a zero-wide range is widened as though its width were zero_width" do
+      assert {Bounds.expand_range({5, 5}, mult: 0.05), Bounds.expand_range({0, 0}, mult: 0.05),
+              Bounds.expand_range({1, 1 + 1.0e-14}, mult: 0.05),
+              Bounds.expand_range({5, 5}, mult: 0.05, zero_width: 10),
+              Bounds.expand_range({5, 5}, mult: 1, zero_width: 0)} ===
+               {{4.95, 5.05}, {-0.05, 0.05}, {0.95, 1.05000000000001}, {4.5, 5.5}, {5, 5}}
+    end
+
+    test "a range high to low widens outward, and a negative multiple narrows one past its middle" do
+      assert {Bounds.expand_range({3, 1}, mult: 0.05), Bounds.expand_range({1, 3}, mult: -0.5),
+              Bounds.expand_range({1, 3}, mult: -1)} === {{3.1, 0.9}, {2.0, 2.0}, {3, 1}}
+    end
+
+    # R's `c(-Inf, 1)`, `c(1, Inf)`, `c(Inf, Inf)` and `c(-Inf, Inf)`: an infinite width times 0 is
+    # NaN, and a sum past the largest double an infinity.
+    test "an infinite end gives R's IEEE answer, NaN where no multiple meets an infinite width" do
+      assert {Bounds.expand_range({:neg_infinity, 1}, mult: 0.05),
+              Bounds.expand_range({1, :infinity}), Bounds.expand_range({1, :infinity}, add: 1),
+              Bounds.expand_range({:infinity, :infinity}, mult: 0.05),
+              Bounds.expand_range({:neg_infinity, :infinity}),
+              Bounds.expand_range({1.0e308, 1.7e308}, mult: 1)} ===
+               {{:neg_infinity, :infinity}, {:nan, :nan}, {:nan, :nan}, {:infinity, :infinity},
+                {:nan, :nan}, {3.000_000_000_000_001e307, :infinity}}
+    end
+
+    # R fails on `c(NA, 1)` and `c(NaN, 1)`. The ends are built as the test runs: a literal the
+    # guard refuses fails the type checker.
+    test "a missing or NaN end is refused" do
+      [missing, nan] = Enum.take([nil, :nan], 2)
+
+      assert_raise FunctionClauseError, fn -> Bounds.expand_range({missing, 1}) end
+      assert_raise FunctionClauseError, fn -> Bounds.expand_range({1, nan}, mult: 0.05) end
+    end
+
+    # R takes `mul = Inf` (`-Inf Inf`) and `mul = NA` (`NA NA`); a departure.
+    test "a multiple, constant or width but a finite number or a pair of them is refused" do
+      for options <- [
+            [mult: :infinity],
+            [mult: nil],
+            [add: {1, :infinity}],
+            [mult: {1, 2, 3}],
+            [zero_width: :infinity],
+            [zero_width: {1, 2}],
+            [mul: 0.05]
+          ] do
+        assert_raise NimbleOptions.ValidationError, fn -> Bounds.expand_range({1, 3}, options) end
+      end
+    end
+  end
+
   describe "censor/2" do
     # R's `oob_censor(c(1, 5, 10, NA, Inf, -Inf, NaN, 2, 8), c(2, 8))` is `NA 5 NA NA Inf -Inf NaN
     # 2 8`: the ends themselves are kept, and so is NaN.
