@@ -17,7 +17,9 @@ defmodule Giggly.Geom.Line do
   # at its end, and a missing one last, as R's `order()` puts `NA` last. The orientation is the
   # layer's to give, or, where it is `:none`, a summary's lines, the stat's, read from the
   # `flipped_aes` column it writes, as ggplot2's `has_flipped_aes(ambiguous = TRUE)` reads it
-  # first: along y where the first row's is true, and along x where it is false.
+  # first: along y where the first row's is true, and along x where it is false. The orientation is
+  # written in every row's `flipped_aes`, true along y, as `GeomLine$setup_data()` writes it, so a
+  # position reads it there before it would read a discrete axis.
 
   @enforce_keys [:orientation, :line_end, :line_join, :mitre_limit, :arrow]
   defstruct @enforce_keys
@@ -63,7 +65,9 @@ defmodule Giggly.Geom.Line do
         |> Enum.sort_by(fn {key, _index} -> key end)
         |> Enum.map(fn {_key, index} -> index end)
 
-      DataFrame.slice(frame, order)
+      frame
+      |> DataFrame.slice(order)
+      |> DataFrame.put(:flipped_aes, List.duplicate(along == :y, DataFrame.row_count(frame)))
     end
 
     # The axis the rows are put in order of: the orientation, or the stat's where it is `:none`.

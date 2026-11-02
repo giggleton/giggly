@@ -63,11 +63,13 @@ numbered: the entry beginning "Group ids follow ggplot2's".
   mapped before the stat, warns at numbers on a date axis, and places numbers on a time axis as
   seconds.
 - **Just before a layer's position runs, each aesthetic the position reads goes into every
-  row**: the value the layer sets, or else the position's default
-  (`Position.default_aesthetics/1`), as ggplot2's `Position$use_defaults()`, so every text layer's
-  table carries `nudge_x` and `nudge_y`, 0 when unset, as R's `layer_data()` does. **No layer maps
-  one yet, so a column the plot's mapping carried in under its name is replaced** and moves nothing
-  (design-log §4, the entry beginning "A position declares the aesthetics it reads").
+  row**: the value the layer sets, else the column it maps, its own or the plot's, which its stat
+  kept, else the position's default (`Position.default_aesthetics/1`), as ggplot2's
+  `Position$use_defaults()`, so every nudging layer's table carries `nudge_x` and `nudge_y`, 0
+  when unset, as R's `layer_data()` does (design-log §4, the entry beginning "A position declares
+  the aesthetics it reads"). **A mapped one must hold numbers**, or the run is refused naming the
+  layer by index, the aesthetic, the value as the plot holds it and its type, a boolean's and a
+  factor's included (design-log §4, the entry beginning "A nudge is an aesthetic only").
 - **The position scales are reset and trained again after the position**, on every layer's
   x-family and y-family columns where the marks now stand, as ggplot2's `reset_scales()` and second
   `train_position()`: a bar's `ymin` of 0 reaches the y axis, and a discrete scale keeps its levels

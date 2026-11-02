@@ -35,7 +35,7 @@ its own, an outlier. `stat_boxplot()` computes the five numbers for each group, 
 `Giggly.Plot.geom_boxplot/3`, which computes the five numbers for each group itself, takes ggplot2's
 options as keyword options (`notch:`, `varwidth:`, `outlier_colour:` and the look of each part),
 and sets boxes that share a position side by side as `position_dodge2()` does. It has no
-`stat_boxplot()` of its own, no `geom_jitter()` and no `cut_width()`, maps no `lower`, `middle` or
+`stat_boxplot()` of its own and no `cut_width()`, maps no `lower`, `middle` or
 `upper`, and cannot choose a layer's stat. A plot is described with `Giggly.Plot` and drawn with
 `Giggly.to_svg/2`, which returns an SVG document. The setup cell aliases `Giggly.Plot`, so the
 cells write `Plot.new/2`, and defines `render`, which draws a plot and shows it below the cell with

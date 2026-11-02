@@ -20,7 +20,10 @@ each power of the base: long ones at the powers, middle ones at the fives and sh
 they suit base 10 best. It is superseded by `guide_axis_logticks()`. It expects data already on a
 log scale, through `scale_x_log10()` and `scale_y_log10()` or by taking logs before plotting; under
 `coord_transform()`, which takes the logs itself, it needs `scaled = FALSE`. Giggly has log scales,
-`Giggly.Plot.scale_x_log10/2` and `Giggly.Plot.scale_y_log10/2`, but no `annotation_logticks()`.
+`Giggly.Plot.scale_x_log10/2` and `Giggly.Plot.scale_y_log10/2`, but no `annotation_logticks()`,
+since ggplot2 has superseded it, and its replacement draws a different plot: `guide_axis_logticks()`
+draws the ticks on the axis, outside the panel, where `annotation_logticks()` draws them inside. So
+no example here is drawn, and none names what it waits for.
 
 ## Log ticks on chosen sides
 
@@ -47,8 +50,7 @@ ggplot2's `msleep`, which Giggly has as `Giggly.Datasets.msleep/0`, describes th
 mammals. Some lack a brain weight, and `na.rm = TRUE` drops them without a warning, as Giggly drops
 any row missing a position.
 
-Not in Giggly yet: `scales::trans_breaks()`, `scales::trans_format()` and `scales::math_format()`,
-and `annotation_logticks()` and its `sides` option.
+Not drawn: Giggly has no `annotation_logticks()`, as the About says.
 
 ## Ticks outside the panel
 
@@ -57,8 +59,7 @@ a + annotation_logticks(sides = "lr", outside = TRUE) +
  coord_cartesian(clip = "off")  # Ticks outside plot
 ```
 
-Not in Giggly yet: everything `a` needs (`scales::trans_breaks()`, `scales::trans_format()` and
-`scales::math_format()`), and `annotation_logticks()` and its `outside` option.
+Not drawn: Giggly has no `annotation_logticks()`, as the About says.
 
 ## Without the minor grid lines
 
@@ -67,8 +68,7 @@ Not in Giggly yet: everything `a` needs (`scales::trans_breaks()`, `scales::tran
 a + annotation_logticks(sides = "trbl") + theme(panel.grid.minor = element_blank())
 ```
 
-Not in Giggly yet: everything `a` needs (`scales::trans_breaks()`, `scales::trans_format()` and
-`scales::math_format()`), and `annotation_logticks()`.
+Not drawn: Giggly has no `annotation_logticks()`, as the About says.
 
 ## Taking logs first
 
@@ -84,7 +84,7 @@ b <- ggplot(msleep, aes(log10(bodywt), log10(brainwt))) +
 b + annotation_logticks()
 ```
 
-Not in Giggly yet: `scales::label_math()` and `annotation_logticks()`.
+Not drawn: Giggly has no `annotation_logticks()`, as the About says.
 
 ## Log coordinates
 
@@ -97,7 +97,7 @@ t <- ggplot(msleep, aes(bodywt, brainwt)) +
 t + annotation_logticks(scaled = FALSE)
 ```
 
-Not in Giggly yet: `coord_transform()`, and `annotation_logticks()` and its `scaled` option.
+Not drawn: Giggly has no `annotation_logticks()`, as the About says.
 
 ## Tick lengths
 
@@ -110,6 +110,4 @@ a + annotation_logticks(
 )
 ```
 
-Not in Giggly yet: everything `a` needs (`scales::trans_breaks()`, `scales::trans_format()` and
-`scales::math_format()`), and `annotation_logticks()` and its `short`, `mid` and `long` options,
-lengths given as `grid` units.
+Not drawn: Giggly has no `annotation_logticks()`, as the About says.

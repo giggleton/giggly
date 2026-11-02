@@ -955,6 +955,21 @@ defmodule Giggly.GeomTest do
              |> DataFrame.pull(:x) === [1.0, 2.0, 3.0]
     end
 
+    # Golden: ggplot2 4.0.3's `layer_data()` in R 4.6.1 for `geom_line()` over a discrete y,
+    # `flipped_aes` FALSE in every row, so a position reads it before the discrete axis.
+    test "a line writes its orientation in every row's flipped_aes, true along y" do
+      frame =
+        DataFrame.new(x: [2.0, 1.0], y: [1, 2], panel: [1, 1], group: [1, 1])
+
+      levels = %{x: :continuous, y: :discrete}
+
+      along_x = Geom.setup_data(@line, frame, levels)
+      along_y = Geom.setup_data(%{@line | orientation: :y}, frame, levels)
+
+      assert {DataFrame.pull(along_x, :flipped_aes), DataFrame.pull(along_y, :flipped_aes)} ==
+               {[false, false], [true, true]}
+    end
+
     # R's `order()` puts minus infinity first, plus infinity after the numbers and `NA` last.
     test "an infinite position sorts at its end, and a missing one after every other" do
       frame =

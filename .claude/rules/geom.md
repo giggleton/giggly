@@ -204,7 +204,9 @@ beginning "Each layer's defaults are filled in from the theme".
   infinities sort at their ends, a missing position last, as R's `order()` sorts; it then draws
   and keys as a `Geom.Path` with its parameters, as ggplot2's `GeomLine` is a `GeomPath`. Its
   orientation is the layer's, or, where it is `:none`, as a summary's line records it, the stat's
-  `flipped_aes`, as `has_flipped_aes(ambiguous = TRUE)` reads it first.
+  `flipped_aes`, as `has_flipped_aes(ambiguous = TRUE)` reads it first; it writes that in every
+  row's `flipped_aes`, as `GeomLine$setup_data()` does, so a position never reads a line's
+  discrete axis for its orientation.
 - **A segment (`Geom.Segment`) is drawn as ggplot2's `GeomSegment` draws one, straight or as a
   path by what `Coord.linear?/1` says, never by matching the coordinate system's kind** (design-log
   §4, the entry beginning "`geom_segment()` draws a straight line"): a straight line per row, in

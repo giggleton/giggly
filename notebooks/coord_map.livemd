@@ -20,7 +20,9 @@ projection the `mapproj` package defines. A projection need not keep straight li
 this takes a good deal of computation. `coord_quickmap()` approximates it more quickly by fixing
 the aspect ratio to the ratio between the lengths of a degree of latitude and a degree of
 longitude, which keeps lines straight and works best for small areas near the equator. Both are
-superseded by `coord_sf()`. Giggly has none of these yet, nor the map data the examples draw.
+superseded by `coord_sf()`, so Giggly has neither, and each example waits for `coord_sf()`, which
+it lacks too, beside the map data the examples draw; whether `coord_sf()` draws each as ggplot2
+draws it, R's drawing settles when it arrives.
 
 ## New Zealand in Cartesian coordinates
 
@@ -50,7 +52,8 @@ nzmap + coord_map()
 }
 ```
 
-Not in Giggly yet: map data from the `maps` package, `geom_polygon()`, and `coord_map()`.
+Not in Giggly yet: map data from the `maps` package, `geom_polygon()`, and `coord_sf()` and its
+`default_crs` option.
 
 ## The aspect ratio approximation
 
@@ -61,7 +64,8 @@ nzmap + coord_quickmap()
 }
 ```
 
-Not in Giggly yet: map data from the `maps` package, `geom_polygon()`, and `coord_quickmap()`.
+Not in Giggly yet: map data from the `maps` package, `geom_polygon()`, and `coord_sf()` and its
+`default_crs` option.
 
 ## Another projection
 
@@ -72,8 +76,8 @@ nzmap + coord_map("azequalarea", orientation = c(-36.92, 174.6, 0))
 }
 ```
 
-Not in Giggly yet: map data from the `maps` package, `geom_polygon()`, and `coord_map()` with its
-projections and its `orientation` option.
+Not in Giggly yet: map data from the `maps` package, `geom_polygon()`, and `coord_sf()` and its
+`crs` and `default_crs` options.
 
 ## The United States in Cartesian coordinates
 
@@ -99,7 +103,8 @@ usamap + coord_map()
 }
 ```
 
-Not in Giggly yet: map data from the `maps` package, `geom_polygon()`, and `coord_map()`.
+Not in Giggly yet: map data from the `maps` package, `geom_polygon()`, and `coord_sf()` and its
+`default_crs` option.
 
 ## Other projections
 
@@ -125,8 +130,8 @@ usamap + coord_map("bonne", lat0 = 50)
 }
 ```
 
-Not in Giggly yet: map data from the `maps` package, `geom_polygon()`, and `coord_map()` with its
-projections and their parameters.
+Not in Giggly yet: map data from the `maps` package, `geom_polygon()`, and `coord_sf()` and its
+`crs` and `default_crs` options.
 
 ## A world map seen from above the North Pole
 
@@ -144,7 +149,8 @@ worldmap + coord_map("ortho")
 }
 ```
 
-Not in Giggly yet: map data from the `maps` package and `coord_map()` with its projections.
+Not in Giggly yet: map data from the `maps` package, and `coord_sf()` and its `crs` and
+`default_crs` options.
 
 ## Other orientations
 
@@ -160,5 +166,5 @@ worldmap + coord_map("ortho", orientation = c(41, -74, 0))
 }
 ```
 
-Not in Giggly yet: map data from the `maps` package, and `coord_map()` with its projections and its
-`orientation` option.
+Not in Giggly yet: map data from the `maps` package, and `coord_sf()` and its `crs` and
+`default_crs` options.

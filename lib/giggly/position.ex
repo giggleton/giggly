@@ -14,12 +14,15 @@ defprotocol Giggly.Position do
   # The identity (`Giggly.Position.Identity`) moves nothing, as ggplot2's `geom_point()` defaults
   # `position = "identity"`; a layer records it rather than leaving the position out, so a layer
   # whose marks stay where they are says so. Stacking (`Giggly.Position.Stack`) piles bars that
-  # share an x, as `geom_col()` defaults `position = "stack"`. Dodging (`Giggly.Position.Dodge`)
+  # share an x, as `geom_col()` defaults `position = "stack"`, and filling, the same kind, scales
+  # each pile to reach 1, as `position = "fill"` does. Dodging (`Giggly.Position.Dodge`)
   # sets them side by side, and dodging by clusters (`Giggly.Position.Dodge2`) does so for bars
   # whose spans overlap, whatever their groups and widths. Nudging (`Giggly.Position.Nudge`) moves
-  # every mark a set distance, as `geom_text()` defaults `position = "nudge"`, and jittering
+  # each mark the distance its layer sets or maps, as `geom_text()` defaults `position = "nudge"`,
+  # and jittering
   # (`Giggly.Position.Jitter`) a small random one, as `geom_jitter()` defaults `position =
-  # "jitter"`.
+  # "jitter"`; jittering beside dodging (`Giggly.Position.Jitterdodge`) sets the marks side by side
+  # and then jitters them, as points over dodged box plots are.
   #
   # A position may read aesthetics of its own, as nudging reads `nudge_x` and `nudge_y`; it declares
   # them with their defaults, as ggplot2's position declares its `default_aes`, and the assembly
@@ -33,7 +36,7 @@ defprotocol Giggly.Position do
   # their protocol implementations, which no boundary exports.
   use Boundary,
     deps: [Giggly.Aesthetics, Giggly.DataFrame, Giggly.Resolution],
-    exports: [Dodge, Dodge2, Identity, Jitter, Nudge, Stack]
+    exports: [Dodge, Dodge2, Identity, Jitter, Jitterdodge, Nudge, Stack]
 
   alias Giggly.DataFrame
 

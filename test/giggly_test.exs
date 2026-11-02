@@ -4635,7 +4635,7 @@ defmodule GigglyTest do
       dodged = paired_boxes(position: :dodge)
 
       padded =
-        paired_boxes(varwidth: true, position: Plot.position_dodge2(padding: 0.3))
+        paired_boxes(varwidth: true, position: {:dodge2, padding: 0.3})
 
       assert DataFrame.pull(clusters, :x) === [0.8125, 1.1875, 1.8125, 2.1875]
 
@@ -5918,7 +5918,7 @@ defmodule GigglyTest do
     # then `position_dodge2(preserve = "single")`.
     test "the bars at an x share its width with a gap; with :single each takes its share alone" do
       total = counted_cylinders(:dodge2)
-      single = counted_cylinders(Plot.position_dodge2(preserve: :single))
+      single = counted_cylinders({:dodge2, preserve: :single})
 
       assert DataFrame.pull(total, :x) === [
                0.77500000000000002,
@@ -5949,9 +5949,9 @@ defmodule GigglyTest do
 
     # The same with `position_dodge2(reverse = TRUE)`, `padding = 0` and `padding = 0.5`.
     test "reverse: puts the highest group first, and padding: is the gap each bar leaves" do
-      reversed = counted_cylinders(Plot.position_dodge2(reverse: true))
-      unpadded = counted_cylinders(Plot.position_dodge2(padding: 0))
-      half = counted_cylinders(Plot.position_dodge2(padding: 0.5))
+      reversed = counted_cylinders({:dodge2, reverse: true})
+      unpadded = counted_cylinders({:dodge2, padding: 0})
+      half = counted_cylinders({:dodge2, padding: 0.5})
 
       assert {DataFrame.pull(reversed, :group), DataFrame.pull(reversed, :xmin)} ===
                {[2, 1, 4, 3, 5],
@@ -6018,7 +6018,7 @@ defmodule GigglyTest do
 
       mapped = %{x: :x, y: :y, fill: :g, width: :w}
       total = dodged_columns(rows, mapped, position: :dodge2)
-      single = dodged_columns(rows, mapped, position: Plot.position_dodge2(preserve: :single))
+      single = dodged_columns(rows, mapped, position: {:dodge2, preserve: :single})
       set = dodged_columns(rows, %{x: :x, y: :y, fill: :g}, width: 0.5, position: :dodge2)
 
       precise =
@@ -6105,7 +6105,7 @@ defmodule GigglyTest do
             "g" => ["p", "p", "q", "p", "q", "r"]
           },
           %{x: :x, y: :y, fill: :g},
-          position: Plot.position_dodge2(preserve: :single)
+          position: {:dodge2, preserve: :single}
         )
 
       assert {DataFrame.pull(missing, :y), DataFrame.pull(missing, :x)} ===
@@ -6181,7 +6181,7 @@ defmodule GigglyTest do
           "y" => [1, 2, 3, 4, 3]
         }
         |> Plot.new(%{x: {:constant, "x"}, y: :y, fill: :g2})
-        |> Plot.geom_col(position: Plot.position_dodge2(preserve: :single))
+        |> Plot.geom_col(position: {:dodge2, preserve: :single})
         |> Plot.facet_wrap(:g1)
         |> Giggly.layer_data()
 
@@ -6625,6 +6625,144 @@ defmodule GigglyTest do
         |> Giggly.layer_data()
 
       assert DataFrame.pull(frame, :x) === [18_263.0, 18_267.0]
+    end
+  end
+
+  # Golden throughout: ggplot2 4.0.3's `layer_data()` in R 4.6.1 for the same plots, printed to 17
+  # significant digits. They move with how ggplot2's `use_defaults()` puts a position's aesthetics
+  # in, or with what a stat carries.
+  describe "layer_data/2, nudges set and mapped" do
+    @shifted %{"x" => [1.0, 2.0], "y" => [1.0, 2.0], "name" => ["a", "b"], "shift" => [0.5, -0.5]}
+
+    test "a nudge the plot maps moves a nudging layer's marks and rides unused into another's" do
+      plot = Plot.new(@shifted, %{x: :x, y: :y, label: :name, nudge_x: :shift})
+
+      text =
+        plot
+        |> Plot.geom_text()
+        |> Giggly.layer_data()
+
+      points =
+        plot
+        |> Plot.geom_point()
+        |> Giggly.layer_data()
+
+      assert Enum.map([{text, :x}, {text, :nudge_x}, {points, :x}, {points, :nudge_x}], fn
+               {frame, name} -> DataFrame.pull(frame, name)
+             end) === [[1.5, 1.5], [0.5, -0.5], [1.0, 2.0], [0.5, -0.5]]
+    end
+
+    test "a nudge the layer sets wins over one mapped" do
+      frame =
+        @shifted
+        |> Plot.new(%{x: :x, y: :y, label: :name, nudge_x: :shift})
+        |> Plot.geom_text(nudge_x: 0.25)
+        |> Giggly.layer_data()
+
+      assert {DataFrame.pull(frame, :x), DataFrame.pull(frame, :nudge_x)} ===
+               {[1.25, 2.25], [0.25, 0.25]}
+    end
+
+    test "a layer's own mapped nudge moves each mark its own way, along its axis alone" do
+      frame =
+        @shifted
+        |> Plot.new(%{x: :x, y: :y})
+        |> Plot.geom_point(%{nudge_x: :shift}, position: :nudge)
+        |> Giggly.layer_data()
+
+      assert Enum.map([:x, :y, :nudge_x, :nudge_y], fn name -> DataFrame.pull(frame, name) end) ===
+               [[1.5, 1.5], [1.0, 2.0], [0.5, -0.5], [+0.0, +0.0]]
+    end
+
+    # R warns that the varying nudge "was dropped during statistical transformation".
+    test "a stat keeps a mapped nudge constant in each group and drops one that varies" do
+      bars = %{"g" => ["a", "a", "b"], "each" => [0.1, 0.2, 0.3], "group" => [0.25, 0.25, -0.25]}
+
+      varying =
+        bars
+        |> Plot.new(%{x: :g})
+        |> Plot.geom_bar(%{nudge_y: :each}, position: :nudge)
+        |> Giggly.layer_data()
+
+      constant =
+        bars
+        |> Plot.new(%{x: :g, fill: :g})
+        |> Plot.geom_bar(%{nudge_y: :group}, position: :nudge)
+        |> Giggly.layer_data()
+
+      assert {DataFrame.pull(varying, :y), DataFrame.pull(varying, :nudge_y)} ===
+               {[2.0, 1.0], [+0.0, +0.0]}
+
+      assert Enum.map([:y, :ymin, :ymax], fn name -> DataFrame.pull(constant, name) end) ===
+               [[2.25, 0.75], [0.25, -0.25], [2.25, 0.75]]
+    end
+
+    test "a nudge mapped after the stat reads what it computed" do
+      frame =
+        %{"x" => [1.0, 1.0, 2.0], "y" => [1.0, 1.0, 2.0]}
+        |> Plot.new(%{x: :x, y: :y})
+        |> Plot.geom_count(%{nudge_y: {:after_stat, [{&Kernel.//2, [:n, 10]}]}}, position: :nudge)
+        |> Giggly.layer_data()
+
+      assert {DataFrame.pull(frame, :y), DataFrame.pull(frame, :nudge_y)} ===
+               {[1.2, 2.1], [0.2, 0.1]}
+    end
+
+    # R gives the row a missing position beside a nudge that is not 0, and fails ("missing value
+    # where TRUE/FALSE needed") where every other nudge along the axis is 0, where Giggly departs.
+    test "a missing nudge leaves its row's position missing, and an infinite one sends it there" do
+      for {nudges, nudged} <- [
+            {[0.1, nil, 0.3], [1.1, nil, 3.3]},
+            {[0.1, :infinity, 0.3], [1.1, :infinity, 3.3]},
+            {[0.0, nil, 0.0], [1.0, nil, 3.0]}
+          ] do
+        frame =
+          %{"x" => [1, 2, 3], "y" => [1.0, 2.0, 3.0], "name" => ["a", "b", "c"], "n" => nudges}
+          |> Plot.new(%{x: :x, y: :y, label: :name})
+          |> Plot.geom_text(%{nudge_y: :n})
+          |> Giggly.layer_data()
+
+        assert {nudges, DataFrame.pull(frame, :y)} === {nudges, nudged}
+      end
+    end
+
+    # R fails at a string ("non-numeric argument to binary operator"), warns at a factor and
+    # draws none of its marks, and moves a logical's by 0 or 1.
+    test "a nudge mapped to a column that is not numbers is refused when run" do
+      for {values, dtype} <- [
+            {["p", "q"], ":string"},
+            {[true, false], ":boolean"},
+            {Giggly.Factor.new(["p", "q"]), ":category"},
+            {[~D[2020-01-01], ~D[2020-01-02]], ":date"}
+          ] do
+        plot =
+          %{"x" => [1.0, 2.0], "y" => [1.0, 2.0], "name" => ["a", "b"], "n" => values}
+          |> Plot.new(%{x: :x, y: :y, label: :name})
+          |> Plot.geom_text(%{nudge_y: :n})
+
+        error = assert_raise ArgumentError, fn -> Giggly.layer_data(plot) end
+
+        assert error.message ==
+                 "the layer at index 0 maps :nudge_y to \"n\", a #{dtype} column, but a nudge is " <>
+                   "a distance along its axis, so it takes numbers"
+      end
+    end
+
+    test "a reference line is nudged along its own axis, set or mapped" do
+      plot = Plot.new(@shifted, %{x: :x, y: :y})
+
+      horizontal =
+        plot
+        |> Plot.geom_hline(yintercept: 2, position: :nudge, nudge_y: 0.5)
+        |> Giggly.layer_data()
+
+      vertical =
+        plot
+        |> Plot.geom_vline(%{xintercept: :x, nudge_x: :shift}, position: :nudge)
+        |> Giggly.layer_data()
+
+      assert {DataFrame.pull(horizontal, :yintercept), DataFrame.pull(vertical, :xintercept)} ===
+               {[2.5], [1.5, 1.5]}
     end
   end
 
@@ -9000,6 +9138,23 @@ defmodule GigglyTest do
         |> to_svg()
 
       assert svg == File.read!("test/golden/jitter_boxplot.svg")
+    end
+
+    # Golden: test/golden/jitterdodge_boxplot.svg, checked against ggplot2's drawing of the same
+    # plot, made by test/golden/jitterdodge_boxplot.R, as test/golden/jitter_boxplot.svg is: every
+    # element matches it, the x axis drawn before the y, and every clip path.
+    # position_jitterdodge()'s example on mpg: boxes by class dodged by drive train, each car's
+    # point dodged to its drive train's box and jittered across it. It moves with what moves
+    # test/golden/boxplot.svg, and with jittering and dodging.
+    test "points jittered beside dodging spread across their own group's box" do
+      svg =
+        Giggly.Datasets.mpg()
+        |> Plot.new(%{x: :class, y: :hwy, fill: :drv})
+        |> Plot.geom_boxplot(outlier_size: 0)
+        |> Plot.geom_point(shape: 21, position: :jitterdodge)
+        |> to_svg()
+
+      assert svg == File.read!("test/golden/jitterdodge_boxplot.svg")
     end
 
     # Golden: test/golden/jitter.svg, checked against ggplot2's drawing of the same plot, made by
@@ -12447,13 +12602,12 @@ defmodule GigglyTest do
       end
     end
 
-    # Goldens: test/golden/dodge_errorbar.svg, dodge_width.svg, dodge_linerange.svg,
+    # Goldens: test/golden/dodge_errorbar.svg, dodge_width.svg,
     # dodge_linerange_width.svg and dodge_pointrange_flipped.svg, each checked against ggplot2's
     # drawing of the same plot, made by the R script of its name: every element and clip path
     # matches, the x axis drawn before the y as in test/golden/point.svg. Error bars dodged beside
     # dodged columns within their own width and within the columns' 0.9; position_dodge's page's
-    # line ranges, unmoved given no width and on their bars given 0.9; and point ranges across the
-    # panel dodged along y.
+    # line ranges on their bars given 0.9; and point ranges across the panel dodged along y.
     test "dodged ranges are placed as ggplot2 places them" do
       table = %{
         "trt" => Giggly.Factor.new(["1", "1", "2", "2"]),
@@ -12476,7 +12630,7 @@ defmodule GigglyTest do
 
       filled = Plot.new(table, %{x: :trt, y: :resp, fill: :group})
       range = %{ymin: :lower, ymax: :upper}
-      dodge = Plot.position_dodge(width: 0.9)
+      dodge = {:dodge, width: 0.9}
 
       plots = [
         dodge_errorbar:
@@ -12487,15 +12641,55 @@ defmodule GigglyTest do
           filled
           |> Plot.geom_col(position: dodge)
           |> Plot.geom_errorbar(range, position: dodge, width: 0.25),
-        dodge_linerange: Plot.geom_linerange(bars, %{ymin: :lo, ymax: :hi}, position: :dodge),
         dodge_linerange_width:
           Plot.geom_linerange(bars, %{ymin: :lo, ymax: :hi}, position: dodge),
         dodge_pointrange_flipped:
           table
           |> Plot.new(%{x: :resp, y: :trt, color: :group})
           |> Plot.geom_pointrange(%{xmin: :lower, xmax: :upper},
-            position: Plot.position_dodge(width: 0.5)
+            position: {:dodge, width: 0.5}
           )
+      ]
+
+      for {name, drawn} <- plots do
+        assert golden?(drawn, Atom.to_string(name)), "#{name} differs from its golden"
+      end
+    end
+
+    # Goldens: test/golden/stack_lines_points.svg, stack_text.svg and dodge_text.svg, each
+    # checked against ggplot2's drawing of the same plot, made by the R script of its name: every
+    # element and clip path matches, the x axis drawn before the y as in test/golden/point.svg.
+    # position_stack's page's lines and points stacked by one group, and its labels stacked over
+    # its areas; geom_text's page's labels dodged within the columns' 0.9.
+    test "points, lines and text are stacked and dodged as ggplot2 moves them" do
+      series = %{
+        "time" => Enum.flat_map([1.0, 2.0, 3.0, 4.0], fn time -> List.duplicate(time, 4) end),
+        "type" => Enum.flat_map(1..4, fn _time -> ["a", "b", "c", "d"] end),
+        "value" => [8, 10, 7, 11, 14, 12, 11, 9, 14, 11, 8, 2, 8, 10, 7, 12]
+      }
+
+      grouped = Plot.new(series, %{x: :time, y: :value, group: :type})
+
+      columns = %{
+        "x" => Giggly.Factor.new(["1", "1", "2", "2"]),
+        "y" => [1.0, 3.0, 2.0, 1.0],
+        "grp" => ["a", "b", "a", "b"]
+      }
+
+      plots = [
+        stack_lines_points:
+          grouped
+          |> Plot.geom_line(%{colour: :type}, position: :stack)
+          |> Plot.geom_point(%{colour: :type}, position: :stack),
+        stack_text:
+          grouped
+          |> Plot.geom_area(%{fill: :type})
+          |> Plot.geom_text(%{label: :type}, position: :stack),
+        dodge_text:
+          columns
+          |> Plot.new(%{x: :x, y: :y, group: :grp})
+          |> Plot.geom_col(%{fill: :grp}, position: :dodge)
+          |> Plot.geom_text(%{label: :y}, position: {:dodge, width: 0.9})
       ]
 
       for {name, drawn} <- plots do
@@ -13018,6 +13212,49 @@ defmodule GigglyTest do
         |> Plot.geom_density(position: :stack)
 
       assert golden?(plot, "density_stacked")
+    end
+
+    # Golden: test/golden/bars_filled.svg, checked as test/golden/smooth_lm.svg is, made by
+    # test/golden/bars_filled.R. Each cylinder count's cars by engine shape, each pile filled to 1.
+    # It moves with filling, or the y axis's breaks between 0 and 1.
+    test "filled bars reach 1, each its share of its pile" do
+      plot =
+        Giggly.Datasets.mtcars()
+        |> Plot.new(%{x: {:factor, [:cyl]}, fill: {:factor, [:vs]}})
+        |> Plot.geom_bar(position: :fill)
+
+      assert golden?(plot, "bars_filled")
+    end
+
+    # Golden: test/golden/labels_stacked_middle.svg, checked as test/golden/smooth_lm.svg is, made
+    # by test/golden/labels_stacked_middle.R. Columns stacked, one piling down from zero, each
+    # labelled in the middle of its part. It moves with stacking's vjust, or a pile below zero.
+    test "labels stacked with vjust 0.5 sit in the middle of the columns they label" do
+      plot =
+        %{
+          "x" => ["a", "a", "b", "b", "b"],
+          "y" => [1, 2, 1, 3, -1],
+          "grp" => ["x", "y", "x", "y", "y"]
+        }
+        |> Plot.new(%{x: :x, y: :y, group: :grp})
+        |> Plot.geom_col(%{fill: :grp})
+        |> Plot.geom_hline(yintercept: 0)
+        |> Plot.geom_text(%{label: :grp}, position: {:stack, vjust: 0.5})
+
+      assert golden?(plot, "labels_stacked_middle")
+    end
+
+    # Golden: test/golden/bars_stacked_reversed.svg, checked as test/golden/smooth_lm.svg is, made
+    # by test/golden/bars_stacked_reversed.R. Horizontal bars stacked lowest drive train first,
+    # reading in the legend's order along each bar. It moves with stacking reversed, or along y.
+    test "horizontal bars stacked in reverse run in the legend's order" do
+      plot =
+        Giggly.Datasets.mpg()
+        |> Plot.new(%{y: :class})
+        |> Plot.geom_bar(%{fill: :drv}, position: {:stack, reverse: true})
+        |> Plot.theme(legend_position: :top)
+
+      assert golden?(plot, "bars_stacked_reversed")
     end
 
     # Golden: test/golden/stat_density.svg, checked as test/golden/smooth_lm.svg is, made by

@@ -165,8 +165,7 @@ a + geom_point(stat = "align", position = "stack", size = 8)
 
 Points drawn with the areas' stat and position show the values `stat_align()` computes, stacked.
 
-Not in Giggly yet: `stat_align()` given to a geom as `stat = "align"`, and `geom_point()`'s
-`position` option, here `position = "stack"`.
+Not in Giggly yet: `stat_align()` given to a geom as `stat = "align"`.
 
 ## Areas without alignment
 

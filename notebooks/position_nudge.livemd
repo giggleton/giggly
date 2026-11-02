@@ -27,9 +27,12 @@ list of what remains.
 `position_nudge()` moves every item a fixed distance along `x`, `y` or both, which is most useful
 for shifting items on a discrete scale by a small amount. Labels are the usual case, so
 `geom_text()` builds it in, as its `nudge_x` and `nudge_y` options; the distances can also be
-mapped, as the `nudge_x` and `nudge_y` aesthetics, to move each item its own way. Giggly nudges
-text, by `Giggly.Plot.geom_text/3`'s `nudge_x:` and `nudge_y:` options; it has no
-`position_nudge()`, and maps no `nudge_x` or `nudge_y`. A plot is described with `Giggly.Plot` and
+mapped, as the `nudge_x` and `nudge_y` aesthetics, to move each item its own way. Giggly nudges a
+layer's marks beside `position: :nudge`, the default of `Giggly.Plot.geom_text/3` and
+`Giggly.Plot.geom_label/3`, by its `nudge_x:` and `nudge_y:` options, which every layer function
+but `Giggly.Plot.geom_abline/3` takes, or by a mapped `nudge_x` and `nudge_y`. `:nudge` takes no
+options: `position_nudge()`'s `x` and `y` are ggplot2's older way of giving the same distances,
+which Giggly takes as the aesthetics alone. A plot is described with `Giggly.Plot` and
 drawn with `Giggly.to_svg/2`, which returns an SVG document. The setup cell aliases `Giggly.Plot`,
 so the cells write `Plot.new/2`, and defines `render`, which draws a plot and shows it below the
 cell with `Kino.Image`. The examples make a small table of their own, as ggplot2's do.
@@ -67,8 +70,17 @@ ggplot(df, aes(x, y)) +
   geom_text(aes(label = y), position = position_nudge(y = -0.1))
 ```
 
-Not in Giggly yet: `geom_text()`'s `position` option and `position_nudge()`. Giggly nudges text by
-`geom_text/3`'s own options, as the next example does.
+Giggly gives the distance as `nudge_y:`, which nudging reads, where ggplot2 gives it to
+`position_nudge()`; each label moves down a tenth of the step between `y`'s values, as the next
+example's do.
+
+```elixir
+df
+|> Plot.new(%{x: :x, y: :y})
+|> Plot.geom_point()
+|> Plot.geom_text(%{label: :y}, position: :nudge, nudge_y: -0.1)
+|> render.()
+```
 
 ## Nudging in brief
 
@@ -100,5 +112,4 @@ ggplot(df, aes(x, y)) +
 
 A vector in `aes()` gives one value per row, so the labels go down and up in turn.
 
-Not in Giggly yet: mapping `nudge_y`, and a vector outside the data in a mapping, here `c(-0.1, 0.1,
--0.1, 0.1)`.
+Not in Giggly yet: a vector outside the data in a mapping, here `c(-0.1, 0.1, -0.1, 0.1)`.

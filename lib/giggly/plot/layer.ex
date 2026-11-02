@@ -15,7 +15,8 @@ defmodule Giggly.Plot.Layer do
   # the function's options set, by canonical name, as ggplot2's `aes_params` does, and is empty when
   # it sets none: one value each, or for an annotation's per-row aesthetics a list, one value per
   # row of its table. `accepted` lists the aesthetics the layer can use, its geom's and its stat's,
-  # which its own mapping is checked against; an aesthetic it takes from the plot's mapping that it
+  # and the nudges its marks move by where its position nudges, which its own mapping is checked
+  # against; an aesthetic it takes from the plot's mapping that it
   # cannot use rides along unused, as in ggplot2, and the layer draws in a legend only for those it
   # accepts.
   #

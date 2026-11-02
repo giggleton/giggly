@@ -18,8 +18,10 @@ of what remains.
 `expand_limits()` widens a plot's scales to include the values it is given, in every panel, by
 adding a layer that draws nothing at those values (a `geom_blank()`). ggplot2 now prefers giving a
 scale's `limits` a function instead, such as `scale_x_continuous(limits = ~range(.x, 0))` to include
-zero. Giggly has no `expand_limits()`, and a scale's limits are numbers or values, never a function,
-as `Giggly.Plot.lims/2` and the scale functions' `limits:` take them.
+zero, which ggplot2 draws exactly as it draws `expand_limits()`. Giggly has no `expand_limits()`,
+since ggplot2 has superseded it, and its examples wait for a function as a scale's `limits`:
+Giggly's limits are numbers or values, never a function, as `Giggly.Plot.lims/2` and the scale
+functions' `limits:` take them.
 
 ## Including a value on an axis
 
@@ -30,7 +32,10 @@ p + expand_limits(y = c(1, 9))
 p + expand_limits(x = 0, y = 0)
 ```
 
-Not in Giggly yet: `expand_limits()`.
+ggplot2 draws each the same with a function as the scale's limits, `expand_limits(x = 0)` as
+`scale_x_continuous(limits = ~range(.x, 0))`.
+
+Not in Giggly yet: a function as a scale's `limits`.
 
 ## Widening a colour scale
 
@@ -46,4 +51,7 @@ ggplot(mtcars, aes(mpg, wt)) +
   expand_limits(colour = factor(seq(2, 10, by = 2)))
 ```
 
-Not in Giggly yet: `expand_limits()`.
+ggplot2 draws each the same with a function as the colour scale's limits, the first as
+`scale_colour_continuous(limits = ~range(.x, seq(2, 10, by = 2)))`.
+
+Not in Giggly yet: a function as a scale's `limits`.

@@ -83,9 +83,9 @@ Not in Giggly yet: `geom_polygon()`.
 ```
 
 The comment draws nothing; it points to `coord_map()`, which projects longitude and latitude onto
-the plane.
+the plane, and which ggplot2 has superseded with `coord_sf()`.
 
-Not in Giggly yet: `coord_map()`.
+Not in Giggly yet: `coord_sf()` and its `crs` and `default_crs` options.
 
 ## Polygons with holes
 

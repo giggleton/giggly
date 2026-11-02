@@ -31,8 +31,9 @@ defmodule Giggly.Assembly do
   #      layer's geom (`Giggly.Geom`) give each row the extent it is drawn over, such as a bar's
   #      edges, told whether each axis is discrete, which decides a bar's orientation;
   #  11. puts into every row each aesthetic a layer's position reads, such as nudging's `nudge_x`,
-  #      the value the layer sets or else the position's default, as ggplot2's `use_defaults()`
-  #      for a position does, then moves the layer's marks by its position (`Giggly.Position`);
+  #      the value the layer sets, else the column it maps, refused unless it holds numbers, else
+  #      the position's default, as ggplot2's `use_defaults()` for a position does, then moves the
+  #      layer's marks by its position (`Giggly.Position`);
   #  12. resets each scale and trains it again on every layer's columns on its axis, where the
   #      marks now stand, a discrete scale keeping its levels and widening its continuous range;
   #  13. completes the plot's theme (`Giggly.Theme`), its settings laid over the complete theme it
@@ -318,14 +319,14 @@ defmodule Giggly.Assembly do
     non_position_columns = non_position_columns(plot, grouped_data, statistic_data)
 
     layer_data =
-      Enum.zip_with(layers, statistic_data, fn layer, statistic ->
+      layers
+      |> Enum.with_index()
+      |> Enum.zip_with(statistic_data, fn {layer, index}, statistic ->
         fixed = Plot.layer_fixed(layer)
-
-        set_up =
-          Geom.setup_data(Plot.layer_geom(layer), set_positions(statistic, fixed), axis_kinds)
-
+        geom = Plot.layer_geom(layer)
+        set_up = Geom.setup_data(geom, set_positions(statistic, fixed), axis_kinds)
         position = Plot.layer_position(layer)
-        defaulted = set_position_aesthetics(set_up, position, fixed)
+        defaulted = set_position_aesthetics(set_up, position, {plot, layer, index})
         Position.compute_layer(position, defaulted, axis_kinds)
       end)
 
@@ -841,13 +842,47 @@ defmodule Giggly.Assembly do
   defp missing_for_none(:none), do: nil
   defp missing_for_none(value), do: value
 
-  # The layer's table with each aesthetic its position reads given, in every row, the value the
-  # layer sets for it, or else the position's default, as ggplot2's `use_defaults()` for a position
-  # puts them in before the position runs. No layer maps one yet, so a column the plot's mapping
-  # carried in under its name is replaced, and moves nothing.
-  defp set_position_aesthetics(frame, position, fixed) do
-    defaults = Position.default_aesthetics(position)
-    set_fixed(frame, Map.merge(defaults, Map.take(fixed, Map.keys(defaults))))
+  # The layer's table with each aesthetic its position reads in every row, as ggplot2's
+  # `use_defaults()` for a position puts them in before the position runs: the value the layer
+  # sets, else the column it maps, its own or the plot's, which its stat kept, else the position's
+  # default. A value the layer sets has had its mapping dropped (`Plot.computed_mapping/2`), so a
+  # column under its name is mapped. A mapped one is a distance along an axis, so it must hold
+  # numbers, or the run is refused naming the layer, at `index`, the aesthetic, the value as the
+  # plot holds it and its type, where R fails at a string, moves no factor's mark and moves a
+  # logical one's by 0 or 1.
+  defp set_position_aesthetics(frame, position, {plot, layer, index}) do
+    names = DataFrame.names(frame)
+    dtypes = DataFrame.dtypes(frame)
+
+    {mapped, unmapped} =
+      position
+      |> Position.default_aesthetics()
+      |> Map.split_with(fn {aesthetic, _default} -> aesthetic in names end)
+
+    mapped
+    |> Map.keys()
+    |> Enum.each(fn aesthetic ->
+      dtype = Map.fetch!(dtypes, aesthetic)
+
+      if Scale.kind(dtype) != :continuous do
+        value =
+          plot
+          |> mapping_with_defaults(layer)
+          |> Map.fetch!(aesthetic)
+
+        raise ArgumentError,
+              "the layer at index #{index} maps #{inspect(aesthetic)} to #{inspect(value)}, a " <>
+                "#{inspect(dtype)} column, but a nudge is a distance along its axis, so it " <>
+                "takes numbers"
+      end
+    end)
+
+    set =
+      layer
+      |> Plot.layer_fixed()
+      |> Map.take(Map.keys(unmapped))
+
+    set_fixed(frame, Map.merge(unmapped, set))
   end
 
   # The layer's table with each position the layer sets, an x- or y-family aesthetic, given its

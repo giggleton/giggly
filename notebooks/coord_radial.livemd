@@ -21,7 +21,8 @@ a pie chart is a stacked bar chart drawn this way. `coord_polar()` is superseded
 starts and ends, the limits of the angle and the radius, whether the scales expand, the size of a
 hole in the middle, and where the radius axis goes. `Giggly.Plot.coord_radial/1` is ggplot2's
 `coord_radial()` without options, so it draws as `coord_radial()` does with every option at its
-default. Giggly has no `coord_polar()` yet, and draws no bars in radial coordinates: a bar layer
+default. Giggly has no `coord_polar()`, since ggplot2 has superseded it, and draws no bars in
+radial coordinates: a bar layer
 under `Giggly.Plot.coord_radial/1` raises.
 
 ## A pie chart
@@ -109,7 +110,7 @@ doh + geom_bar(width = 0.9, position = "fill") +
 ```
 
 Not in Giggly yet: the `movies` dataset, `cut_interval()` and `cut_number()`, bars in radial
-coordinates, `position_fill()`, and `coord_radial()`'s `theta` and `expand` options.
+coordinates, and `coord_radial()`'s `theta` and `expand` options.
 
 ## A partial circle
 
