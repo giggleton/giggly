@@ -28,11 +28,13 @@ defmodule Giggly.Stat.Ydensity do
   # A row missing its x, y or weight, or at an infinite one, is left out first, as ggplot2's
   # `remove_missing()` drops it. A group of fewer than two rows is left out, as `drop` does by
   # default (ggplot2 also warns), or with `drop: false` kept as one row of its x, its y and `n`,
-  # every other computed column missing, so a position can make room for it. Where the estimate
-  # fails, or a group with quantiles has fewer than two rows inside the bounds, which R's
-  # `approx()` cannot read, the whole panel is given no rows, as ggplot2 catches the failure per
-  # panel; without quantiles such a group is one row of its x, its width and every other column
-  # missing. A weight that is not a number is refused.
+  # every other computed column missing, so a position can make room for it; a panel of such
+  # groups alone is given no rows, as ggplot2's working out of its violins' widths fails it, but
+  # with `scale: :width`, which reads no density. Where the estimate fails, or a group with
+  # quantiles has fewer than two rows inside the bounds, which R's `approx()` cannot read, the
+  # whole panel is given no rows, as ggplot2 catches the failure per panel; without quantiles such
+  # a group is one row of its x, its width and every other column missing. A weight that is not a
+  # number is refused.
   #
   # Its orientation, ggplot2's `has_flipped_aes()` for a violin: `orientation` when it names an
   # axis; else along whichever axis is continuous where the other is discrete; else along y where
@@ -205,7 +207,7 @@ defmodule Giggly.Stat.Ydensity do
         |> Enum.zip_with(quantiles, fn {key, group}, group_quantiles ->
           {key, violin(Map.get(curves, key), group, stat, group_quantiles)}
         end)
-        |> without_failed_panels()
+        |> without_failed_panels(curves, stat.scale)
 
       kept_rows = kept_rows(rows, figures, groups)
       constant = Carry.constant_columns(kept_rows, carried)
@@ -270,7 +272,7 @@ defmodule Giggly.Stat.Ydensity do
       if stat.drop,
         do: [],
         else: [
-          Map.merge(missing_row(), %{x: as_float(group.x_low), y: group.y_low, n: group.rows})
+          Map.merge(missing_row(), %{x: position(group), y: group.y_low, n: group.rows})
         ]
     end
 
@@ -335,10 +337,8 @@ defmodule Giggly.Stat.Ydensity do
       value
     end
 
-    # Where a group's violin stands: its x, or the middle of its x values' range, R's
-    # `mean(range(x))`, where they are more than one.
-    defp position(%{x_count: 1, x_low: x_low}), do: as_float(x_low)
-
+    # Where a group's violin stands: the middle of its x values' range, R's `mean(range(x))`, and so
+    # its x where it holds one.
     defp position(group) do
       group.x_low
       |> Arithmetic.add(group.x_high)
@@ -356,13 +356,19 @@ defmodule Giggly.Stat.Ydensity do
       |> Arithmetic.multiply(@range_share)
     end
 
-    defp as_float(value) when is_integer(value), do: value / 1
-    defp as_float(value), do: value
-
     # The groups, every group of a panel where one fails given no rows, as ggplot2 gives a panel
-    # whose computing fails none.
-    defp without_failed_panels(groups) do
-      failed = for {{panel, _group}, :fails} <- groups, into: MapSet.new(), do: panel
+    # whose computing fails none: so too a panel none of whose groups was estimated, unless its
+    # violins are as wide as their scaled densities, since ggplot2 works a violin's width out from a
+    # `density` column such a panel never gets.
+    defp without_failed_panels(groups, curves, scale) do
+      failing = for {{panel, _group}, :fails} <- groups, into: MapSet.new(), do: panel
+      estimated = for {{panel, _group}, _curve} <- curves, into: MapSet.new(), do: panel
+      panels = for {{panel, _group}, _rows} <- groups, into: MapSet.new(), do: panel
+
+      failed =
+        if scale == :width,
+          do: failing,
+          else: MapSet.union(failing, MapSet.difference(panels, estimated))
 
       Enum.map(groups, fn {{panel, _group} = key, rows} ->
         if panel in failed, do: {key, []}, else: {key, rows}

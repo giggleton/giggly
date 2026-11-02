@@ -3215,7 +3215,7 @@ defmodule Giggly.StatTest do
     end
 
     # Golden: x a, a, b, b and b at y 1, 9, 1, 2 and 3 with `bounds = c(0, 5)`, and with
-    # `quantiles = NULL` too, rows 1, 2 and 1537.
+    # `quantiles = NULL` too, and with `width = 0.5`, rows 1, 2 and 1537.
     test "a group of fewer than two rows inside the bounds fails its panel where quantiles read it" do
       frame =
         DataFrame.new(
@@ -3230,6 +3230,8 @@ defmodule Giggly.StatTest do
 
       unread = violins(frame, bounds: {0.0, 5.0}, quantiles: :none)
       assert DataFrame.row_count(unread) == 1537
+      given = violins(frame, bounds: {0.0, 5.0}, quantiles: :none, width: 0.5)
+      assert at_rows(given, :width, [1, 2, 1537]) == [0.5, 0.5, 0.5]
       assert at_rows(unread, :x, [1, 2, 1537]) == [1.0, 2.0, 2.0]
       assert at_rows(unread, :y, [1, 2, 1537]) == [nil, 0.0, 5.0]
       assert at_rows(unread, :n, [1, 2, 1537]) == [nil, 3, 3]
@@ -3377,6 +3379,144 @@ defmodule Giggly.StatTest do
         0.91677827371146492,
         0.9278395117249042
       ])
+    end
+
+    # Golden: x a, b, a and b at y 1, 1, 2 and 2 grouped 1, 1, 2 and 2; x 1, 2, 3, 1, 2 and 3 at
+    # y 1, 1, 1, 1, 2 and 3 in groups 1 and 2; and the frame each of whose groups holds one y with
+    # `orientation = "x"`.
+    test "a discrete axis decides before the groups, and neither rule leaves a violin along y" do
+      frame =
+        DataFrame.new(
+          x: [1, 2, 1, 2],
+          y: [1.0, 1.0, 2.0, 2.0],
+          panel: [1, 1, 1, 1],
+          group: [1, 1, 2, 2]
+        )
+
+      discrete = violins(frame)
+
+      assert DataFrame.pull(discrete, :x) == List.duplicate(1.5, 6)
+      assert DataFrame.pull(discrete, :y) == [1.0, 1.0, 1.0, 2.0, 2.0, 2.0]
+      assert DataFrame.pull(discrete, :quantile) == [0.25, 0.5, 0.75, 0.25, 0.5, 0.75]
+      assert DataFrame.pull(discrete, :flipped_aes) == List.duplicate(false, 6)
+
+      neither =
+        [x: [1.0, 2.0, 3.0, 1.0, 2.0, 3.0], y: [1.0, 1.0, 1.0, 1.0, 2.0, 3.0]]
+        |> Enum.concat(panel: List.duplicate(1, 6), group: [1, 1, 1, 2, 2, 2])
+        |> DataFrame.new()
+        |> violins([], false)
+
+      assert DataFrame.row_count(neither) == 518
+      assert at_rows(neither, :x, [1, 4]) == [2.0, 2.0]
+      assert at_rows(neither, :y, [1, 4]) == [1.0, 1.0]
+      assert DataFrame.pull(neither, :flipped_aes) == List.duplicate(false, 518)
+
+      told =
+        [x: [1.0, 2.0, 3.0, 1.0, 2.0, 4.0], y: [1, 1, 1, 2, 2, 2]]
+        |> Enum.concat(panel: List.duplicate(1, 6), group: [1, 1, 1, 2, 2, 2])
+        |> DataFrame.new()
+        |> violins([orientation: :x], false)
+
+      assert DataFrame.pull(told, :x) == [2.0, 2.0, 2.0, 2.5, 2.5, 2.5]
+      assert DataFrame.pull(told, :y) == [1.0, 1.0, 1.0, 2.0, 2.0, 2.0]
+
+      assert_near(told, :width, [
+        1.8,
+        1.8,
+        1.8,
+        2.7000000000000002,
+        2.7000000000000002,
+        2.7000000000000002
+      ])
+
+      assert DataFrame.pull(told, :flipped_aes) == List.duplicate(false, 6)
+    end
+
+    # Golden: x 1, 1, 1 and Inf at y 1, 2, 4 and 5, rows 1 and 513.
+    test "a row at an infinite x is left out" do
+      frame =
+        DataFrame.new(
+          x: [1.0, 1.0, 1.0, :infinity],
+          y: [1.0, 2.0, 4.0, 5.0],
+          panel: [1, 1, 1, 1],
+          group: [1, 1, 1, 1]
+        )
+
+      violins = violins(frame, [], false)
+
+      assert at_rows(violins, :x, [1, 513]) == [1.0, 1.0]
+      assert at_rows(violins, :n, [1, 513]) == [3, 3.0]
+
+      assert_near_values(:density, at_rows(violins, :density, [1, 513]), [
+        0.24114038426332288,
+        0.27301500765632652
+      ])
+    end
+
+    # Golden: x a, b at y 1 and 2 with `drop = FALSE`, and `scale = "width"` too.
+    test "a panel of short groups alone is given no rows, but where the widths are the scaled densities" do
+      frame = DataFrame.new(x: [1, 2], y: [1.0, 2.0], panel: [1, 1], group: [1, 2])
+
+      for scale <- [:area, :count] do
+        failed = violins(frame, drop: false, scale: scale)
+        assert DataFrame.row_count(failed) == 0
+      end
+
+      widths = violins(frame, drop: false, scale: :width)
+      assert DataFrame.pull(widths, :x) === [1.0, 2.0]
+      assert DataFrame.pull(widths, :y) == [1.0, 2.0]
+      assert DataFrame.pull(widths, :n) == [1, 1]
+      assert DataFrame.pull(widths, :violinwidth) == [nil, nil]
+    end
+
+    # Golden: x a, a, a, b and b at y 1, 2, 4, 1 and 2, weighted 1, 1, 1, -1 and 1, coloured u,
+    # u, u, v and w, a facet for each x; the colour as a category, as a factor is carried.
+    test "a group's constant columns are carried, counted over the groups given rows" do
+      frame =
+        DataFrame.new([
+          {:x, [1, 1, 1, 2, 2]},
+          {:y, [1.0, 2.0, 4.0, 1.0, 2.0]},
+          {:weight, [1, 1, 1, -1, 1]},
+          {:color, ["u", "u", "u", "v", "w"],
+           {:category, levels: ["w", "v", "u"], ordered: false}},
+          {:panel, [1, 1, 1, 2, 2]},
+          {:group, [1, 1, 1, 2, 2]}
+        ])
+
+      violins = violins(frame, [], true, [1, 2])
+
+      assert DataFrame.row_count(violins) == 515
+      assert DataFrame.pull(violins, :color) == List.duplicate("u", 515)
+      assert DataFrame.pull(violins, :weight) == List.duplicate(1, 515)
+
+      assert DataFrame.category(violins, :color) ==
+               {:category, levels: ["w", "v", "u"], ordered: false}
+    end
+
+    test "names what an after_stat can read, the aesthetics it takes, needs and consumes" do
+      assert Stat.Ydensity.computed_variables() ==
+               [:count, :density, :n, :quantile, :scaled, :violinwidth, :width]
+
+      assert Stat.Ydensity.accepted_aesthetics() == [:group, :weight, :x, :y]
+      assert Stat.Ydensity.required_aesthetics() == [:x, :y]
+      assert Stat.Ydensity.dropped_aesthetics() == [:weight]
+    end
+
+    test "no aesthetic takes a computed column by default" do
+      stat = %Stat.Ydensity{
+        bandwidth: :nrd0,
+        adjust: 1.0,
+        kernel: :gaussian,
+        trim: true,
+        bounds: {:neg_infinity, :infinity},
+        scale: :area,
+        quantiles: [0.25, 0.5, 0.75],
+        drop: true,
+        width: :none,
+        orientation: :none
+      }
+
+      assert Stat.default_mapping(stat) == %{}
     end
 
     test "a weight that is not a number is refused" do

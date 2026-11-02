@@ -449,11 +449,7 @@ defmodule Giggly.Stat.KernelDensity do
   end
 
   defp curve(plan, totals, settings) do
-    places =
-      plan.from
-      |> Curve.places(plan.to, plan.points)
-      |> Enum.map(fn place -> place / 1 end)
-
+    places = Curve.places(plan.from, plan.to, plan.points)
     estimates = convolved(plan, totals, settings)
 
     estimated =

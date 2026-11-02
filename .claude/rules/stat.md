@@ -281,8 +281,10 @@ the entry beginning "Each facet, coordinate system, geom, stat and position is a
   rows. Its values are R's within 1e-12 of the largest magnitude a column holds. **A panel is
   given no rows where its estimate fails or a group with quantiles has fewer than two rows inside
   the bounds**, which R's `approx()` cannot read; without quantiles that group is one row of its
-  x and width. It runs along the axis `has_flipped_aes()` picks for a violin, the box plot's rule
-  without its one-axis case, since a violin needs both. With `drop: false` and the first group a
+  x and width. A panel of short groups alone is given none too, but with `scale: :width`, since R
+  works `violinwidth` out from a `density` column such a panel never gets. It runs along the axis
+  `has_flipped_aes()` picks for a violin, the box plot's rule without its one-axis case, since a
+  violin needs both. With `drop: false` and the first group a
   short one, R's `layer_data()` orders its columns otherwise; Giggly keeps its usual order.
 - **`Giggly.Tensor` is the one module that builds a tensor, and a stat reaches Nx only through it**
   (design-log §4, the entry beginning "Nx is a core dependency"): lists in and out, every tensor on
