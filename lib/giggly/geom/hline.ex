@@ -37,6 +37,7 @@ defmodule Giggly.Geom.Hline do
     use Boundary, classify_to: Giggly.Geom
 
     alias Giggly.{Coord, DataFrame, Geom}
+    alias Giggly.Geom.Mark
 
     @impl Giggly.Geom
     def default_aesthetics(geom, element) do
@@ -67,6 +68,7 @@ defmodule Giggly.Geom.Hline do
         |> DataFrame.put(:x, List.duplicate(low, count))
         |> DataFrame.put(:xend, List.duplicate(high, count))
         |> DataFrame.put(:y, intercepts)
+        |> Mark.opaque_alphas()
 
       geom
       |> segment()

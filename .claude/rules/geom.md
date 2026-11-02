@@ -104,8 +104,12 @@ beginning "Each layer's defaults are filled in from the theme".
   `fill_alpha()` to the fill, `GeomRect` `fill_alpha()` to the fill and `GeomPath` `alpha()` to the
   line; a row whose alpha is missing, the default, keeps the colour's own, opaque for a colour
   with none, as ggplot2's default alpha, `NA`, leaves a colour. **A bar's border is never
-  given the row's alpha**, only its own. `Giggly.Geom.Mark` is the one home of the rule, and a
-  colour reaches the scene as its `#RRGGBB` and an opacity.
+  given the row's alpha**, only its own. **An alpha is held between 0 and 1, and an infinite one
+  draws nothing, but where a geom reads it as opaque** (`Mark.opaque_alpha/1`): a band's fill
+  (ribbon, area, density, smooth), a box plot's box and outliers, and the reference lines, which
+  ggplot2 4.0.3 draws opaque at either infinity whatever the colour's own alpha (design-log §4,
+  the entry beginning "A non-position scale keeps"). `Giggly.Geom.Mark` is the one home of the
+  rule, and a colour reaches the scene as its `#RRGGBB` and an opacity.
 - **A colour of `:none`, R's `NA`, draws nothing**: no point and no line, as ggplot2's `GeomPoint`
   and `GeomPath` drop the rows whose colour is missing (`handle_na()`, a path's at a group's ends),
   and a bar left unfilled or unbordered, whatever the alpha, as `alpha(NA, a)` is `NA`; so a point's
@@ -398,7 +402,9 @@ beginning "Each layer's defaults are filled in from the theme".
   `staplewidth` is not 0, whiskers, then the box and its median as a crossbar draws them
   (`Crossbar.parts/3`), pinched in at its notches with `notch`. Each part takes its look from the struct's map for it, which holds only what the
   layer gave (a look absent is the box's own, `:none` R's `NA`), else the box's row; lines never
-  take the box's alpha and its fill does; the median is twice the box's width unless its look
+  take the box's alpha and its fill does; **a box's `size` is its outliers' alone, never its
+  lines' width**, where R's deprecated shim reads it as their `linewidth` when none is given
+  (design-log §4, the entry beginning "A box plot's `size`"); the median is twice the box's width unless its look
   gives one; the box is by default the theme's ink mixed 20% toward its paper (`#333333`,
   `#000000CC` on clear paper), filled with its paper, as wide as its borders and solid, its
   outliers its points' size, their stroke the layer's 0.5; staples and whiskers are cut square, the

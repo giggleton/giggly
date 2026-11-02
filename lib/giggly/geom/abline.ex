@@ -49,7 +49,7 @@ defmodule Giggly.Geom.Abline do
 
     alias Giggly.{Coord, DataFrame, Geom}
     alias Giggly.DataFrame.Arithmetic
-    alias Giggly.Geom.Path
+    alias Giggly.Geom.{Mark, Path}
 
     # A legend's key, `draw_key_abline()`: a line from the key's bottom left corner to its top
     # right.
@@ -111,6 +111,7 @@ defmodule Giggly.Geom.Abline do
         |> Enum.reduce(lines, fn {name, place}, ended ->
           DataFrame.put(ended, name, Enum.map(ends, fn line -> elem(line, place) end))
         end)
+        |> Mark.opaque_alphas()
 
       geom
       |> segment()

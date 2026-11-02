@@ -79,6 +79,28 @@ stops the question being reopened from scratch. A new entry is about 150 words: 
 sentence or two of why, and one line per rejected alternative. What a later decision replaces is
 deleted from the entry it was in, never marked superseded; git history keeps every version.
 
+- **A non-position scale keeps the infinities its palette gives, and the geoms draw them as
+  ggplot2 4.0.3 does (2026-11-01, Steve: "A", "A", "A", "A", increment 4's step 7's C3, C3a-c;
+  checked against ggplot2 4.0.3).** An alpha, size or line width is R's palette's: past its range
+  for a value an `oob` leaves outside, an infinity for an infinite value, so layer data matches
+  R's. Drawn, an alpha is held between 0 and 1; an infinite one draws nothing, but is opaque in a
+  band's fill, a box plot's box and outliers and the reference lines, as R draws each; an infinite
+  line width raises when drawn, where R fails; a point at an infinite size is not drawn, nor
+  text, which takes no mapped size yet, where R writes an invalid element. *Rejected: an infinity
+  mapped to `na_value`*: layer data unlike R's, and an infinite alpha drawn opaque everywhere.
+  *Rejected: one rule for an infinite alpha*: either way departs from R in some geoms.
+  *Rejected: skipping an infinite line width*: Giggly would draw where R draws nothing.
+
+- **A function `oob` returns one value for each it is handed, each a number, an infinity, `nil`
+  or `:nan`, and is checked as a function of two arguments at the call (2026-11-01, Steve: "A",
+  increment 4's step 7's C2; checked against ggplot2 4.0.3).** A number is read as a float, R's
+  double, and `:nan` as missing; anything else, a string, a boolean or a `Date`, raises when run,
+  naming it, as does a list of another length. R recycles a shorter result, cuts a longer one and
+  coerces strings and logicals; R fails on a function of one argument only when built. A position
+  scale with no finite value and no limits hands its `oob` the range of nothing,
+  `{:infinity, :neg_infinity}`, R's `c(Inf, -Inf)`. *Rejected: R's coercions*: Elixir has no such
+  conversion, so Giggly would invent one to copy R's vectors.
+
 - **An example calling a function ggplot2 has superseded is drawn with the replacement ggplot2
   names, where R draws the two alike (2026-11-01, Steve: "A", "I", "a", "1", positions step 7).**
   Giggly exposes no such function (the entry beginning "Giggly exposes no function"), so a verdict
@@ -448,8 +470,11 @@ deleted from the entry it was in, never marked superseded; git history keeps eve
   space branch by branch, for no example. *Rejected: x and y only*: log colour and size are what
   users reach for.
 
-- **`oob:` takes a name or a function on every continuous and binned scale, and `:discard` is
-  refused (2026-11-01, Steve: "A"; checked against ggplot2 4.0.3).** As R's `oob`: `:censor`
+- **`oob:` takes a name or a function on every scale function ggplot2 gives one, and `:discard`
+  is refused (2026-11-01, Steve: "A", narrowed to R's list by step 7's C1: "A"; checked against
+  ggplot2 4.0.3).** The position, date, date-time and time scales, the continuous and binned
+  colour and fill scales, alpha's and size by area's take it; the size, radius and line width
+  scales take none, as R's fail on one ("unused argument"). As R's `oob`: `:censor`
   (the default, a binned scale's `:squish`), `:censor_any`, `:squish`, `:squish_any`,
   `:squish_infinite`, `:keep`, or `fn values, {low, high} -> values end`, in transformed space,
   run at a position scale's two maps, a list of another length raising when run. `:discard` is
@@ -2309,6 +2334,18 @@ deleted from the entry it was in, never marked superseded; git history keeps eve
   uses and Giggly's cannot. *Rejected: riding along unused* — a mapping silently doing nothing.
   The cost, accepted: a plot weighting a bar layer through its own mapping holds no boxes until
   the weight moves to that layer, where R would have weighed the boxes too.
+
+- **A box plot's `size` is its outliers' alone, never its lines' width (2026-11-01, Steve).**
+  ggplot2 4.0.3 reads it twice: as the outliers' size, which `?geom_boxplot` documents, and,
+  where `linewidth` is neither mapped nor set, as every line's width too, the shim 3.4.0 added
+  when `linewidth` split off ("Using `size` aesthetic for lines was deprecated"), so
+  `aes(size = 3)` draws 3 mm lines (6.40 pt, the median 12.80) where Giggly draws 0.5 mm, and a
+  size legend's keys widen with them. With `linewidth` given R draws what Giggly does, element by
+  element, legend included. Giggly takes no deprecated thing (the entry beginning "Giggly exposes
+  no function"), and its line geoms already refuse `size:` and leave a plot's mapped `size`
+  riding along unused, where R's shim widens their lines. *Rejected: copying R's shim* — a
+  deprecated way of setting the lines, which would then ask every line geom to take `size` too.
+  The cost, accepted: ggplot2 code written before 3.4 draws thinner lines than R does.
 
 - **A box layer dodges by clusters unless told otherwise, and beside `varwidth:` by clusters
   alone, at `preserve: :single` (2026-10-22, Steve, scoping distributions' step 6; 2026-11-01,
@@ -4177,6 +4214,8 @@ tells the story (`git show <hash>`). Until 2026-10-15 each milestone also had a 
 `git log -S "<title>" -- notes/design-log.md` finds it in this file's history. The phases are
 §1's roadmap.
 
+- 2026-11-01 — Take oob: on Giggly's continuous and binned scales (transforms, step 7)
+  (`6b130a1`); §4: "A non-position scale keeps", "A function `oob`", "`oob:` takes a name"
 - 2026-11-01 — Draw coord_flip()'s examples with the swap ggplot2 prefers, and every example of a
   superseded function with its replacement (positions, step 7) (`00f2415`); §4: "An example calling
   a function ggplot2 has superseded"

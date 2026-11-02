@@ -4692,6 +4692,18 @@ defmodule GigglyTest do
                {[22.170000000000002, 25.297500000000003, 27.873750000000001, 28.357500000000002],
                 [25.005000000000003, 27.727500000000003, 28.076250000000002, 33.217500000000001]}
     end
+
+    # Golden: ggplot2 4.0.3's `layer_data()` in R 4.6.1 for `ggplot(data, aes(g, y, size = w)) +
+    # geom_boxplot(linewidth = 0.5)`: size 1 and 6, the size scale's range, and linewidth 0.5.
+    # Without `linewidth = 0.5` R's deprecated shim copies size into linewidth, 1 and 6, which
+    # Giggly does not (design-log §4, the entry beginning "A box plot's `size`"); only that
+    # decision or the size scale's default range moves it.
+    test "a mapped size is the outliers' alone, leaving the box's line width its default" do
+      frame = box_layer(%{x: :g, y: :y, size: :w})
+
+      assert {DataFrame.pull(frame, :size), DataFrame.pull(frame, :linewidth)} ===
+               {[1.0, 6.0], [0.5, 0.5]}
+    end
   end
 
   describe "layer_data/2, for geom_segment" do
@@ -6757,6 +6769,48 @@ defmodule GigglyTest do
   # Golden throughout: ggplot2 4.0.3's `layer_data()` in R 4.6.1 for the same plots of mpg. They
   # move with how a continuous scale's limits censor a position.
   describe "layer_data/2, under a scale's limits" do
+    # Golden: ggplot2 4.0.3's `layer_data()` in R 4.6.1 for `geom_histogram(binwidth = 1)` of 1 to
+    # 10 under `scale_x_continuous(limits = c(3, 8), oob = ...)` (`inc4/step7/probe.txt`): the stat
+    # bins what the first map leaves, and the second map moves the bins' outer edges.
+    test "an oob runs before the stat and again on its bins" do
+      binned = fn oob ->
+        frame =
+          %{"x" => Enum.map(1..10, fn value -> value * 1.0 end)}
+          |> Plot.new(%{x: :x})
+          |> Plot.geom_histogram(binwidth: 1)
+          |> Plot.scale_x_continuous(limits: {3, 8}, oob: oob)
+          |> Giggly.layer_data()
+
+        {DataFrame.pull(frame, :xmin), DataFrame.pull(frame, :xmax),
+         DataFrame.pull(frame, :count)}
+      end
+
+      assert {binned.(:squish), binned.(:keep)} ===
+               {{[3.0, 3.5, 4.5, 5.5, 6.5, 7.5], [3.5, 4.5, 5.5, 6.5, 7.5, 8.0],
+                 [3.0, 1.0, 1.0, 1.0, 1.0, 3.0]},
+                {[2.5, 3.5, 4.5, 5.5, 6.5, 7.5], [3.5, 4.5, 5.5, 6.5, 7.5, 8.5],
+                 [1.0, 1.0, 1.0, 1.0, 1.0, 1.0]}}
+    end
+
+    # Golden: ggplot2 4.0.3's `layer_data()` in R 4.6.1 for bars of 15 and 10 stacked and one of 5
+    # under `scale_y_continuous(limits = c(0, 20), oob = ...)` (`inc4/step7/probe.txt`): the
+    # stacked top at 25 squished to 20, or kept.
+    test "an oob runs on the bars once stacked" do
+      stacked = fn oob ->
+        frame =
+          %{"x" => [1, 1, 2], "y" => [15, 10, 5], "g" => ["a", "b", "a"]}
+          |> Plot.new(%{x: :x, y: :y, fill: :g})
+          |> Plot.geom_col()
+          |> Plot.scale_y_continuous(limits: {0, 20}, oob: oob)
+          |> Giggly.layer_data()
+
+        {DataFrame.pull(frame, :ymin), DataFrame.pull(frame, :ymax)}
+      end
+
+      assert {stacked.(:squish), stacked.(:keep)} ===
+               {{[10.0, 0.0, 0.0], [20.0, 10.0, 5.0]}, {[10.0, 0.0, 0.0], [25.0, 10.0, 5.0]}}
+    end
+
     # Golden: ggplot2 4.0.3's `layer_data()` in R 4.6.1 for `geom_point(aes(x, y))` over x 1, NaN,
     # 3 and y NaN, 2, 3: x 1, NA, 3 and y NA, 2, 3, as a position scale maps NaN to NA.
     test "a NaN position is mapped to a missing one" do
@@ -7895,6 +7949,49 @@ defmodule GigglyTest do
   end
 
   describe "to_svg/2" do
+    # ggplot2 4.0.3 fails to draw it, R 4.6.1: "'lwd' must be non-negative and finite"
+    # (`inc4/step7/geoms.txt`), while its layer data holds Inf.
+    test "an infinite line width is kept in the layer's table and raises when drawn" do
+      plot =
+        %{
+          "x" => [1, 2, 3, 4],
+          "y" => [1, 2, 3, 4],
+          "g" => [1, 1, 2, 2],
+          "w" => [1, 2, :infinity, :infinity]
+        }
+        |> Plot.new(%{x: :x, y: :y, group: :g, linewidth: :w})
+        |> Plot.geom_line()
+
+      widths =
+        plot
+        |> Giggly.layer_data()
+        |> DataFrame.pull(:linewidth)
+
+      assert widths === [1.0, 6.0, :infinity, :infinity]
+
+      error = assert_raise ArgumentError, fn -> Giggly.to_svg(plot) end
+
+      assert String.starts_with?(
+               error.message,
+               "a layer drawn by Giggly.Geom.Line has a linewidth "
+             )
+
+      assert error.message =~ "of :infinity"
+
+      below =
+        %{
+          "x" => [1, 2, 3, 4],
+          "y" => [1, 2, 3, 4],
+          "g" => [1, 1, 2, 2],
+          "w" => [1, 2, :neg_infinity, 1]
+        }
+        |> Plot.new(%{x: :x, y: :y, group: :g, linewidth: :w})
+        |> Plot.geom_line()
+
+      error = assert_raise ArgumentError, fn -> Giggly.to_svg(below) end
+      assert error.message =~ "of :neg_infinity"
+    end
+
     # Golden: test/golden/point.svg. The data spans x 0 to 10 and y 0 to 50 in columns wt and mpg,
     # as ggplot2's own snapshot `tests/testthat/_snaps/coord-cartesian/expand-range.svg` does, and
     # the drawing is checked against ggplot2's drawing of the same plot, made by

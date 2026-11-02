@@ -9078,6 +9078,111 @@ defmodule Giggly.PlotTest do
     end
   end
 
+  describe "a scale's oob:" do
+    # Every scale function ggplot2 4.0.3 gives an `oob` (`inc4/step7/formals.R`): the position,
+    # date, date-time and time scales, the continuous and binned colour and fill scales, alpha's
+    # and size by area's, each with what else it needs.
+    @oob_scale_functions [
+      {&Plot.scale_x_continuous/2, []},
+      {&Plot.scale_y_continuous/2, []},
+      {&Plot.scale_x_log10/2, []},
+      {&Plot.scale_y_sqrt/2, []},
+      {&Plot.scale_x_reverse/2, []},
+      {&Plot.scale_x_date/2, []},
+      {&Plot.scale_y_datetime/2, []},
+      {&Plot.scale_x_time/2, []},
+      {&Plot.scale_color_continuous/2, []},
+      {&Plot.scale_fill_gradient/2, []},
+      {&Plot.scale_color_gradient2/2, []},
+      {&Plot.scale_fill_gradientn/2, [colors: ["red", "blue"]]},
+      {&Plot.scale_color_viridis_c/2, []},
+      {&Plot.scale_fill_distiller/2, []},
+      {&Plot.scale_alpha_continuous/2, []},
+      {&Plot.scale_size_area/2, []},
+      {&Plot.scale_color_binned/2, []},
+      {&Plot.scale_fill_steps/2, []},
+      {&Plot.scale_color_steps2/2, []},
+      {&Plot.scale_fill_stepsn/2, [colors: ["red", "blue"]]},
+      {&Plot.scale_color_viridis_b/2, []},
+      {&Plot.scale_fill_fermenter/2, []}
+    ]
+
+    defp recorded_oob(function, options) do
+      @rows
+      |> Plot.new()
+      |> function.(options)
+      |> Map.fetch!(:scales)
+      |> Map.values()
+      |> then(fn [scale] -> scale.oob end)
+    end
+
+    test "each scale function ggplot2 gives an oob records one, a name or a function of two arguments" do
+      capped = fn values, _limits -> values end
+
+      for {function, needed} <- @oob_scale_functions do
+        assert {recorded_oob(function, [{:oob, :squish_any} | needed]),
+                recorded_oob(function, [{:oob, capped} | needed])} === {:squish_any, capped}
+      end
+    end
+
+    test "a continuous scale censors and a binned one squishes when given none, as ggplot2's" do
+      assert {recorded_oob(&Plot.scale_y_continuous/2, []),
+              recorded_oob(&Plot.scale_color_binned/2, [])} === {:censor, :squish}
+    end
+
+    # ggplot2 4.0.3's `scale_size_continuous()`, `scale_radius()`, `scale_linewidth_continuous()`
+    # and a discrete scale fail on an `oob` ("unused argument").
+    test "the size, radius and line width scales and a discrete scale take no oob:" do
+      plot = Plot.new(@rows)
+
+      for function <- [
+            &Plot.scale_size_continuous/2,
+            &Plot.scale_radius/2,
+            &Plot.scale_linewidth_continuous/2,
+            &Plot.scale_x_discrete/2
+          ] do
+        assert_raise NimbleOptions.ValidationError, ~r/unknown options \[:oob\]/, fn ->
+          function.(plot, oob: :squish)
+        end
+      end
+    end
+
+    # ggplot2 4.0.3 recycles `oob_discard()`'s fewer values over the rows: limits of 10 to 30 on y
+    # of 5, 20, 40 and 25 draw the points at 20, 25, 20 and 25 (`inc4/step7/fn.txt`).
+    test ":discard is refused, naming :censor" do
+      error =
+        assert_raise NimbleOptions.ValidationError, fn ->
+          @rows
+          |> Plot.new()
+          |> Plot.scale_y_continuous(oob: :discard)
+        end
+
+      assert String.starts_with?(error.message, "invalid value for :oob option: oob: :discard ")
+      assert error.message =~ "use :censor"
+    end
+
+    test "another name, or a function of another arity, is refused" do
+      plot = Plot.new(@rows)
+
+      for oob <- [:clamp, fn values -> values end] do
+        error =
+          assert_raise NimbleOptions.ValidationError, fn ->
+            Plot.scale_color_binned(plot, oob: oob)
+          end
+
+        assert String.starts_with?(
+                 error.message,
+                 "invalid value for :oob option: expected one of "
+               )
+
+        assert error.message =~
+                 ":censor, :censor_any, :squish, :squish_any, :squish_infinite, :keep"
+
+        assert error.message =~ "got: #{inspect(oob)}"
+      end
+    end
+  end
+
   # `value` with its type hidden from the compiler, so a test can hand a function a value its
   # guards refuse.
   @spec untyped(term()) :: term()

@@ -114,12 +114,43 @@ defmodule Giggly.Geom.Mark do
     |> Enum.zip_with(colors, fn alpha, color -> opacity(color, alpha) end)
   end
 
-  # A mark's opacity in `color`, from 0 to 1: its alpha, or the colour's own where it has none.
+  # A mark's opacity in `color`, from 0 to 1: its alpha held between 0 and 1, as R draws an alpha
+  # below 0 as none and one above 1 as opaque, or the colour's own where it has none; an infinite
+  # alpha draws nothing, as most of ggplot2's geoms draw it, the rest reading it through
+  # `opaque_alpha/1` first.
   @doc false
-  @spec opacity(String.t() | :none, number() | nil | :nan) :: float()
+  @spec opacity(String.t() | :none, Scales.double()) :: float()
   def opacity(:none, _alpha), do: 0.0
-  def opacity(_color, alpha) when is_number(alpha), do: alpha / 1
+
+  def opacity(_color, alpha) when is_number(alpha) do
+    (alpha / 1)
+    |> max(0.0)
+    |> min(1.0)
+  end
+
   def opacity(color, missing) when missing in [nil, :nan], do: own_opacity(color)
+  def opacity(_color, infinite) when infinite in [:infinity, :neg_infinity], do: 0.0
+
+  # An alpha as the geoms ggplot2 draws opaque at an infinite alpha read it: an infinity 1, either
+  # sign, the rest as given. A ribbon's, area's, density's and smooth's band, a boxplot's box and
+  # outliers, and the reference lines read their alphas through it.
+  @doc false
+  @spec opaque_alpha(Scales.double()) :: Scales.double()
+  def opaque_alpha(infinite) when infinite in [:infinity, :neg_infinity], do: 1.0
+  def opaque_alpha(alpha), do: alpha
+
+  # `frame` with each row's alpha read through `opaque_alpha/1`, for a geom that hands its rows on
+  # to another's drawing.
+  @doc false
+  @spec opaque_alphas(DataFrame.t()) :: DataFrame.t()
+  def opaque_alphas(frame) do
+    alphas =
+      frame
+      |> DataFrame.pull(:alpha)
+      |> Enum.map(&opaque_alpha/1)
+
+    DataFrame.put(frame, :alpha, alphas)
+  end
 
   # A colour's own opacity: its alpha byte over 255, opaque for a colour without one, and none for
   # no colour.

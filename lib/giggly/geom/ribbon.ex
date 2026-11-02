@@ -306,7 +306,8 @@ defmodule Giggly.Geom.Ribbon do
       color: Enum.map(outlines, fn _outline -> Mark.hex(border) end),
       color_opacity: Enum.map(outlines, fn _outline -> Mark.own_opacity(border) end),
       fill: Enum.map(outlines, fn _outline -> Mark.hex(fill) end),
-      fill_opacity: Enum.map(outlines, fn _outline -> Mark.opacity(fill, look.alpha) end),
+      fill_opacity:
+        Enum.map(outlines, fn _outline -> Mark.opacity(fill, Mark.opaque_alpha(look.alpha)) end),
       dashes: dashes,
       line_end: geom.line_end,
       line_join: drawn_join(geom.line_join),

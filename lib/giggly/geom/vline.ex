@@ -37,7 +37,7 @@ defmodule Giggly.Geom.Vline do
     use Boundary, classify_to: Giggly.Geom
 
     alias Giggly.{Coord, DataFrame, Geom}
-    alias Giggly.Geom.Path
+    alias Giggly.Geom.{Mark, Path}
 
     # A legend's key, `draw_key_vline()`: a line up the middle of the key, from its bottom to its
     # top.
@@ -72,6 +72,7 @@ defmodule Giggly.Geom.Vline do
         |> DataFrame.put(:x, intercepts)
         |> DataFrame.put(:y, List.duplicate(low, count))
         |> DataFrame.put(:yend, List.duplicate(high, count))
+        |> Mark.opaque_alphas()
 
       geom
       |> segment()

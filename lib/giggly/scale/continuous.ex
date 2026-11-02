@@ -29,9 +29,10 @@ defmodule Giggly.Scale.Continuous do
       low end over the limits' width; `{:mid, midpoint}`, its distance from the midpoint over twice
       the further end's, so the midpoint is at the middle and the further end at 0 or 1; or `:max`,
       the value over the high end, so 0 is at 0.
-    * `na_value`: what a missing value, one not a finite number, or one outside the limits maps
-      to: `nil` for a position, alpha, line width and size, grey, `"#7F7F7F"`, for colour and
-      fill, or `:none`, no colour.
+    * `na_value`: what a value the palette gives nothing for maps to, a missing one, one `oob`
+      leaves missing, or for a colour one left outside the limits or infinite, while an alpha,
+      size or line width is an infinity for an infinite value: `nil` for a position, alpha, line
+      width and size, grey, `"#7F7F7F"`, for colour and fill, or `:none`, no colour.
     * `guide`: the guide that draws it: `:axis` for a position, `:legend` for alpha, line width,
       size and
       `:colorbar` for colour and fill unless a scale function chooses `:legend` or
@@ -40,7 +41,17 @@ defmodule Giggly.Scale.Continuous do
       gives.
     * `limits`: `{low, high}`, the values it spans whatever the data, in data units, `nil` at an
       end the data decides; once transformed, the two are sorted. A value outside them is
-      missing, so its row is not drawn.
+      handled as `oob` says.
+    * `oob`: what happens to a value outside the limits, in transformed space, before it is
+      placed, and for a position again once the stat and position have moved it: `:censor`, a
+      finite number outside made missing, so a position's row is not drawn and another
+      aesthetic's value takes `na_value`; `:censor_any`, an infinity too; `:squish`, a finite
+      number moved onto the nearer limit; `:squish_any`, an infinity too; `:squish_infinite`, an
+      infinity alone moved onto its limit; `:keep`, every value kept, a position drawn past the
+      panel's edge and a colour taking `na_value`, as its palette gives none there, while an
+      opacity or a size runs on past its range; or a function handed one column's values and the
+      limits, `{low, high}`, that returns a value for each, a number, `:infinity`,
+      `:neg_infinity`, `nil` or `:nan`, R's NaN, which is missing.
     * `breaks` and `minor_breaks`: the values an axis marks, in data units; on a date axis,
       `{:width, [week: 1]}` for a break every step, one of `:day`, `:week`, `:month` and `:year`
       and how many of it, on a date-time axis `:second`, `:minute` and `:hour` too, and on a time
@@ -64,7 +75,7 @@ defmodule Giggly.Scale.Continuous do
 
   # Use it through `Giggly.Scale`; the transformation is resolved by `Scales.Transform`.
 
-  alias Scales.{Bounds, DataRange, Palette, Transform}
+  alias Scales.{DataRange, Palette, Transform}
 
   # Every field's default is a position scale's before it has seen any data: the identity
   # transformation and palette, places between the limits' ends, an axis, and every option the
@@ -77,6 +88,7 @@ defmodule Giggly.Scale.Continuous do
             guide: :axis,
             name: :default,
             limits: {nil, nil},
+            oob: :censor,
             breaks: :default,
             minor_breaks: :default,
             n_breaks: :default,
@@ -90,6 +102,19 @@ defmodule Giggly.Scale.Continuous do
   @type date_step :: [
           {:second | :minute | :hour | :day | :week | :month | :year, pos_integer()}
         ]
+
+  @typedoc """
+  What a scale does with a value outside its limits: one of R's `oob_*` functions by name, or a
+  function of one column's values and the limits that returns a value for each.
+  """
+  @type oob ::
+          :censor
+          | :censor_any
+          | :squish
+          | :squish_any
+          | :squish_infinite
+          | :keep
+          | (list(), {number(), number()} -> list())
 
   @typedoc "A value a date, date-time or time axis places."
   @type time_value :: Date.t() | DateTime.t() | NaiveDateTime.t() | Time.t()
@@ -111,6 +136,7 @@ defmodule Giggly.Scale.Continuous do
           guide: :axis | :legend | :colorbar | :colorsteps | :none | struct(),
           name: :default | :none | String.t(),
           limits: {number() | time_value() | nil, number() | time_value() | nil},
+          oob: oob(),
           breaks:
             :default
             | :none
@@ -145,20 +171,6 @@ defmodule Giggly.Scale.Continuous do
   @spec train(t(), list()) :: t()
   def train(%__MODULE__{range: range} = scale, values) do
     %{scale | range: DataRange.train_continuous(range, values)}
-  end
-
-  # Each value, `nil` where it is a number outside the limits, as ggplot2's position scales censor
-  # (`oob = censor`, `Scales.Bounds.censor/2`), and NaN `nil` too, as ggplot2's position map
-  # gives `NA` for it.
-  @doc false
-  @spec censor(t(), list()) :: list()
-  def censor(%__MODULE__{} = scale, values) do
-    values
-    |> Bounds.censor(limits(scale))
-    |> Enum.map(fn
-      :nan -> nil
-      value -> value
-    end)
   end
 
   # The scale's limits in transformed space, as ggplot2 transforms a scale's limits when it makes

@@ -13,9 +13,10 @@ defmodule Giggly.Geom.Boxplot do
   # `Giggly.Plot.geom_boxplot/3`, whose defaults are R's. Use it through `Giggly.Geom`.
   #
   # Boxes use `:x`, `:y`, `:group`, `:alpha`, `:color`, `:fill`, `:linetype` and `:linewidth`, and
-  # `:shape` and `:size`, which only the outliers read, as ggplot2's do. What they are drawn from is
-  # what the summary writes, which no mapping gives, so a layer is checked against the summary's
-  # facts and the geom declares no required aesthetics.
+  # `:shape` and `:size`, which only the outliers read, never ggplot2's deprecated reading of
+  # `size` as the lines' width (design-log §4, the entry beginning "A box plot's `size`"). What
+  # they are drawn from is what the summary writes, which no mapping gives, so a layer is checked
+  # against the summary's facts and the geom declares no required aesthetics.
   #
   # While the plot is assembled (`setup_data/3`), each box is set up as ggplot2's
   # `GeomBoxplot$setup_data()` sets it, along the axis its stat wrote in `flipped_aes`, a horizontal
@@ -308,7 +309,7 @@ defmodule Giggly.Geom.Boxplot do
           shape: List.duplicate(Map.get(look, :shape, box.shape), count),
           size: List.duplicate(Map.get(look, :size, box.size), count),
           stroke: List.duplicate(Map.fetch!(look, :stroke), count),
-          alpha: List.duplicate(Map.get(look, :alpha, box.alpha), count)
+          alpha: List.duplicate(Mark.opaque_alpha(Map.get(look, :alpha, box.alpha)), count)
         )
 
       Geom.draw_panel(%Point{}, points, coord, panel_params, installed_fonts)
@@ -361,7 +362,9 @@ defmodule Giggly.Geom.Boxplot do
         line_join: :mitre
       }
 
-      {drawn_box, median} = Crossbar.parts(box, style, placing)
+      {drawn_box, median} =
+        Crossbar.parts(%{box | alpha: Mark.opaque_alpha(box.alpha)}, style, placing)
+
       Enum.concat(drawn_box, median)
     end
 

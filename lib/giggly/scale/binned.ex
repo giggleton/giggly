@@ -12,20 +12,25 @@ defmodule Giggly.Scale.Binned do
     * `rescaler`: how a value's place in the limits is found: `:rescale`, its distance from the
       low end over the limits' width; or `{:mid, midpoint}`, its distance from the midpoint over
       twice the further end's, so the midpoint is at the middle and the further end at 0 or 1.
-    * `na_value`: what a missing value, or one not a finite number, maps to: grey, `"#7F7F7F"`,
+    * `na_value`: what a missing value, one not a finite number, or one `oob` leaves outside
+      the limits maps to: grey, `"#7F7F7F"`,
       or `:none`, no colour.
     * `guide`: the guide that draws it: `:colorsteps`, a bar of one block of colour for each
       bin; `:legend`, a key for each break; or `:none` for none.
     * `name`: its guide's title, `:none` for none, or `:default` for the title its mapping
       gives.
     * `limits`: `{low, high}`, the values it spans whatever the data, `nil` at an end the data
-      decides. A value outside them takes the colour of the bin at the nearer end. With neither
+      decides. A value outside them is handled as `oob` says. With neither
       end given and its breaks the default, the limits are the data's range widened so the end
       bins are as wide as their neighbours: from the lowest break inside the range less the step
       to the next, to the highest plus the step from the one before; with one break inside, so
       it is the middle, from it less its distance to the further end of the range to it plus the
       same; with none inside, not widened, its ends its breaks, and a range of one value widened
       by 0.05 either side first.
+    * `oob`: what happens to a value outside the limits before it is binned, as a continuous
+      scale's `oob` says: `:squish`, a finite number moved onto the nearer limit, so it takes
+      the colour of the bin at that end; any other of `Giggly.Scale.Continuous`'s; a value still
+      outside, or missing, maps to `na_value`.
     * `breaks`: the values its bins are cut at, beside the limits: a list, those inside the
       limits kept, in the order given; a function handed the limits, `{low, high}`, and for one of
       two arguments `[n: n_breaks]` too, that returns them, or `{value, label}` pairs, a pair's
@@ -59,15 +64,17 @@ defmodule Giggly.Scale.Binned do
   # answer with a guide drawn (design-log §4, the entry beginning "A binned scale's breaks and
   # limits").
   #
-  # Mapping is R's `ScaleBinned$map()`: each value squished into the limits (`oob = squish`,
-  # `Scales.Bounds.squish/2`), placed in them by the rescaler, then cut at the breaks' places with
-  # the limits' as the outer edges, R's `cut(include.lowest = TRUE, right)`; a bin's colour is the
+  # Mapping is R's `ScaleBinned$map()`: each value as the scale's `oob` leaves it on the limits
+  # (`Giggly.Scale.OutOfBounds`), `:squish` by default, as R's `oob = squish`, placed in them by the
+  # rescaler, then cut at the breaks' places with the limits' as the outer edges, R's
+  # `cut(include.lowest = TRUE, right)`, a place left outside them in no bin, as `cut()` gives `NA`
+  # there; a bin's colour is the
   # palette's for the bins' count, `pal_binned()`, or the continuous palette's at its middle. Given
   # breaks outside the limits are left out, where R cuts at them too and gives a bin beyond the
   # limits, whose middle no gradient colours, so a value on the limit there drew as missing. One
   # bin colours every value but a missing one, which R's single colour, recycled, colours too.
 
-  alias Giggly.Scale.BreaksFunction
+  alias Giggly.Scale.{BreaksFunction, OutOfBounds}
   alias Scales.{Bounds, DataRange, Palette, Transform}
 
   # Every field's default is `scale_colour_binned()`'s before it has seen any data: the gradient
@@ -81,6 +88,7 @@ defmodule Giggly.Scale.Binned do
             guide: :colorsteps,
             name: :default,
             limits: {nil, nil},
+            oob: :squish,
             breaks: :default,
             labels: :default,
             n_breaks: 5,
@@ -96,6 +104,7 @@ defmodule Giggly.Scale.Binned do
           guide: :colorsteps | :legend | :none,
           name: :default | :none | String.t(),
           limits: {number() | nil, number() | nil},
+          oob: Giggly.Scale.Continuous.oob(),
           breaks:
             :default
             | :none
@@ -196,8 +205,8 @@ defmodule Giggly.Scale.Binned do
       |> rescaled(limits, rescaler)
 
     places =
-      values
-      |> Bounds.squish(limits)
+      scale.oob
+      |> OutOfBounds.run(values, limits)
       |> Enum.map(fn value -> if is_number(value), do: value end)
       |> rescaled(limits, rescaler)
 
@@ -324,8 +333,16 @@ defmodule Giggly.Scale.Binned do
       |> Enum.chunk_every(2, 1, :discard)
       |> Enum.map(fn [low, high] -> high - (high - low) / 2 end)
 
-    {Enum.map(places, fn place -> bin(place, edges, right) end), middles}
+    {Enum.map(places, fn place -> bin(inside(place, edges), edges, right) end), middles}
   end
+
+  # A place outside the outer edges, where the scale's `oob` left a value outside its limits, is
+  # in no bin, as R's `cut()` gives `NA` there.
+  defp inside(place, [low | _rest] = edges) when is_number(place) do
+    if place < low or place > List.last(edges), do: nil, else: place
+  end
+
+  defp inside(nil, _edges), do: nil
 
   defp bin(nil, _edges, _right), do: nil
 

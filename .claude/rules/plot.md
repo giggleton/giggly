@@ -473,7 +473,12 @@ stat and position" and "Each facet, coordinate system, geom, stat and position i
   date scale's list of labels needs a list of breaks as long, checked at the call, since its default
   breaks are known only when run, or a breaks function, whose breaks it is one for each of when
   run; a discrete scale's is one for each break given, or else each limit
-  given, checked at the call, and otherwise when run. `date_labels:` is checked at the call by
+  given, checked at the call, and otherwise when run. `oob:` is taken where ggplot2 4.0.3's
+  function takes an `oob` (the position, date, date-time and time scales, the continuous and
+  binned colour and fill scales, `scale_alpha_continuous/2` and `scale_size_area/2`; not the
+  size, radius and line width scales, nor a discrete one), checked at the call: a name of R's
+  `oob_*` functions or a function of two arguments, `:discard` refused, since ggplot2 recycles
+  its fewer values over the rows (design-log §4, the entry beginning "`oob:` takes a name"). `date_labels:` is checked at the call by
   writing a date in it with `Calendar.strftime/3`, a date-time on a date-time scale or a time of
   day on a time scale, so a format it cannot write (`"%W"`, or a date's `"%Y"` on a time scale)
   raises there. A caller writes `:none` only to remove

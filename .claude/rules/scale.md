@@ -48,12 +48,28 @@ identity transformation: the entry beginning "A layer records its stat and posit
   R's `rescale_mid()` (`Scales.Bounds.rescale_mid/4`), as gradient2's does; or `:max`, by R's
   `rescale_max()` (`Scales.Bounds.rescale_max/3`), the value over the
   limits' high end, as `scale_size_area()`'s does, so 0 is at 0 and one value at 1, a high end of
-  0 placing 0 at `nil`, R's NaN, and raising for any other value, which R makes an infinity it
-  cannot draw. The rescaler is the scale's, not the palette's, since a palette takes a place and
-  the colour bar's ticks never go through a midpoint. A missing value, one that is not a finite
-  number, or one outside the limits, which ggplot2 censors (`oob = censor`), maps to the scale's
-  `na_value`, ggplot2's `na.value`: `nil` for a position, alpha, line width and size, grey50 for a
-  colour or fill, or what a plot's scale gives, `:none` among them.
+  0 placing 0 at `nil`, R's NaN, and raising for any other finite value, which R makes an
+  infinity it cannot draw. The rescaler is the scale's, not the palette's, since a palette takes a place and
+  the colour bar's ticks never go through a midpoint. A value is placed once its `oob` has run
+  (below), and placed beyond 0 to 1 where it leaves one outside; a value the palette gives
+  nothing for, `nil` or NaN, maps to the scale's `na_value`, ggplot2's `na.value`: `nil` for a
+  position, alpha, line width and size, grey50 for a colour or fill, or what a plot's scale gives,
+  `:none` among them. A colour's palette gives nothing off its ends or at an infinity; alpha's,
+  size's and line width's run on past their range and give an infinity for an infinite value, as
+  R's palettes do (design-log §4, the entry beginning "A non-position scale keeps"), and
+  `:max`'s infinite place is an infinity whatever the high end.
+- **A continuous or binned scale's `oob` is R's, run in transformed space before a value is
+  placed** (`Giggly.Scale.OutOfBounds`; design-log §4, the entries beginning "`oob:` takes a
+  name" and "A function `oob`"): a name runs `Scales.Bounds`'s function of that name on the
+  limits `limits/1` gives, ends filled from the range; a function is handed one column's values
+  and those limits, sorted, and returns a value for each, a number read as a float, an infinity,
+  `nil` or `:nan`, another count or kind raising when run. NaN comes back `nil`, from either. A
+  position's runs at both maps, `map/2` before the stat and `map_positions/2` once the positions
+  are final, each column alone; with no limits and no finite value it is handed the range of
+  nothing, `{:infinity, :neg_infinity}`, as R's; a non-position scale with no limits maps every
+  value to `na_value` without it. Guides map through `map/2`, so a legend's keys and a colour
+  bar's colours go through it too. Its tests pin R's table of every name and two functions over
+  each kind of scale (`test/giggly/fixtures/r_oob_ggplot2_4.0.3.txt`).
 - **A legend's breaks are the scale's on its limits, not an axis's extent** (`legend_breaks/1`),
   from its options as an axis's are: a continuous scale's are its breaks, given or its
   transformation's, inside its limits, taken as floats as R's limits are doubles, one at the low
@@ -114,8 +130,9 @@ identity transformation: the entry beginning "A layer records its stat and posit
   trains as a continuous scale and takes numbers alone (`takes?/2`); **its breaks and widened
   limits are worked out from its range and options each time they are read, never stored**, and
   it maps on the widened limits whatever the guide, where R's limits depend on whether a guide
-  read them first. Each value is squished into the limits (`Scales.Bounds.squish/2`), placed by
-  its rescaler and cut at the breaks' places, R's `cut(include.lowest = TRUE, right)`; a bin is
+  read them first. Each value goes through its `oob`, `:squish` by default, as R's, is placed by
+  its rescaler and cut at the breaks' places, R's `cut(include.lowest = TRUE, right)`, a place
+  left outside the limits in no bin, as `cut()` gives `NA`; a bin is
   coloured by `{:binned, palette}`'s colours for the bins' count, too few raising, or by a
   continuous palette at its middle. Given breaks outside the limits are left out with their
   labels, a function's breaks, handed the limits and `[n: n_breaks]` for two arguments, read as
@@ -130,10 +147,10 @@ identity transformation: the entry beginning "A layer records its stat and posit
   **`shown_limits/1` gives the limits a scale with `show_limits` labels the bar's ends with**,
   written by its labels as its breaks are, `[]` when not shown, raising beside a list of labels,
   which R ignores with a warning. Its tests pin R's breaks, limits, colours and labels.
-- **A continuous scale carries the options a plot gives it**, `name`, `limits`, `breaks`,
+- **A continuous scale carries the options a plot gives it**, `name`, `limits`, `oob`, `breaks`,
   `minor_breaks`, `n_breaks`, `labels`, `expand` and `rescaler`, each `:default` until given but
   `rescaler`,
-  `:rescale`, `limits` `{nil, nil}` and
+  `:rescale`, `oob` `:censor` (a binned scale's `:squish`), `limits` `{nil, nil}` and
   `expand` ggplot2's `[mult: {0.05, 0.05}, add: {0, 0}]`; `Giggly.Plot` writes the struct,
   untrained, and the assembly trains a copy (design-log §4, the entry beginning "A scale function
   records the untrained scale"). Its field defaults are a position scale's, so `%Continuous{}` is
@@ -174,14 +191,14 @@ identity transformation: the entry beginning "A layer records its stat and posit
   place, a break left out taking its label with it, a list one for each candidate break or the run
   raises (R pads it with `NA`); a map labels the values it holds, the rest written as a level is;
   a function is handed the breaks' values, `nil` among them.
-- **Limits replace the range end by end, and a position outside them is censored.** Given in
-  data units, they are transformed and, both given, sorted, as ggplot2 transforms and sorts them
-  (`Continuous.limits/1`); a given end outside the domain raises, where R fails. An end of `nil`
-  takes the range's (R's `get_limits()`), and with both ends an axis exists before any data.
-  `map/2` turns a position outside the limits into `nil` before the stat, and `censor/2` does once
-  the positions are final, as ggplot2 maps them twice with `oob = censor` (finite values only):
-  `:infinity` and `:neg_infinity` are kept, NaN becomes `nil`, as ggplot2's position map gives
-  `NA` for it, and a discrete scale's positions are never censored.
+- **Limits replace the range end by end, and a position outside them goes through the scale's
+  `oob`.** Given in data units, they are transformed and, both given, sorted, as ggplot2
+  transforms and sorts them (`Continuous.limits/1`); a given end outside the domain raises, where
+  R fails. An end of `nil` takes the range's (R's `get_limits()`), and with both ends an axis
+  exists before any data. By default, `:censor`, a finite position outside becomes `nil` at both
+  maps, `:infinity` and `:neg_infinity` kept, so a bar whose base the limits leave out is missing;
+  NaN becomes `nil`, as ggplot2's position map gives `NA` for it, and a discrete scale's positions
+  are returned as given.
 - **Given breaks are kept in the order given wherever they fall inside the widened extent**, in
   data units and transformed, one outside the transformation's domain dropped, even beyond the
   limits, as R keeps 1.4 on mtcars' weights from 1.513; given labels go with their

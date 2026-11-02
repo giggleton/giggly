@@ -84,6 +84,11 @@ beginning "Legends go where the theme puts them".
   ggplot2's `draw_layer()` splits by `PANEL`; a geom never sees another panel's rows. A panel
   where the layer has no rows, as one only another table makes, draws nothing of it, as ggplot2
   gives it an empty grob, and its geom is not called.
+- **A layer whose line widths hold an infinity raises before its geom draws it**, naming the
+  geom, as R fails to draw one ("'lwd' must be non-negative and finite"); its table keeps the
+  infinity a scale's palette gave, as ggplot2's layer data does (design-log §4, the entry beginning
+  "A non-position scale keeps"). A geom draws with a `linewidth` column only where it strokes one,
+  so the check reads the column alone.
 - **A plot's legends go where the theme puts them (`legend_position`), as ggplot2's
   `table_add_legends()` places its guide boxes**: a column right of the panels, or left of the y
   title inside the tag's column; a row above the panels below the plot's title and subtitle, or
