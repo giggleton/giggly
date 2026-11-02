@@ -9249,12 +9249,24 @@ defmodule Giggly.PlotTest do
 
       for {function, options} <- @transform_scale_functions,
           {transform, shown} <- [
-            {:date, "expected a transformation of numbers, since Plot.scale_x_date/2"},
+            {:date,
+             "expected a transformation of numbers, since Plot.scale_x_date/2, " <>
+               "Plot.scale_x_datetime/2 and Plot.scale_x_time/2 and their y twins place dates, " <>
+               "date-times and times, got: :date"},
             {{:compose, [:time, :reverse]}, "expected a transformation of numbers"},
             {{:compose, [:log10, :date]},
              "got: {:compose, [:log10, :date]}, which Scales.Transform refuses: a date, " <>
                "date-time or time transformation comes first"},
-            {:ln, "expected a transformation: `:identity`, `:log`, `:log2`, `:log10`"},
+            {:ln,
+             "expected a transformation: `:identity`, `:log`, `:log2`, `:log10`, `{:log, base}`, " <>
+               "`:log1p`, `:exp`, `{:exp, base}`, `:asinh`, `:pseudo_log`, " <>
+               "`{:pseudo_log, sigma: sigma, base: base}`, `:sqrt`, `:reverse`, `:reciprocal`, " <>
+               "`:asn`, `:atanh`, `:logit`, `:probit`, `{:probability, :normal, mean: mean, sd: sd}`, " <>
+               "`{:probability, :logistic, location: location, scale: scale}`, " <>
+               "`{:boxcox, exponent}`, `{:boxcox, exponent, offset: offset}`, `{:modulus, exponent}`, " <>
+               "`{:modulus, exponent, offset: offset}`, `{:yj, exponent}`, `:timespan`, " <>
+               "`{:timespan, unit}`, a composition `{:compose, [part, ...]}` or one " <>
+               "`Scales.Transform.new/2` makes, got: :ln"},
             {{:log, 1}, "got: {:log, 1}"}
           ] do
         error =
@@ -9272,7 +9284,8 @@ defmodule Giggly.PlotTest do
       plot = Plot.new(@rows)
 
       for {function, options, limits, outside} <- [
-            {&Plot.scale_x_log10/2, [], {-5, 1000}, "-5.0 falls outside the :log10"},
+            {&Plot.scale_x_log10/2, [], {-5, 1000},
+             "limits: {-5.0, 1000.0}, and -5.0 falls outside the :log10"},
             {&Plot.scale_y_continuous/2, [transform: :log10], {0, 1000},
              "0.0 falls outside the :log10 transformation's domain, {1.0e-100, :infinity}"},
             {&Plot.scale_color_continuous/2, [transform: :sqrt], {nil, -5},
@@ -9341,20 +9354,26 @@ defmodule Giggly.PlotTest do
                  1
       end
 
-      error =
-        assert_raise ArgumentError, fn ->
-          Plot.scale_linewidth_continuous(plot, transform: :sqrt, n_breaks: 1)
-        end
+      for transform <- [:sqrt, {:boxcox, 2}, {:compose, [{:modulus, 2}, :reverse]}] do
+        error =
+          assert_raise ArgumentError, fn ->
+            Plot.scale_linewidth_continuous(plot, transform: transform, n_breaks: 1)
+          end
 
-      assert error.message =~ "Plot.scale_linewidth_continuous/2 is given n_breaks: 1"
+        assert error.message =~ "Plot.scale_linewidth_continuous/2 is given n_breaks: 1"
+      end
 
-      for transform <- [:timespan, {:timespan, :hour}, {:compose, [:timespan, :reverse]}] do
+      for {transform, first} <- [
+            {:timespan, ":timespan"},
+            {{:timespan, :hour}, "{:timespan, :hour}"},
+            {{:compose, [:timespan, :reverse]}, ":timespan"}
+          ] do
         error =
           assert_raise ArgumentError, fn ->
             Plot.scale_x_continuous(plot, transform: transform, n_breaks: 3)
           end
 
-        assert error.message =~ "is given n_breaks: beside transform: "
+        assert error.message =~ "is given n_breaks: beside transform: #{first}, whose breaks"
         assert error.message =~ "whose breaks count no number"
       end
     end

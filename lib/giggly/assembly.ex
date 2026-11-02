@@ -1010,9 +1010,8 @@ defmodule Giggly.Assembly do
   end
 
   # Whether the column `name` goes through `scale`'s transformation: a column of numbers of an
-  # aesthetic other than position, its scale continuous with a transformation but the identity.
-  defp transformed?(%Scale.Continuous{transform: transform}, name, dtypes)
-       when transform != :identity do
+  # aesthetic other than position whose scale is continuous, the identity leaving it as it is.
+  defp transformed?(%Scale.Continuous{}, name, dtypes) do
     dtype = Map.fetch!(dtypes, name)
     name in Scale.non_position_aesthetics() and Scale.kind(dtype) == :continuous
   end

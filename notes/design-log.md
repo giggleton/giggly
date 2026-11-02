@@ -4266,6 +4266,10 @@ tells the story (`git show <hash>`). Until 2026-10-15 each milestone also had a 
 `git log -S "<title>" -- notes/design-log.md` finds it in this file's history. The phases are
 §1's roadmap.
 
+- 2026-11-02 — Take transform: on Giggly's continuous non-position scales, any transformation on x
+  and y (transforms, step 8) (`1b40993`); §4: "`transform:` takes every", "A column of an
+  aesthetic other than position", "gradient2's midpoint", "A given limit outside", "A
+  transformation of your own labels"
 - 2026-11-01 — Take oob: on Giggly's continuous and binned scales (transforms, step 7)
   (`6b130a1`); §4: "A non-position scale keeps", "A function `oob`", "`oob:` takes a name"
 - 2026-11-01 — Draw coord_flip()'s examples with the swap ggplot2 prefers, and every example of a

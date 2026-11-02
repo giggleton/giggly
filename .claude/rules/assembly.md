@@ -27,7 +27,7 @@ numbered: the entry beginning "Group ids follow ggplot2's".
   table, raw → each layer's mapping is evaluated (`Giggly.Mapping.evaluate/2`), an after_stat
   left for after the stat (`Mapping.stage/1`) → `Group.add/2` writes `group` →
   transform scales (the positions, and every other aesthetic's column of numbers whose plot's
-  scale has a transformation, `through_transformations/3`) → train position scales → map
+  scale is continuous, `through_transformations/3`) → train position scales → map
   positions to numeric (not to the unit panel) → stat → `after_stat`, each column it computes
   transformed as those before it, so a stat counting distinct values sees them transformed, as
   ggplot2's `transform_df()` and `map_statistic()` transform them → the positions a layer sets into every row (a rectangle's set corners, as

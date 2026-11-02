@@ -2793,7 +2793,7 @@ defmodule Giggly.Plot do
       ...>   |> Giggly.Plot.facet_wrap(:cyl, labeller: :both)
       ...>   |> Giggly.to_svg()
       ...>   |> IO.iodata_to_binary()
-      iex> Enum.map(["cyl: 4", "cyl: 6"], fn label -> svg =~ ">\#{label}</text>" end)
+      iex> Enum.map(["cyl: 4", "cyl: 6"], fn label -> svg =~ ">" <> label <> "</text>" end)
       [true, true]
 
   #{@labeller_doc}
