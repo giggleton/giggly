@@ -256,19 +256,15 @@ defmodule Giggly.Geom.Violin do
       Enum.concat([left, right, [hd(left)]])
     end
 
-    # A violin's lines across it at its quantiles, drawn as a path: none where their line type is
-    # blank, or where no row of its outline marks a quantile.
-    defp quantile_lines(%{linetype: :none}, _outline, _placing, _installed_fonts), do: []
-
+    # A violin's lines across it at its quantiles, drawn as a path, which draws none of a blank line
+    # type, and none where no row of its outline marks a quantile.
     defp quantile_lines(look, outline, {flipped, coord, panel_params}, installed_fonts) do
-      case Enum.filter(outline, fn {row, _along} -> is_number(row.quantile) end) do
-        [] ->
-          []
+      lines =
+        outline
+        |> Enum.filter(fn {row, _along} -> is_number(row.quantile) end)
+        |> quantile_table(look, flipped)
 
-        marks ->
-          lines = quantile_table(marks, look, flipped)
-          Geom.draw_panel(@quantile_path, lines, coord, panel_params, installed_fonts)
-      end
+      Geom.draw_panel(@quantile_path, lines, coord, panel_params, installed_fonts)
     end
 
     # The quantile lines' table: each of the outline's rows marking a quantile at its side, turned

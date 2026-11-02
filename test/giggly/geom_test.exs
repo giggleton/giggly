@@ -1108,6 +1108,9 @@ defmodule Giggly.GeomTest do
              ]
 
       assert rounded_lines(second_lines) == [[{0.375, 0.5}, {0.625, 0.5}]]
+
+      assert {first_lines.line_end, first_lines.line_join, first_lines.mitre_limit} ==
+               {:butt, :round, 10.0}
     end
 
     test "quantile lines of a blank line type, or with no quantile marked, are not drawn" do
@@ -1117,6 +1120,27 @@ defmodule Giggly.GeomTest do
 
       assert [%Polygons{}] = draw_panel(@violin, marked, @cartesian, @params)
       assert [%Polygons{}] = draw_panel(solid, unmarked, @cartesian, @params)
+    end
+
+    # vdiffr: `geom_violin(quantile.colour = NA, quantile.linetype = 1)` writes each line with no
+    # stroke, so none shows, and so does a line whose row's colour a scale left missing.
+    test "quantile lines of no colour are not drawn, beside those of a colour" do
+      frame =
+        violin_rows(
+          y: [1.0, 2.0, 3.0],
+          violinwidth: [1.0, 1.0, 1.0],
+          quantile: [nil, 0.25, 0.75],
+          color: ["#333333", nil, "#FF0000"]
+        )
+
+      solid = %{@violin | quantile: %{linetype: {}}}
+      uncoloured = %{@violin | quantile: %{linetype: {}, color: :none}}
+
+      assert [%Polygons{}, %Polylines{color: ["#FF0000"]} = drawn] =
+               draw_panel(solid, frame, @cartesian, @params)
+
+      assert rounded_lines(drawn) == [[{0.25, 0.75}, {0.75, 0.75}]]
+      assert [%Polygons{}] = draw_panel(uncoloured, frame, @cartesian, @params)
     end
 
     # vdiffr: `geom_violin(quantiles = c(0, 1), quantile.linetype = 1)` draws quantile 0's line
