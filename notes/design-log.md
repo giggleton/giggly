@@ -1871,10 +1871,13 @@ deleted from the entry it was in, never marked superseded; git history keeps eve
 
 - **The mutation pass runs muex's mutants in warm VMs, each against the whole suite (2026-10-24,
   Steve).** `warm.sh` starts workers that each load the app and the tests once, then compile each
-  mutant over its module, recompile what read it while compiling and now reads something else, run
-  the whole suite to its first failure, and load the originals back; muex builds the mutants and
-  writes the JSON report, as a library, and one `:cover` run per worker finds the lines no test
-  runs. It is sound because Giggly keeps no state for a mutant to leave (`CorePurity`), the fonts
+  mutant over its module, recompile what read it while compiling and now reads something else, the
+  mutated file itself never (until 2026-11-02 a file reading a call with arguments, `plot.ex`, was
+  recompiled from disk, undoing each mutant), run the whole suite to its first failure, and load
+  the originals back; a worker stops where a file does not compile as muex prints it unmutated
+  (an escaped `\#{` in a doctest made every `plot.ex` mutant invalid from 2026-10-31); muex
+  builds the mutants and writes the JSON report, as a library, and one `:cover` run per worker
+  finds the lines no test runs. It is sound because Giggly keeps no state for a mutant to leave (`CorePurity`), the fonts
   the suite registers with Pica registered once per worker and only read, and a mutant that
   searches the installed fonts leaving Pica's scan of them, which a later one reads as a fresh
   scan would give it; a mutant
