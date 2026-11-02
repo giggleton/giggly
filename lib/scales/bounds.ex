@@ -2,9 +2,10 @@ defmodule Scales.Bounds do
   @moduledoc """
   Values against the bounds of a range: values moved from one range to another (`rescale/3`,
   `rescale_mid/4`, `rescale_max/3`, or not at all, `rescale_none/1`), whether a range is zero
-  wide (`zero_range?/1`), and what is done with values outside a range, R's `oob_*` family:
-  censored (`censor/2`, `censor_any/2`), squished onto its ends (`squish/2`, `squish_any/2`,
-  `squish_infinite/2`), dropped (`discard/2`) or kept (`keep/2`).
+  wide (`zero_range?/1`), a range widened at its ends (`expand_range/2`), and what is done with
+  values outside a range, R's `oob_*` family: censored (`censor/2`, `censor_any/2`), squished
+  onto its ends (`squish/2`, `squish_any/2`, `squish_infinite/2`), dropped (`discard/2`) or kept
+  (`keep/2`).
 
   Each takes values as R holds its doubles (`t:Scales.double/0`) and gives R's answer to the last
   digit, in R's order of operations, with IEEE arithmetic's infinities and NaN where R gives them:
@@ -27,6 +28,37 @@ defmodule Scales.Bounds do
   # An end of the range the `oob_*` family takes: a number, an infinity, or `nil` for none on its
   # side.
   defguardp is_end(value) when is_bound(value) or is_nil(value)
+
+  # `expand_range/2`'s options, R's `expand_range()`'s `mul`, `add` and `zero_width` and their
+  # defaults. An amount for each end is R's vector of two.
+  @amount_type {:or,
+                [
+                  :integer,
+                  :float,
+                  {:tuple, [{:or, [:integer, :float]}, {:or, [:integer, :float]}]}
+                ]}
+
+  @expand_range_schema NimbleOptions.new!(
+                         mult: [
+                           type: @amount_type,
+                           default: 0,
+                           doc:
+                             "The multiple of the width each end moves by, a number for both " <>
+                               "or `{low_end, high_end}`."
+                         ],
+                         add: [
+                           type: @amount_type,
+                           default: 0,
+                           doc:
+                             "The constant each end moves by besides, a number for both or " <>
+                               "`{low_end, high_end}`."
+                         ],
+                         zero_width: [
+                           type: {:or, [:integer, :float]},
+                           default: 1,
+                           doc: "The width a zero-wide range is widened as though it had."
+                         ]
+                       )
 
   @typedoc "A range, its low end and its high end, each a number or an infinity."
   @type range :: {bound(), bound()}
@@ -187,6 +219,59 @@ defmodule Scales.Bounds do
   end
 
   def zero_range?({low, high}) when is_bound(low) and is_bound(high), do: false
+
+  @doc """
+  The range widened at each end by a multiple of its width plus a constant, R's
+  `expand_range()`: the low end moved down by `width * mult + add`, the high end up, each end
+  by its own where `{low_end, high_end}` gives two. A zero-wide range (`zero_range?/1`) takes
+  `zero_width` as its width, so a single value is still widened by a multiple. A range high to
+  low is widened outward as R's is, its width negative, and a negative multiple or constant
+  narrows it, its ends crossing past the middle.
+
+  An end may be an infinity, with IEEE arithmetic's answer, as R's gives: an infinite width
+  times 0 is NaN, so a range reaching an infinity widened by no multiple gives `:nan` at both
+  ends, as R does. An end of `nil` or NaN is refused, as R fails on one; so are an infinite
+  multiple, constant or width, which R takes.
+
+  ## Options
+
+  #{NimbleOptions.docs(@expand_range_schema)}
+
+  ## Examples
+
+      iex> Scales.Bounds.expand_range({1, 3}, mult: 0.05)
+      {0.9, 3.1}
+
+      iex> Scales.Bounds.expand_range({1, 3}, mult: {0.05, 0.1}, add: {0, 2})
+      {0.9, 5.2}
+
+      iex> Scales.Bounds.expand_range({5, 5}, mult: 0.05, zero_width: 10)
+      {4.5, 5.5}
+
+      iex> Scales.Bounds.expand_range({1, :infinity}, mult: 0.05)
+      {:neg_infinity, :infinity}
+  """
+  @spec expand_range(range(), keyword()) :: {Scales.double(), Scales.double()}
+  # An end that is not a number or an infinity is refused by `zero_range?/1`, which reads both.
+  def expand_range({low, high} = range, options \\ []) do
+    options = NimbleOptions.validate!(options, @expand_range_schema)
+    {mult_low, mult_high} = each_end(options[:mult])
+    {add_low, add_high} = each_end(options[:add])
+    width = if zero_range?(range), do: options[:zero_width], else: Double.subtract(high, low)
+
+    {Double.subtract(low, widening(width, mult_low, add_low)),
+     Double.add(high, widening(width, mult_high, add_high))}
+  end
+
+  defp each_end({low_end, high_end}), do: {low_end, high_end}
+  defp each_end(amount), do: {amount, amount}
+
+  # R's `width * mul + add`, in R's order.
+  defp widening(width, mult, add) do
+    width
+    |> Double.multiply(mult)
+    |> Double.add(add)
+  end
 
   @doc """
   Each value, `nil` where it is a finite number outside `{low, high}`, R's `oob_censor()`.

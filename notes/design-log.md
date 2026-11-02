@@ -112,6 +112,20 @@ deleted from the entry it was in, never marked superseded; git history keeps eve
   *Rejected: refusing them on `stat_ydensity/3`*, as Giggly refuses what R ignores: the two
   functions would differ only there, where R's split is how `geom_violin()` builds a parameter.
 
+- **A range is widened by `Scales.Bounds.expand_range/2`, R's `expand_range()`, and Giggly's
+  extents through it (2026-11-02, Steve: "A" twice, increment 4's step 10; checked against
+  scales 1.4.0).** `mult:`, `add:` and `zero_width:`, R's `mul`, `add` and `zero_width` with
+  their defaults 0, 0 and 1, checked by NimbleOptions, `mult:` and `add:` a number or
+  `{low_end, high_end}`, R's vector of two, which ggplot2's `expand_range4()` hands it; `mult:`
+  is the name Giggly's `expand:` gives the same amount. Ends are R's doubles through
+  `Scales.Double`: an infinite end widens to the infinities, and with no multiple gives `:nan`
+  at both, R's `Inf * 0`; a `nil` or NaN end is refused, as R fails; an infinite or missing
+  amount is refused, where R takes it. The scales 1.4.0 export the 2026-10-27 gap list missed,
+  counting Giggly's own expansion as the package's. *Rejected: R's `mul:`*, an abbreviation
+  neither library uses. *Rejected: positional amounts*, where every `Scales` function takes
+  keywords. *Rejected: refusing infinite ends*, which every other `Bounds` function takes.
+  *Rejected: `Inf * 0` as 0*, tidier and not R's.
+
 - **A transformation of your own labels its breaks turned back rounded to 14 significant digits
   unless it says (2026-11-02, Steve: "A", increment 4's step 8; checked against ggplot2 4.0.3).**
   `Transform.new/2` without `labels:` records `&Labels.plain_round_tripped/1`, as logit's and
@@ -4318,6 +4332,8 @@ tells the story (`git show <hash>`). Until 2026-10-15 each milestone also had a 
   (`2a4cd6f`); §4: "A violin's quantile lines are R's"
 - 2026-11-02 — Draw every violin's border butt-ended and round-cornered, as ggplot2 does, its key
   alone taking lineend and linejoin (`f3968b1`); §4: "A violin's border is always"
+- 2026-11-02 — Add Scales.Bounds.expand_range/2, R's expand_range(), and widen Giggly's extents
+  through it (transforms, step 10) (`24db15d`); §4: "A range is widened"
 - 2026-11-02 — Add geom_violin() and stat_ydensity(): a violin per group, drawn as ggplot2's
   GeomViolin (violins, step 2) (`a6dea4d`); §4: "A violin's width is R's"
 - 2026-11-02 — Add stat_ydensity(), a violin's densities, sharing the density's estimate (violins,

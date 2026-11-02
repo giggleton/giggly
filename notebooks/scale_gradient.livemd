@@ -35,8 +35,8 @@ same for fill. A missing value is drawn in grey, or in the colour `na.value` giv
 reads a gradient back is a colour bar, `guide_colourbar()`. Giggly has all six,
 `Giggly.Plot.scale_color_gradient/2` and the rest, with their colours, gradient2's `midpoint:`, and
 their limits, breaks, labels and `na_value:`, and reads each back with a colour bar; it has no
-`rescaler` option (`scales::rescale_mid()`). The setup cell binds `Giggly.Datasets.faithfuld/0`,
-ggplot2's `faithfuld`, to its name in R.
+`rescaler` option. The setup cell binds `Giggly.Datasets.faithfuld/0`, ggplot2's `faithfuld`, to its
+name in R.
 
 ## The default gradient
 
@@ -244,7 +244,7 @@ ggplot(df, aes(x, y)) +
 `scales::rescale_mid()` puts 0 at the middle of the colours, here white, however far the data
 reaches on either side.
 
-Not in Giggly yet: `scale_colour_gradientn()`'s `rescaler` option and `scales::rescale_mid()`.
+Not in Giggly yet: `scale_colour_gradientn()`'s `rescaler` option.
 
 ## Filling with a gradient
 

@@ -34,12 +34,12 @@ functions, `Giggly.Plot.scale_x_continuous/2` and the rest, with their titles, l
 minor breaks, each also a function of the limits, a number of breaks (`n_breaks:`), labels,
 expansion and transformations, breaks functions in `Scales.Breaks` and `Scales.MinorBreaks`, and
 formatters for labels in `Scales.Labels`, and a transformation of your own
-(`Scales.Transform.new/2`); it has no `sec.axis` option (`sec_axis()`). A plot is described with `Giggly.Plot` and
-drawn with `Giggly.to_svg/2`, which returns an SVG document. The setup cell aliases `Giggly.Plot`,
-so the cells write `Plot.new/2`, and defines `render`, which draws a plot and shows it below the
-cell with `Kino.Image`. The cells draw `Giggly.Datasets.mpg/0`, ggplot2's `mpg`: fuel economy for
-234 cars of 38 popular models from 1999 to 2008, which the setup cell binds to `mpg`, ggplot2's
-name for it.
+(`Scales.Transform.new/2`); it has no `sec.axis` option (`sec_axis()`). A plot is described with
+`Giggly.Plot` and drawn with `Giggly.to_svg/2`, which returns an SVG document. The setup cell
+aliases `Giggly.Plot`, so the cells write `Plot.new/2`, and defines `render`, which draws a plot and
+shows it below the cell with `Kino.Image`. The cells draw `Giggly.Datasets.mpg/0`, ggplot2's `mpg`:
+fuel economy for 234 cars of 38 popular models from 1999 to 2008, which the setup cell binds to
+`mpg`, ggplot2's name for it.
 
 ## The default scales
 
