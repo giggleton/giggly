@@ -4314,6 +4314,14 @@ tells the story (`git show <hash>`). Until 2026-10-15 each milestone also had a 
 `git log -S "<title>" -- notes/design-log.md` finds it in this file's history. The phases are
 §1's roadmap.
 
+- 2026-11-02 — Draw a violin's quantile lines, as ggplot2's GeomViolin draws them (violins, step 3)
+  (`2a4cd6f`); §4: "A violin's quantile lines are R's"
+- 2026-11-02 — Draw every violin's border butt-ended and round-cornered, as ggplot2 does, its key
+  alone taking lineend and linejoin (`f3968b1`); §4: "A violin's border is always"
+- 2026-11-02 — Add geom_violin() and stat_ydensity(): a violin per group, drawn as ggplot2's
+  GeomViolin (violins, step 2) (`a6dea4d`); §4: "A violin's width is R's"
+- 2026-11-02 — Add stat_ydensity(), a violin's densities, sharing the density's estimate (violins,
+  step 1) (`2117be1`); §4: "A violin's densities share the density's estimate"
 - 2026-11-02 — Take transform: on Giggly's continuous non-position scales, any transformation on x
   and y (transforms, step 8) (`1b40993`); §4: "`transform:` takes every", "A column of an
   aesthetic other than position", "gradient2's midpoint", "A given limit outside", "A
