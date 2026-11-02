@@ -45,7 +45,9 @@ identity transformation: the entry beginning "A layer records its stat and posit
   middle of its palette (0.55 for alpha); the rescale palette calls the same function. **A scale's
   `rescaler` says how a value is placed, as ggplot2's scale holds its rescaler** (design-log §4,
   the entry beginning "A scale's `rescaler`"): `:rescale`, by `rescale()`; `{:mid, midpoint}`, by
-  R's `rescale_mid()` (`Scales.Bounds.rescale_mid/4`), as gradient2's does; or `:max`, by R's
+  R's `rescale_mid()` (`Scales.Bounds.rescale_mid/4`), as gradient2's does, its midpoint in
+  transformed space, given in data units and transformed by the scale function, as ggplot2's
+  `mid_rescaler()` transforms it (design-log §4, the entry beginning "gradient2's midpoint"); or `:max`, by R's
   `rescale_max()` (`Scales.Bounds.rescale_max/3`), the value over the
   limits' high end, as `scale_size_area()`'s does, so 0 is at 0 and one value at 1, a high end of
   0 placing 0 at `nil`, R's NaN, and raising for any other finite value, which R makes an
@@ -193,8 +195,10 @@ identity transformation: the entry beginning "A layer records its stat and posit
   a function is handed the breaks' values, `nil` among them.
 - **Limits replace the range end by end, and a position outside them goes through the scale's
   `oob`.** Given in data units, they are transformed and, both given, sorted, as ggplot2
-  transforms and sorts them (`Continuous.limits/1`); a given end outside the domain raises, where
-  R fails. An end of `nil` takes the range's (R's `get_limits()`), and with both ends an axis
+  transforms and sorts them (`Continuous.limits/1`); a given end outside the domain is refused
+  by the scale function at the call, and by `limits/1` for a scale built by hand, where R warns
+  and takes the data's end for one turned into NaN and fails for one turned into an infinity
+  (design-log §4, the entry beginning "A given limit outside"). An end of `nil` takes the range's (R's `get_limits()`), and with both ends an axis
   exists before any data. By default, `:censor`, a finite position outside becomes `nil` at both
   maps, `:infinity` and `:neg_infinity` kept, so a bar whose base the limits leave out is missing;
   NaN becomes `nil`, as ggplot2's position map gives `NA` for it, and a discrete scale's positions
@@ -253,7 +257,11 @@ identity transformation: the entry beginning "A layer records its stat and posit
   with its zone and the time zone database that reads it, as R's `transform_time(tz)` holds its
   zone (design-log §4, the entry beginning "A time zone's database is passed on the scale"), a
   plot's naming its zone and database; `new(:time)` records `:time`; a plot's scale may name
-  `:log10`, `:sqrt`, `:reverse` or `:reciprocal`. A discrete scale has none, as in ggplot2, and
+  any transformation of numbers `Scales.Transform` names, a composition or a user's own among
+  them, on an axis and on a continuous scale of colour, fill, alpha, size or line width alike
+  (design-log §4, the entries beginning "`transform:` takes every" and "`transform:` reaches"),
+  the scale training, breaking, placing and sampling its colour bar in transformed space and
+  labelling in data units; a binned scale takes none. A discrete scale has none, as in ggplot2, and
   `transform/2` returns its values as given.
 - **A date-time scale's zone is the one a plot gave it, else its first column's**
   (`settle_zone/2`), as ggplot2's takes the first column's `tzone` when given none: `:default`

@@ -290,13 +290,14 @@ defmodule Giggly.Assembly do
 
     transformed_data =
       Enum.map(grouped_data, fn frame ->
-        through_scales(
-          frame,
+        frame
+        |> through_scales(
           {untrained_x_scales, x_routes},
           {untrained_y_scales, y_routes},
           &Scale.transform/2,
           categories(frame)
         )
+        |> through_transformations(plot, DataFrame.names(frame))
       end)
 
     x_scales = train(untrained_x_scales, x_routes, :x, transformed_data, :levels)
@@ -984,8 +985,38 @@ defmodule Giggly.Assembly do
       statistic
       |> put_column(column)
       |> through_axis(aesthetic, source, {layer_at, scale_kinds}, axes)
+      |> through_transformations(plot, [aesthetic])
     end)
   end
+
+  # The frame with each column `names` holds of an aesthetic other than position put through its
+  # plot's scale's transformation (`Scale.transform/2`), as ggplot2 transforms every scale's
+  # columns before the stat and the columns a stat computes after it, so a stat counting distinct
+  # values counts two a logarithm makes NaN as one: a column of numbers alone, any other left for
+  # its scale to refuse once chosen. A default scale's transformation is the identity.
+  defp through_transformations(frame, %Plot{scales: scales}, names) do
+    dtypes = DataFrame.dtypes(frame)
+
+    names
+    |> Enum.filter(fn name -> transformed?(Map.get(scales, name), name, dtypes) end)
+    |> Enum.reduce(frame, fn aesthetic, transformed ->
+      values = DataFrame.pull(transformed, aesthetic)
+
+      scales
+      |> Map.fetch!(aesthetic)
+      |> Scale.transform(values)
+      |> then(fn positions -> DataFrame.put(transformed, aesthetic, positions) end)
+    end)
+  end
+
+  # Whether the column `name` goes through `scale`'s transformation: a column of numbers of an
+  # aesthetic other than position whose scale is continuous, the identity leaving it as it is.
+  defp transformed?(%Scale.Continuous{}, name, dtypes) do
+    dtype = Map.fetch!(dtypes, name)
+    name in Scale.non_position_aesthetics() and Scale.kind(dtype) == :continuous
+  end
+
+  defp transformed?(_scale, _name, _dtypes), do: false
 
   defp put_column(frame, {name, values}), do: DataFrame.put(frame, name, values)
 

@@ -379,7 +379,7 @@ defmodule Giggly.Plot do
   }
 
   alias Giggly.Plot.{Layer, Options}
-  alias Scales.{ColorOperations, Palette}
+  alias Scales.{ColorOperations, Palette, Transform}
 
   @enforce_keys [
     :data,
@@ -1763,7 +1763,7 @@ defmodule Giggly.Plot do
     layer = %Layer{
       geom: kind,
       stat: summary_stat(validated),
-      position: position(Keyword.get(validated, :position, :identity)),
+      position: position(Keyword.fetch!(validated, :position)),
       data: data,
       mapping: resolve(mapping, plot, data, "Plot.stat_summary/3"),
       fixed: fixed(validated),
@@ -2793,7 +2793,7 @@ defmodule Giggly.Plot do
       ...>   |> Giggly.Plot.facet_wrap(:cyl, labeller: :both)
       ...>   |> Giggly.to_svg()
       ...>   |> IO.iodata_to_binary()
-      iex> Enum.map(["cyl: 4", "cyl: 6"], fn label -> svg =~ ">\#{label}</text>" end)
+      iex> Enum.map(["cyl: 4", "cyl: 6"], fn label -> svg =~ ">" <> label <> "</text>" end)
       [true, true]
 
   #{@labeller_doc}
@@ -3776,7 +3776,7 @@ defmodule Giggly.Plot do
       options,
       Options.gradient2_scale(),
       "Plot.scale_color_gradient2/2",
-      &gradient2_scale/1
+      fn validated -> gradient2_scale(validated, "Plot.scale_color_gradient2/2") end
     )
   end
 
@@ -3804,7 +3804,7 @@ defmodule Giggly.Plot do
       options,
       Options.gradient2_scale(),
       "Plot.scale_fill_gradient2/2",
-      &gradient2_scale/1
+      fn validated -> gradient2_scale(validated, "Plot.scale_fill_gradient2/2") end
     )
   end
 
@@ -5041,9 +5041,18 @@ defmodule Giggly.Plot do
   defp limits_scale(aesthetic, limits) do
     {schema, scale_of} = limited_scale(aesthetic, limits)
 
-    [limits: limits]
+    limits
+    |> limits_options()
     |> NimbleOptions.validate!(schema)
     |> scale_of.()
+  end
+
+  # A scale's options for `limits` alone, two numbers high to low reversing it, as an axis's do.
+  defp limits_options(limits) do
+    case limits_transform(limits) do
+      :reverse -> [limits: limits, transform: :reverse]
+      :identity -> [limits: limits]
+    end
   end
 
   defp limited_scale(:alpha, values) when is_list(values),
@@ -6699,7 +6708,6 @@ defmodule Giggly.Plot do
     given =
       plot
       |> computed_mapping(layer)
-      |> Map.merge(layer.fixed)
       |> Map.keys()
 
     along = range_along(orientation, given)
@@ -6992,7 +7000,9 @@ defmodule Giggly.Plot do
     validated = NimbleOptions.validate!(options, Options.continuous_scale())
     check_scale_labels(validated, function)
     check_wanted_beside(options, function)
-    check_n_breaks(validated, Keyword.get(validated, :transform, :identity), function)
+    transform = Keyword.get(validated, :transform, :identity)
+    check_n_breaks(validated, transform, function)
+    check_limits_domain(validated, transform, function)
     put_scale(plot, aesthetic, struct!(Scale.Continuous, validated))
   end
 
@@ -7003,6 +7013,7 @@ defmodule Giggly.Plot do
     check_scale_labels(validated, function)
     check_wanted_beside(options, function)
     check_n_breaks(validated, transform, function)
+    check_limits_domain(validated, transform, function)
     put_scale(plot, aesthetic, struct!(Scale.Continuous, [{:transform, transform} | validated]))
   end
 
@@ -7090,9 +7101,10 @@ defmodule Giggly.Plot do
     put_scale(plot, aesthetic, scale)
   end
 
-  defp check_labels(%Scale.Continuous{}, validated, function) do
+  defp check_labels(%Scale.Continuous{transform: transform}, validated, function) do
     check_scale_labels(validated, function)
-    check_n_breaks(validated, :identity, function)
+    check_n_breaks(validated, transform, function)
+    check_limits_domain(validated, transform, function)
   end
 
   defp check_labels(%Scale.Discrete{}, validated, function),
@@ -7285,10 +7297,22 @@ defmodule Giggly.Plot do
 
   defp gradient_scale(validated), do: gradient_through(validated, [:low, :high])
   # A diverging scale, each value placed by its distance from the midpoint, ggplot2's
-  # `rescale_mid()`.
-  defp gradient2_scale(validated) do
+  # `rescale_mid()`, the midpoint given in data units and transformed, as ggplot2's
+  # `mid_rescaler()` transforms it. One outside the transformation's domain is refused, where
+  # ggplot2 warns and colours every value its missing one.
+  defp gradient2_scale(validated, function) do
     {midpoint, options} = Keyword.pop!(validated, :midpoint)
-    gradient_through([{:rescaler, {:mid, midpoint}} | options], [:low, :mid, :high])
+    transform = Keyword.get(options, :transform, :identity)
+
+    case Transform.transform(transform, [midpoint]) do
+      [position] when is_number(position) ->
+        gradient_through([{:rescaler, {:mid, position}} | options], [:low, :mid, :high])
+
+      _outside ->
+        raise ArgumentError,
+              "#{function}'s midpoint, #{inspect(midpoint)} (0.0 when not given), falls " <>
+                "outside #{in_domain(transform)}; give midpoint: a value inside it"
+    end
   end
 
   # A continuous colour scale with a gradient through the colours of the options `names`, in that
@@ -7428,19 +7452,76 @@ defmodule Giggly.Plot do
 
   defp given_breaks(:error), do: "and it has none"
 
-  # Extended breaks, every transformation's on a continuous scale but log10's, need two or more
-  # wanted, as R's search finds none for one and fails.
-  defp check_n_breaks(validated, transform, function) do
-    case {Keyword.fetch(validated, :n_breaks), Keyword.get(validated, :breaks, :default)} do
-      {{:ok, 1}, :default} when transform != :log10 ->
-        raise ArgumentError,
-              "#{function} is given n_breaks: 1, and the breaks it chooses need 2 or more " <>
-                "wanted, as a log axis's do not"
+  # A logarithm in any base, whose breaks are `Scales.Breaks.log/2`'s.
+  defguardp is_logarithm(transform)
+            when transform in [:log, :log2, :log10] or
+                   (is_tuple(transform) and elem(transform, 0) == :log)
 
-      _wanted ->
+  # A number of breaks wanted reaches the transformation's own breaks, a composition's first
+  # part's: a span of time's count none, as R's ignore `n.breaks` with a warning, and extended
+  # breaks, every built-in transformation's but a logarithm's, need two or more wanted, as R's
+  # search finds none for one and fails. A transformation of a user's own breaks as its function
+  # does.
+  defp check_n_breaks(validated, transform, function) do
+    check_wanted(
+      Keyword.fetch(validated, :n_breaks),
+      Keyword.get(validated, :breaks, :default),
+      first_part(transform),
+      function
+    )
+  end
+
+  defp check_wanted({:ok, _wanted}, :default, first, function)
+       when first == :timespan or (is_tuple(first) and elem(first, 0) == :timespan) do
+    raise ArgumentError,
+          "#{function} is given n_breaks: beside transform: #{inspect(first)}, whose breaks " <>
+            "count no number; give breaks: Scales.Breaks.timespan/2's, which takes one, or leave " <>
+            "n_breaks: out"
+  end
+
+  defp check_wanted({:ok, 1}, :default, first, function)
+       when not is_logarithm(first) and not is_struct(first, Transform) do
+    raise ArgumentError,
+          "#{function} is given n_breaks: 1, and the breaks it chooses need 2 or more " <>
+            "wanted, as a log axis's do not"
+  end
+
+  defp check_wanted(_wanted, _breaks, _first, _function), do: :ok
+
+  # The transformation whose breaks a scale's are: a composition's first part's, as
+  # `Scales.Transform` breaks a composition.
+  defp first_part({:compose, [first | _rest]}), do: first_part(first)
+  defp first_part(transform), do: transform
+
+  # Limits are given in data units and placed transformed, so an end outside the transformation's
+  # domain, turned into no number, is refused, where ggplot2 warns and takes the data's end for
+  # one turned into NaN, and fails for one turned into an infinity.
+  defp check_limits_domain(validated, transform, function) do
+    {low, high} = limits = Keyword.get(validated, :limits, {nil, nil})
+
+    [low, high]
+    |> Enum.zip_with(Transform.transform(transform, [low, high]), fn given, position ->
+      {given, position}
+    end)
+    |> Enum.find(fn {given, position} -> not is_nil(given) and not is_number(position) end)
+    |> case do
+      nil ->
         :ok
+
+      {outside, _position} ->
+        raise ArgumentError,
+              "#{function} is given limits: #{inspect(limits)}, and #{inspect(outside)} falls " <>
+                "outside #{in_domain(transform)}, where it cannot be placed"
     end
   end
+
+  # A transformation's domain in words, for a refusal: its name and the domain in data units.
+  defp in_domain(%Transform{name: name} = transform),
+    do: "the #{inspect(name)} transformation's domain, #{inspect(Transform.domain(transform))}"
+
+  defp in_domain(transform),
+    do:
+      "the #{inspect(transform)} transformation's domain, #{inspect(Transform.domain(transform))}"
 
   # A number of breaks wanted, given among `options`, is read by the transformation's breaks or by
   # a breaks function of two arguments, so it is refused beside breaks that want none, as R

@@ -33,8 +33,8 @@ square root and reverse scales are shortcuts for common transformations. Giggly 
 functions, `Giggly.Plot.scale_x_continuous/2` and the rest, with their titles, limits, breaks and
 minor breaks, each also a function of the limits, a number of breaks (`n_breaks:`), labels,
 expansion and transformations, breaks functions in `Scales.Breaks` and `Scales.MinorBreaks`, and
-formatters for labels in `Scales.Labels`; it has no `sec.axis` option (`sec_axis()`), and no
-transformation of your own (`scales::new_transform()`). A plot is described with `Giggly.Plot` and
+formatters for labels in `Scales.Labels`, and a transformation of your own
+(`Scales.Transform.new/2`); it has no `sec.axis` option (`sec_axis()`). A plot is described with `Giggly.Plot` and
 drawn with `Giggly.to_svg/2`, which returns an SVG document. The setup cell aliases `Giggly.Plot`,
 so the cells write `Plot.new/2`, and defines `render`, which draws a plot and shows it below the
 cell with `Kino.Image`. The cells draw `Giggly.Datasets.mpg/0`, ggplot2's `mpg`: fuel economy for
@@ -257,9 +257,9 @@ p1 + scale_y_continuous(transform = scales::transform_reciprocal())
 # You can also create your own. See ?scales::new_transform
 ```
 
-Giggly names a transformation by an atom, `:identity`, `:log10`, `:sqrt`, `:reverse` or
-`:reciprocal`, where R takes the scales package's objects; it has none of the package's others,
-and makes none of your own.
+Giggly names a transformation, `:reciprocal` here, where R takes the scales package's objects:
+every one of `Scales.Transform`'s, a composition such as `{:compose, [:log10, :reverse]}`, or one
+of your own from `Scales.Transform.new/2`.
 
 ```elixir
 p1

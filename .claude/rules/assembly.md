@@ -26,8 +26,11 @@ numbered: the entry beginning "Group ids follow ggplot2's".
   panels out from the plot's data and every layer's table and assigns `panel` to each layer's
   table, raw → each layer's mapping is evaluated (`Giggly.Mapping.evaluate/2`), an after_stat
   left for after the stat (`Mapping.stage/1`) → `Group.add/2` writes `group` →
-  transform scales → train position scales → map positions to numeric (not to the unit panel) →
-  stat → `after_stat` → the positions a layer sets into every row (a rectangle's set corners, as
+  transform scales (the positions, and every other aesthetic's column of numbers whose plot's
+  scale is continuous, `through_transformations/3`) → train position scales → map
+  positions to numeric (not to the unit panel) → stat → `after_stat`, each column it computes
+  transformed as those before it, so a stat counting distinct values sees them transformed, as
+  ggplot2's `transform_df()` and `map_statistic()` transform them → the positions a layer sets into every row (a rectangle's set corners, as
   ggplot2's `GeomRect$setup_data()` fills them in), and the width or height it sets where its
   table has none, as `compute_data_size()` reads a row's size before its parameter (a stat writing a width
   takes the set one as its own, as `stat_count()` and `stat_boxplot()` do) → geom reparameterize

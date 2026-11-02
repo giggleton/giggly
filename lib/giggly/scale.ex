@@ -41,8 +41,9 @@ defmodule Giggly.Scale do
   # trains on them (`Scales.Transform`), so it trains, and maps, in transformed space. A
   # continuous scale of numbers records the identity, as ggplot2's continuous scales default to
   # `transform = "identity"`: an untransformed axis says so rather than leaving it out. A date
-  # scale records the date transformation, and a plot's scale may name log10, square root,
-  # reverse or reciprocal; a date-time scale and a time scale record theirs. Its limits, breaks
+  # scale records the date transformation, and a plot's scale may name any transformation of
+  # numbers, for an axis or for an aesthetic other than position, whose columns the assembly puts
+  # through it before the stat; a date-time scale and a time scale record theirs. Its limits, breaks
   # and minor breaks are given in data units and put through the transformation here; its labels
   # are written from the breaks turned back. A discrete scale has no transformation, as in
   # ggplot2.

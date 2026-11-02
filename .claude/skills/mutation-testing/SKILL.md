@@ -54,6 +54,11 @@ What matters for reading its report:
 - **Every mutant meets the whole suite**, to its first failure, so none survives a test that was
   never selected for it. A test file that can no longer load because the code it calls while
   compiling raised has killed the mutant.
+- **A file must compile as muex prints it**: every mutant is compiled from muex's print of the
+  file's syntax tree, so each worker first compiles the unmutated print, and stops naming the file
+  and the error where it fails (an escaped interpolation, `\#{...}`, in a doctest is printed
+  unescaped); a file reading a call with arguments while compiling is recompiled from disk for
+  each mutant it reaches, but never the mutated file itself.
 - **A line no test runs** is found by one `:cover` run per worker, and its mutants are reported
   `no_coverage` without running.
 - **A mutant that runs past 60 seconds** is reported `timeout`, and its worker carries on in a

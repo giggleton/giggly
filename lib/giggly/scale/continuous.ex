@@ -12,8 +12,9 @@ defmodule Giggly.Scale.Continuous do
       being the time zone its breaks are laid and written in, `:default` until its first column
       gives it one, or `:naive` for naive date-times, and `database` the
       `Calendar.TimeZoneDatabase` that reads it; `:time` for times of day, which it sees as
-      seconds since midnight; or `:log10`, `:sqrt`, `:reverse` (each value negated) or
-      `:reciprocal`, as a plot's scale names one.
+      seconds since midnight; or any other transformation of numbers `Scales.Transform` names,
+      `:log10`, `:reverse` (each value negated), a composition or one of a user's own among them,
+      as a plot's scale names one, on an axis or on any other aesthetic.
     * `palette`: what turns a value's place in its limits into its aesthetic's value: `:identity`
       for a position, left for the coordinate system to place; `{:rescale, {low, high}}` for an
       aesthetic such as alpha or line width, each place, from 0 to 1, rescaled onto `low` to
@@ -26,8 +27,9 @@ defmodule Giggly.Scale.Continuous do
       other of `Scales.Palette`'s, such as `{:brewer, %{palette: "Blues", direction: 1}}`, a
       discrete one taken as a gradient through its colours.
     * `rescaler`: how a value's place in the limits is found: `:rescale`, its distance from the
-      low end over the limits' width; `{:mid, midpoint}`, its distance from the midpoint over twice
-      the further end's, so the midpoint is at the middle and the further end at 0 or 1; or `:max`,
+      low end over the limits' width; `{:mid, midpoint}`, its distance from the midpoint, in
+      transformed space, over twice the further end's, so the midpoint is at the middle and the
+      further end at 0 or 1; or `:max`,
       the value over the high end, so 0 is at 0.
     * `na_value`: what a value the palette gives nothing for maps to, a missing one, one `oob`
       leaves missing, or for a colour one left outside the limits or infinite, while an alpha,
@@ -121,15 +123,7 @@ defmodule Giggly.Scale.Continuous do
 
   @type t :: %__MODULE__{
           range: :none | {number(), number()},
-          transform:
-            :identity
-            | :date
-            | {:datetime, String.t() | :default | :naive, module()}
-            | :time
-            | :log10
-            | :sqrt
-            | :reverse
-            | :reciprocal,
+          transform: Transform.name(),
           palette: Palette.t(),
           rescaler: :rescale | {:mid, number()} | :max,
           na_value: nil | number() | String.t() | :none,
@@ -184,7 +178,8 @@ defmodule Giggly.Scale.Continuous do
 
     unless placed?(low, low_position) and placed?(high, high_position) do
       raise ArgumentError,
-            "a scale's limits #{inspect(given)} fall outside its #{name} transformation's domain"
+            "a scale's limits #{inspect(given)} fall outside its #{inspect(name)} " <>
+              "transformation's domain"
     end
 
     sorted(low_position, high_position)

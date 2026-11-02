@@ -149,6 +149,7 @@ defmodule WarmMutation do
 
     log(slice, "#{length(mutants)} mutants to run, #{length(mine)} left in this slice")
     world = warm_up(slice, Map.keys(entries))
+    check_printing(entries, config, world)
 
     for {mutation, index} <- mine do
       started = System.monotonic_time(:millisecond)
@@ -379,6 +380,35 @@ defmodule WarmMutation do
 
   # Puts back what a mutant changed: the modules from _build, a module the mutant added deleted,
   # and the test files compiled again from their source.
+  # Stops the pass where a mutated file does not compile as muex prints it from its syntax tree
+  # unmutated, since every mutant of it would then be reported invalid: an escaped interpolation in
+  # a string, `\#{...}`, is printed unescaped. The modules compiled are loaded back from _build.
+  defp check_printing(entries, config, world) do
+    for {path, entry} <- entries do
+      {:ok, source} = config.language.unparse(entry.ast)
+
+      {result, diagnostics} =
+        Code.with_diagnostics([log: false], fn ->
+          try do
+            {:ok, Code.compile_string(source, Path.join(world.root, path))}
+          rescue
+            error -> {:error, Exception.message(error)}
+          end
+        end)
+
+      case result do
+        {:ok, _modules} ->
+          restore(world, Map.get(world.file_modules, path, []), [])
+
+        {:error, message} ->
+          errors = Enum.map_join(diagnostics, "; ", fn diagnostic -> diagnostic.message end)
+
+          raise "#{path} does not compile as muex prints it, unmutated, so every mutant of it " <>
+                  "would be invalid: #{message}: #{errors}"
+      end
+    end
+  end
+
   defp restore(world, modules, test_files) do
     for module <- modules do
       :code.purge(module)
@@ -460,9 +490,12 @@ defmodule WarmMutation do
   end
 
   # Recompiles each lib reader whose reads the mutant changed, until none changes; a reader that no
-  # longer compiles makes the mutant invalid, as a sandbox's compile would.
+  # longer compiles makes the mutant invalid, as a sandbox's compile would. The mutated file is
+  # never among them: it is compiled from the mutant already, and compiling a reader of a call with
+  # arguments again from disk, as every such reader is, would load the original back and let every
+  # mutant in it survive.
   defp judge_readers(entry, world, mutated) do
-    case recompile_readers(world, mutated, MapSet.new()) do
+    case recompile_readers(world, mutated, MapSet.new([entry.path])) do
       {:invalid, message, touched} ->
         restore(world, touched, [])
         {:invalid, message, []}

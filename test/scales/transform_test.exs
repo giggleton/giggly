@@ -4402,6 +4402,35 @@ defmodule Scales.TransformTest do
       end
     end
 
+    # Golden: ggplot2 4.0.3's colour legend under the cube on 1 to 10,000 (`inc4/step8/kinds.R`),
+    # its breaks' cube roots 2499.999999999999 to 9999.999999999995 in R as here
+    # (`inc4/step8/cuberoot.R`), which `format()` writes `2500` to `10000`, and `plain/1` at 15
+    # digits `2500.00000000000` to `9999.99999999999`
+    test "labels each break turned back rounded to 14 significant digits unless told" do
+      extent = {1.0, 1.0e12}
+      breaks = Transform.breaks(cube(), extent)
+
+      labels = Transform.format(cube(), breaks, extent)
+
+      plain =
+        [labels: &Scales.Labels.plain/1]
+        |> cube()
+        |> Transform.format(breaks, extent)
+
+      assert {breaks, labels, cube().labels} ===
+               {[0.0, 15_625_000_000.0, 125_000_000_000.0, 421_875_000_000.0, 1.0e12],
+                ["0", "2500", "5000", "7500", "10000"], &Scales.Labels.plain_round_tripped/1}
+
+      assert plain ==
+               [
+                 "0.00000000000",
+                 "2500.00000000000",
+                 "5000.00000000000",
+                 "7500.00000000000",
+                 "9999.99999999999"
+               ]
+    end
+
     # ggplot2 hands `n.breaks = 10` to `extended_breaks()`, which takes `n`, and draws -200 to
     # 1000 by 200 on c(0, 1000) under the cube (`inc4/step6/n10.R`); it ignores it, with a
     # warning, for a breaks function without one
@@ -4510,6 +4539,34 @@ defmodule Scales.TransformTest do
                {[1.3028834457097553, 0.65144172285487767, 0.13028834457097555],
                 [0.76752836433134863, 1.6535897336988881, 7.6752836433134872],
                 {4.6415888336127987e-34, :infinity}}
+    end
+  end
+
+  describe "resolved/1" do
+    # A user's function without an infinity's clause fails on a composition's domain, its own
+    # error, never read as an unknown name.
+    test "says whether a name resolves, an unknown one :unknown and a composition's refusal why" do
+      broken =
+        Transform.new("broken",
+          transform: fn value when is_number(value) -> value end,
+          inverse: fn position -> position end
+        )
+
+      assert Enum.map(
+               [:log10, {:log, 3}, {:compose, [:sqrt, :reverse]}, :ln, {:log, 1}, {:compose, []}],
+               &Transform.resolved/1
+             ) == [
+               {:ok, :log10},
+               {:ok, {:log, 3}},
+               {:ok, {:compose, [:sqrt, :reverse]}},
+               {:error, :unknown},
+               {:error, :unknown},
+               {:error, :unknown}
+             ]
+
+      assert {:error, reason} = Transform.resolved({:compose, [:log10, :date]})
+      assert String.starts_with?(reason, "a date, date-time or time transformation comes first")
+      assert_raise FunctionClauseError, fn -> Transform.resolved({:compose, [broken]}) end
     end
   end
 end
