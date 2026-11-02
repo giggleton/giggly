@@ -2649,6 +2649,17 @@ defmodule Giggly.ScaleTest do
       assert_received {:handed, ^values, {:infinity, :neg_infinity}}
     end
 
+    # Golden: ggplot2 4.0.3's `scale_size_continuous(limits = c(10, 30))`, R 4.6.1
+    # (`inc4/step7/aes.txt`): -Inf is NA, its area's square root NaN, and Inf is Inf.
+    test "a size by area from its range gives NaN at minus infinity, which is missing" do
+      scale =
+        Scale.Continuous
+        |> struct!(palette: {:area, {1.0, 6.0}}, guide: :legend, limits: {10.0, 30.0})
+        |> Scale.train([20], :none)
+
+      assert Scale.map(scale, [:neg_infinity, :infinity]) === [nil, :infinity]
+    end
+
     # Golden: ggplot2 4.0.3's `scale_size_area()`, R 4.6.1 (`inc4/step7/aes.txt`): -Inf and Inf
     # are both size Inf, which a point is not drawn at, whatever the limits' high end.
     test "a size by area places an infinite value at an infinity, as its high end of 0 does too" do

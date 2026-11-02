@@ -7827,6 +7827,19 @@ defmodule GigglyTest do
              )
 
       assert error.message =~ "of :infinity"
+
+      below =
+        %{
+          "x" => [1, 2, 3, 4],
+          "y" => [1, 2, 3, 4],
+          "g" => [1, 1, 2, 2],
+          "w" => [1, 2, :neg_infinity, 1]
+        }
+        |> Plot.new(%{x: :x, y: :y, group: :g, linewidth: :w})
+        |> Plot.geom_line()
+
+      error = assert_raise ArgumentError, fn -> Giggly.to_svg(below) end
+      assert error.message =~ "of :neg_infinity"
     end
 
     # Golden: test/golden/point.svg. The data spans x 0 to 10 and y 0 to 50 in columns wt and mpg,

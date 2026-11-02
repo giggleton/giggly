@@ -8534,6 +8534,9 @@ defmodule Giggly.PlotTest do
                  "invalid value for :oob option: expected one of "
                )
 
+        assert error.message =~
+                 ":censor, :censor_any, :squish, :squish_any, :squish_infinite, :keep"
+
         assert error.message =~ "got: #{inspect(oob)}"
       end
     end

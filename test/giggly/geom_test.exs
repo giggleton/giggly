@@ -3578,6 +3578,15 @@ defmodule Giggly.GeomTest do
                draw_panel(%Geom.Point{}, frame, @cartesian, @params)
     end
 
+    test "an alpha given as an integer is an opacity as a float" do
+      frame = DataFrame.new(x: [0.5, 1.0], y: [1.0, 1.0], alpha: [1, 0])
+
+      assert [%Circles{color_opacity: opacities}] =
+               draw_panel(%Geom.Point{}, frame, @cartesian, @params)
+
+      assert opacities === [1.0, +0.0]
+    end
+
     test "a rectangle's fill draws nothing at an infinite alpha" do
       frame =
         DataFrame.new(

@@ -4106,6 +4106,8 @@ tells the story (`git show <hash>`). Until 2026-10-15 each milestone also had a 
 `git log -S "<title>" -- notes/design-log.md` finds it in this file's history. The phases are
 §1's roadmap.
 
+- 2026-11-01 — Take oob: on Giggly's continuous and binned scales (transforms, step 7)
+  (`6b130a1`); §4: "A non-position scale keeps", "A function `oob`", "`oob:` takes a name"
 - 2026-11-01 — Compose transformations and take a user's own (transforms, step 6) (`3409ceb`);
   §4: "A composition is", "A composition's breaks", "A composition's labels", "A composition's
   domain", "A date, date-time or time transformation comes first", "`Transform.new/2` takes", "A
