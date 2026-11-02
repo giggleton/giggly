@@ -3765,7 +3765,7 @@ defmodule Giggly.PlotTest do
       assert along_x.stat.orientation == :x
     end
 
-    test "a violin's look is set for every violin, and its key's ends and corners chosen" do
+    test "a violin's look is set for every violin" do
       [layer] =
         @violin_values
         |> Plot.new(%{x: :g, y: :y})
@@ -3774,14 +3774,11 @@ defmodule Giggly.PlotTest do
           fill: "steelblue",
           alpha: 1,
           linewidth: 2,
-          linetype: 2,
-          lineend: :round,
-          linejoin: :bevel
+          linetype: 2
         )
         |> Map.fetch!(:reversed_layers)
 
       assert %Plot.Layer{
-               geom: %Geom.Violin{line_end: :round, line_join: :bevel},
                fixed: %{
                  color: "#FF0000",
                  fill: "#4682B4",
@@ -3806,6 +3803,19 @@ defmodule Giggly.PlotTest do
 
       assert_raise NimbleOptions.ValidationError, ~r/scale/, fn ->
         Plot.geom_violin(plot, scale: :height)
+      end
+    end
+
+    test "a violin's key takes each of grid's ends and corners" do
+      plot = Plot.new(@violin_values, %{x: :g, y: :y})
+
+      for line_end <- [:butt, :round, :square], line_join <- [:round, :mitre, :bevel] do
+        [layer] =
+          plot
+          |> Plot.geom_violin(lineend: line_end, linejoin: line_join)
+          |> Map.fetch!(:reversed_layers)
+
+        assert layer.geom == %Geom.Violin{line_end: line_end, line_join: line_join}
       end
     end
 
