@@ -90,6 +90,17 @@ deleted from the entry it was in, never marked superseded; git history keeps eve
   the set-size stage already gives it. *Rejected: drawing every violin at the set width*: the
   table would match its drawing, but neither would match R's.
 
+- **A violin's border is always butt-ended and round-cornered, as R draws it (2026-11-02, Steve:
+  "Yes", violins step 3's probe; checked against ggplot2 4.0.3).** `GeomViolin$parameters()` names
+  only `...`, so `draw_layer()` drops the layer's `lineend`, `linejoin` and `linemitre`, and every
+  violin and quantile line takes `GeomPolygon`'s and `GeomPath`'s defaults, butt, round and 10:
+  vdiffr draws `geom_violin(lineend = "square", linejoin = "mitre", linemitre = 3)` identical to
+  `geom_violin()`. Its key keeps them, as `draw_key_polygon()` reads the layer's `lineend` and
+  `linejoin` (butt and mitred unless given), never a mitre limit. So `lineend:` and `linejoin:`
+  shape the keys alone and `linemitre:` is refused, as Giggly refuses what R ignores.
+  *Rejected: honouring them on the violins*, what the options promise: a drawing no ggplot2 user
+  gets. *Rejected: taking `linemitre:` and ignoring it*: an option that silently does nothing.
+
 - **A transformation of your own labels its breaks turned back rounded to 14 significant digits
   unless it says (2026-11-02, Steve: "A", increment 4's step 8; checked against ggplot2 4.0.3).**
   `Transform.new/2` without `labels:` records `&Labels.plain_round_tripped/1`, as logit's and

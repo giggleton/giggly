@@ -1665,6 +1665,27 @@ defmodule Giggly.Plot.Options do
     ]
   ]
 
+  # How a violin layer's legend keys are drawn: the violins themselves are always drawn with butt
+  # ends and round corners, as ggplot2 never hands a violin its layer's `lineend` and `linejoin`,
+  # and no mitre limit is taken, as ggplot2 reads none for a violin or its key.
+  @violin_line_style_options [
+    lineend: [
+      type: {:in, [:butt, :round, :square]},
+      default: :butt,
+      doc:
+        "How the borders of the legend's keys end: cut square at the end (`:butt`), rounded " <>
+          "(`:round`), or cut square half the line's width beyond it (`:square`); the violins' " <>
+          "own borders are always cut square at the end."
+    ],
+    linejoin: [
+      type: {:in, [:round, :mitre, :bevel]},
+      default: :mitre,
+      doc:
+        "How the borders of the legend's keys turn a corner: pointed (`:mitre`), rounded " <>
+          "(`:round`) or cut off (`:bevel`); the violins' own borders always turn rounded."
+    ]
+  ]
+
   # `geom_violin/3`'s and `stat_ydensity/3`'s options, validated at the call: how each group's
   # densities are estimated and scaled, where its violin stands, and how it looks.
   @violin_options NimbleOptions.new!(
@@ -1729,7 +1750,7 @@ defmodule Giggly.Plot.Options do
                         ]
                       ] ++
                       @violin_look_options ++
-                      @stat_density_line_style_options ++ @nudge_options
+                      @violin_line_style_options ++ @nudge_options
                   )
 
   # `geom_smooth/3`'s and `stat_smooth/3`'s options, validated at the call: how each curve is

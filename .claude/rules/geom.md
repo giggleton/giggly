@@ -429,8 +429,11 @@ beginning "Each layer's defaults are filled in from the theme".
   `violinwidth` of the way from x to `xmin` or `xmax`, placed and munched as one path, as
   `GeomPolygon` munches a closed outline, a point missing a coordinate splitting it, each run of
   two points or more drawn. It takes its look from its first row: its fill at its alpha, its border
-  in its colour, width and line type, left off where no line would draw; its corners round where
-  the layer gives none and its key's mitred, as `draw_key_polygon()` falls back. Its defaults are
+  in its colour, width and line type, left off where no line would draw; **its border always butt,
+  round and limited at 10, `GeomPolygon`'s defaults, whatever the layer gives**, as ggplot2's
+  `draw_layer()` drops a violin's `lineend` and `linejoin` (its `parameters()` name only `...`),
+  while its key takes them, as `draw_key_polygon()` reads the layer's, mitred and butt unless
+  given (design-log §4, the entry beginning "A violin's border is always"). Its defaults are
   ggplot2's under the theme: a weight of 1, ink mixed 20% toward paper (`#333333`), a fill of
   paper, the borders' width and line type; its key is `Rect.polygon_key/3`'s. Every drawing is
   checked against vdiffr's (`test/golden/violin*.svg`), radial coordinates included.

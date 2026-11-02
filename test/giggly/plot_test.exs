@@ -3649,7 +3649,7 @@ defmodule Giggly.PlotTest do
 
       assert plot.reversed_layers == [
                %Plot.Layer{
-                 geom: %Geom.Violin{line_end: :butt, line_join: :none, mitre_limit: 10.0},
+                 geom: %Geom.Violin{line_end: :butt, line_join: :mitre},
                  stat: %Stat.Ydensity{
                    bandwidth: :nrd0,
                    adjust: 1.0,
@@ -3765,7 +3765,7 @@ defmodule Giggly.PlotTest do
       assert along_x.stat.orientation == :x
     end
 
-    test "a violin's look is set for every violin, and its border's ends and corners chosen" do
+    test "a violin's look is set for every violin, and its key's ends and corners chosen" do
       [layer] =
         @violin_values
         |> Plot.new(%{x: :g, y: :y})
@@ -3776,13 +3776,12 @@ defmodule Giggly.PlotTest do
           linewidth: 2,
           linetype: 2,
           lineend: :round,
-          linejoin: :mitre,
-          linemitre: 3
+          linejoin: :bevel
         )
         |> Map.fetch!(:reversed_layers)
 
       assert %Plot.Layer{
-               geom: %Geom.Violin{line_end: :round, line_join: :mitre, mitre_limit: 3.0},
+               geom: %Geom.Violin{line_end: :round, line_join: :bevel},
                fixed: %{
                  color: "#FF0000",
                  fill: "#4682B4",
@@ -3807,6 +3806,21 @@ defmodule Giggly.PlotTest do
 
       assert_raise NimbleOptions.ValidationError, ~r/scale/, fn ->
         Plot.geom_violin(plot, scale: :height)
+      end
+    end
+
+    # ggplot2 4.0.3's `GeomViolin` reads no `linemitre`: `draw_layer()` drops it, as its
+    # `parameters()` name only `...`, and `draw_key_polygon()` never reads one.
+    test "a violin takes no mitre limit" do
+      plot = Plot.new(@violin_values, %{x: :g, y: :y})
+
+      for function <- [:geom_violin, :stat_ydensity] do
+        error =
+          assert_raise NimbleOptions.ValidationError, fn ->
+            apply(Plot, function, [plot, [linemitre: 4]])
+          end
+
+        assert error.key in [:linemitre, [:linemitre]]
       end
     end
 

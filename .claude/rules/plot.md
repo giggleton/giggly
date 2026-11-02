@@ -120,7 +120,8 @@ stat and position" and "Each facet, coordinate system, geom, stat and position i
   `:width`), `quantiles:` (a list of probabilities from 0 to 1, each a float, or `:none`,
   `validate_quantiles/1`), `drop:`, `width:` and `orientation:` the stat's, `width:` also set, so
   the assembly fills it where the stat wrote none and puts it into the table last, as R's
-  `aes_params` do; the geom's corners `:none` unless `linejoin:` gives them.
+  `aes_params` do; `lineend:` (`:butt`) and `linejoin:` (`:mitre`) the geom's, which only its
+  keys read, and no `linemitre:`, which ggplot2 reads nowhere for a violin.
   **`stat_summary/3` records `%Stat.Summary{}` with the geom `geom:` names and the position that
   geom's function takes, `:identity` unless given** (design-log §4, the entry beginning
   "`stat_summary/3` draws with eight geoms"): `fun_data:`, `fun:`, `fun_min:`, `fun_max:` and

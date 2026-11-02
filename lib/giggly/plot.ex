@@ -5980,8 +5980,7 @@ defmodule Giggly.Plot do
     layer = %Layer{
       geom: %Geom.Violin{
         line_end: Keyword.fetch!(validated, :lineend),
-        line_join: Keyword.get(validated, :linejoin, :none),
-        mitre_limit: Keyword.fetch!(validated, :linemitre)
+        line_join: Keyword.fetch!(validated, :linejoin)
       },
       stat: %Stat.Ydensity{
         bandwidth: Keyword.fetch!(validated, :bw),

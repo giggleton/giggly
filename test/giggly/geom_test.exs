@@ -908,7 +908,7 @@ defmodule Giggly.GeomTest do
   # Golden: ggplot2 4.0.3's keys through vdiffr 1.0.9 (R 4.6.1), a 17.28-point key: a point at its
   # middle, and a bar's fill 15.86 points square, its border's 0.5 mm short of the key.
   describe "setup_data/3, draw_panel/5 and draw_key/3 for violins" do
-    @violin %Geom.Violin{line_end: :butt, line_join: :none, mitre_limit: 10.0}
+    @violin %Geom.Violin{line_end: :butt, line_join: :mitre}
 
     # A violin's rows as its densities and setup leave them, at x 1 in a room from 0.5 to 1.5, in
     # one panel, group 1 unless given, with `columns` in place of its own or beside them.
@@ -1079,17 +1079,20 @@ defmodule Giggly.GeomTest do
       assert width === 0.0
     end
 
-    test "a violin's corners are round where the layer gives none, its ends and mitre its own" do
+    # vdiffr: `geom_violin(lineend = "square", linejoin = "mitre", linemitre = 3)` draws the same
+    # SVG as `geom_violin()`, every border butt, round and limited at 10.
+    test "a violin's border is cut square and rounded whatever ends and corners its layer gives" do
       frame = violin_rows(y: [1.0, 2.0], violinwidth: [1.0, 1.0])
-      [rounded] = draw_panel(@violin, frame, @cartesian, @params)
-      geom = %{@violin | line_end: :round, line_join: :bevel, mitre_limit: 4.0}
-      [given] = draw_panel(geom, frame, @cartesian, @params)
 
-      assert {rounded.line_end, rounded.line_join, rounded.mitre_limit} == {:butt, :round, 10.0}
-      assert {given.line_end, given.line_join, given.mitre_limit} == {:round, :bevel, 4.0}
+      [drawn] =
+        draw_panel(%{@violin | line_end: :square, line_join: :bevel}, frame, @cartesian, @params)
+
+      assert {drawn.line_end, drawn.line_join, drawn.mitre_limit} == {:butt, :round, 10.0}
     end
 
-    test "a violin's key is a rectangle's, mitred where the layer gives no corners" do
+    # vdiffr: `geom_violin(aes(fill = factor(cyl)), lineend = "round", linejoin = "bevel")` keys
+    # each fill bevelled, where the default keys them mitred.
+    test "a violin's key is a rectangle's, its ends and corners the layer's" do
       [mitred] = draw_key(@violin, %{fill: "#FF0000"})
       [bevelled] = draw_key(%{@violin | line_join: :bevel, line_end: :round}, %{})
 

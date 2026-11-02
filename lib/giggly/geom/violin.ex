@@ -3,11 +3,12 @@ defmodule Giggly.Geom.Violin do
 
   # Violins, ggplot2's `GeomViolin`, which `geom_violin()` draws with: for each group a polygon round
   # its densities (`Giggly.Stat.Ydensity`), mirrored about its `x`, as wide at each `y` as its
-  # `violinwidth` makes it of the room between its sides. Its parameters are how its border's ends
-  # and corners are drawn (`line_end`, `line_join`, `mitre_limit`, ggplot2's
-  # `lineend`, `linejoin` and `linemitre`), its corners `:none` where the layer gives it none,
-  # drawn round, as ggplot2's `GeomPolygon` draws them, and keyed mitred, as `draw_key_polygon()`
-  # draws a key whose layer has no `linejoin`. Use it through `Giggly.Geom`.
+  # `violinwidth` makes it of the room between its sides. Its parameters are how its legend key's
+  # border ends and turns its corners (`line_end`, `line_join`, ggplot2's `lineend` and
+  # `linejoin`), as `draw_key_polygon()` reads them; the violins themselves are always drawn with
+  # butt ends, round corners and grid's mitre limit, `GeomPolygon`'s defaults, as ggplot2 never
+  # hands a violin its layer's (`GeomViolin$parameters()` names none of them). Use it through
+  # `Giggly.Geom`.
   #
   # Violins use `:x`, `:y`, `:group`, `:weight`, `:width`, `:alpha`, `:color`, `:fill`,
   # `:linetype` and `:linewidth`. What they are drawn from is what the densities write, which no
@@ -42,13 +43,12 @@ defmodule Giggly.Geom.Violin do
 
   alias Giggly.Scene.Polylines
 
-  @enforce_keys [:line_end, :line_join, :mitre_limit]
+  @enforce_keys [:line_end, :line_join]
   defstruct @enforce_keys
 
   @type t :: %__MODULE__{
           line_end: Polylines.line_end(),
-          line_join: :none | Polylines.line_join(),
-          mitre_limit: float()
+          line_join: Polylines.line_join()
         }
 
   # The aesthetics a layer of violins can use, from its own mapping or the plot's, beside those its
@@ -72,6 +72,12 @@ defmodule Giggly.Geom.Violin do
 
     # ggplot2's default violin, its share of the spacing of the x positions.
     @width_share 0.9
+
+    # How every violin's border ends, turns its corners and limits a mitred one, whatever its
+    # layer gives: `GeomPolygon$draw_panel()`'s defaults, which ggplot2's violins always take.
+    @line_end :butt
+    @line_join :round
+    @mitre_limit 10.0
 
     # ggplot2's `GeomViolin$default_aes`, in its order, as far as Giggly draws a violin: a weight of
     # 1, the theme's ink mixed toward its paper, a fill of its paper, its borders' width and line
@@ -145,7 +151,7 @@ defmodule Giggly.Geom.Violin do
 
     # Each violin, in the order of their groups, drawn whole before the next.
     @impl Giggly.Geom
-    def draw_panel(geom, frame, coord, panel_params, _installed_fonts) do
+    def draw_panel(_geom, frame, coord, panel_params, _installed_fonts) do
       flipped = flipped?(frame)
 
       frame
@@ -155,7 +161,7 @@ defmodule Giggly.Geom.Violin do
       |> Enum.group_by(fn row -> row.group end)
       |> Enum.sort_by(fn {group, _rows} -> group end)
       |> Enum.flat_map(fn {_group, violin_rows} ->
-        violin(geom, violin_rows, {flipped, coord, panel_params})
+        violin(violin_rows, {flipped, coord, panel_params})
       end)
     end
 
@@ -187,7 +193,7 @@ defmodule Giggly.Geom.Violin do
     end
 
     # A violin's polygon, in its first row's look, each run of its outline's placed points drawn.
-    defp violin(geom, [first | _rest] = violin_rows, placing) do
+    defp violin([first | _rest] = violin_rows, placing) do
       pieces =
         violin_rows
         |> outline()
@@ -198,7 +204,7 @@ defmodule Giggly.Geom.Violin do
 
       case pieces do
         [] -> []
-        pieces -> [polygon(geom, pieces, first)]
+        pieces -> [polygon(pieces, first)]
       end
     end
 
@@ -245,7 +251,7 @@ defmodule Giggly.Geom.Violin do
 
     # A violin's polygon: filled with its fill at its alpha and bordered in its colour, width and
     # line type, a border no line draws left off, as a colour of `:none` leaves it.
-    defp polygon(geom, pieces, look) do
+    defp polygon(pieces, look) do
       width = look.linewidth || 0.0
       drawn = is_number(look.linewidth) and look.linetype != :none
       border = if drawn, do: look.color, else: :none
@@ -264,24 +270,17 @@ defmodule Giggly.Geom.Violin do
         fill: each.(fill),
         fill_opacity: each.(fill_opacity),
         dashes: Mark.dashes(look.linetype, width),
-        line_end: geom.line_end,
-        line_join: drawn_join(geom.line_join),
-        mitre_limit: geom.mitre_limit
+        line_end: @line_end,
+        line_join: @line_join,
+        mitre_limit: @mitre_limit
       }
     end
 
-    # How a violin's corners are drawn: as its layer gives them, or round where it gives none.
-    defp drawn_join(:none), do: :round
-    defp drawn_join(line_join), do: line_join
-
-    # A legend's key, ggplot2's `draw_key_polygon()`, its corners and ends the layer's, its corners
-    # mitred where the layer gives none, and the room it needs, a rectangle's.
+    # A legend's key, ggplot2's `draw_key_polygon()`, its corners and ends the layer's, and the
+    # room it needs, a rectangle's.
     @impl Giggly.Geom
     def draw_key(geom, key, _installed_fonts),
-      do: Rect.polygon_key(key, geom.line_end, key_join(geom.line_join))
-
-    defp key_join(:none), do: :mitre
-    defp key_join(line_join), do: line_join
+      do: Rect.polygon_key(key, geom.line_end, geom.line_join)
 
     @impl Giggly.Geom
     def key_size(_geom, key, installed_fonts), do: Geom.key_size(%Rect{}, key, installed_fonts)
