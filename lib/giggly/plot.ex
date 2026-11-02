@@ -2308,6 +2308,95 @@ defmodule Giggly.Plot do
   end
 
   @doc """
+  Adds a layer of violins: for each group, a density of its `y` mirrored about its `x`, a compact
+  view of its distribution, drawn where a box plot would draw its box.
+
+  Each violin's outline is a kernel density estimate of its group's `y`, worked out as
+  `geom_density/3` works one out, its bandwidth from every row of the group: a kernel, a normal
+  curve unless `kernel:` says otherwise, put at each row and summed, its spread `bw:` times
+  `adjust:`, each row weighing as its `:weight` where one is mapped. A violin spans its own group's
+  extent, at 512 evenly spaced places, unless `trim: false` lets its tails reach three bandwidths
+  past it, and `bounds:` folds back what lies beyond a finite bound. Each violin is as wide at a
+  place as its density there makes it beside the panel's greatest, so every violin has the same
+  area, unless `scale:` says otherwise; it stands at its group's `x`, or the middle of its group's
+  `x` values where they are several, in a room 0.9 times the closest spacing of the `x` positions
+  wide, counting from zero, or 0.9 of the range of those values, or as wide as its group's mapped
+  `:width`, or as `width:` says. A row missing its `x`, `y` or weight, or at an infinite one, is
+  left out; a group of fewer than two rows is left out too, unless `drop: false` keeps it as room
+  for a position. A panel where some group's weight is below 0 is drawn nothing.
+
+  Violins stand along the discrete one of `x` and `y`, so mapping a discrete `y` beside a numeric
+  `x` draws horizontal violins; where both are continuous they stand along the axis on which every
+  group holds one value, or else along `x`, each group a violin. `orientation:` says which.
+  Violins sharing a position are set side by side, as `position:` says.
+
+  Violins use `:x`, `:y`, `:group`, `:weight`, `:width`, `:alpha`, `:color`, `:fill`,
+  `:linetype` and `:linewidth`, and need `:x` and `:y`. A look reaches a violin from its group's
+  first row, so a discrete one groups the rows and gives each group its own violin. Each is
+  bordered in the theme's ink mixed 20% toward its paper and filled with its paper unless a look
+  is mapped or set.
+
+  Given a `quantile_linetype:`, each violin is drawn with a line across it at each of the
+  quantiles of its group's `y` its densities mark (`quantiles:`, its quartiles unless given), side
+  to side at the violin's width there, from its lowest to its highest; each line in its quantile's
+  row's colour, at its alpha, and width unless `quantile_color:` and `quantile_linewidth:` give
+  them. Every border and line is drawn with butt ends and round corners; `lineend:` and
+  `linejoin:` draw the legend's keys.
+
+  Each group's densities compute each place's `density`; `scaled`, the density over the group's
+  greatest; `count`, the density times its rows; `violinwidth`, how wide the violin is there;
+  `n`, its rows; `width`, its room's width where the stat gives one; and `quantile`, which the
+  rows marking `quantiles:` hold, which a mapping reads with an after_stat (`Giggly.Mapping`).
+
+  ## Options
+
+  #{NimbleOptions.docs(Options.violin())}
+
+      iex> frame =
+      ...>   %{"g" => ["a", "a", "a"], "y" => [1.0, 2.0, 4.0]}
+      ...>   |> Giggly.Plot.new(%{x: :g, y: :y})
+      ...>   |> Giggly.Plot.geom_violin(quantiles: [0.5])
+      ...>   |> Giggly.layer_data()
+      iex> {Giggly.DataFrame.row_count(frame), Enum.at(Giggly.DataFrame.pull(frame, :y), -1)}
+      {513, 2.0}
+  """
+  @spec geom_violin(t(), mapping_argument() | keyword(), keyword()) :: t()
+  def geom_violin(plot, mapping_or_options \\ %{}, options \\ [])
+
+  def geom_violin(%__MODULE__{} = plot, options, []) when is_list(options),
+    do: geom_violin(plot, %{}, options)
+
+  def geom_violin(%__MODULE__{} = plot, mapping, options)
+      when is_map(mapping) and is_list(options),
+      do: violin_layer(plot, mapping, options, "Plot.geom_violin/3")
+
+  @doc """
+  Adds a layer of violins, the same layer `geom_violin/3` adds: each group's densities along `y`,
+  drawn as a violin. It takes `geom_violin/3`'s options, and computes and refuses what it does.
+
+  ## Options
+
+  #{NimbleOptions.docs(Options.violin())}
+
+      iex> frame =
+      ...>   %{"g" => ["a", "a", "a"], "y" => [1.0, 2.0, 4.0]}
+      ...>   |> Giggly.Plot.new(%{x: :g, y: :y})
+      ...>   |> Giggly.Plot.stat_ydensity(quantiles: :none)
+      ...>   |> Giggly.layer_data()
+      iex> {Giggly.DataFrame.row_count(frame), Enum.at(Giggly.DataFrame.pull(frame, :y), 0)}
+      {512, 1.0}
+  """
+  @spec stat_ydensity(t(), mapping_argument() | keyword(), keyword()) :: t()
+  def stat_ydensity(plot, mapping_or_options \\ %{}, options \\ [])
+
+  def stat_ydensity(%__MODULE__{} = plot, options, []) when is_list(options),
+    do: stat_ydensity(plot, %{}, options)
+
+  def stat_ydensity(%__MODULE__{} = plot, mapping, options)
+      when is_map(mapping) and is_list(options),
+      do: violin_layer(plot, mapping, options, "Plot.stat_ydensity/3")
+
+  @doc """
   Adds a layer of text: each row's `label` at its `x` and `y`.
 
   Text is written as it is; a whole number has no decimal point (`21`, not `21.0`), any other
@@ -5887,6 +5976,59 @@ defmodule Giggly.Plot do
     )
     |> check_numbers(layer, function, :weight, "a density spreads each row's weight")
     |> check_runs_along(layer, validated, function, "estimate")
+  end
+
+  # The layer `geom_violin/3` and `stat_ydensity/3` add, each group's densities along y drawn as a
+  # violin, its mistakes named as `function`'s.
+  defp violin_layer(plot, mapping, options, function) do
+    validated = layer_options(options, Options.violin())
+    data = own_data(validated)
+
+    layer = %Layer{
+      geom: %Geom.Violin{
+        line_end: Keyword.fetch!(validated, :lineend),
+        line_join: Keyword.fetch!(validated, :linejoin),
+        quantile: quantile_look(validated)
+      },
+      stat: %Stat.Ydensity{
+        bandwidth: Keyword.fetch!(validated, :bw),
+        adjust: Keyword.fetch!(validated, :adjust),
+        kernel: Keyword.fetch!(validated, :kernel),
+        trim: Keyword.fetch!(validated, :trim),
+        bounds: Keyword.fetch!(validated, :bounds),
+        scale: Keyword.fetch!(validated, :scale),
+        quantiles: Keyword.fetch!(validated, :quantiles),
+        drop: Keyword.fetch!(validated, :drop),
+        width: Keyword.get(validated, :width, :none),
+        orientation: Keyword.get(validated, :orientation, :none)
+      },
+      position: position(Keyword.fetch!(validated, :position)),
+      data: data,
+      mapping: resolve(mapping, plot, data, function),
+      fixed: fixed(validated),
+      accepted:
+        Enum.uniq(Stat.Ydensity.accepted_aesthetics() ++ Geom.Violin.accepted_aesthetics()),
+      annotation: false,
+      inherit: true
+    }
+
+    plot
+    |> add_layer(layer, function,
+      required: Stat.Ydensity.required_aesthetics(),
+      computed: Stat.Ydensity.computed_variables(),
+      dropped: Stat.Ydensity.dropped_aesthetics()
+    )
+    |> check_numbers(layer, function, :weight, "a violin spreads each row's weight")
+    |> check_numbers(layer, function, :width, "a violin is drawn as wide as its width")
+  end
+
+  # A violin's quantile lines' look from `geom_violin/3`'s validated options, holding only those
+  # given, the line type always.
+  defp quantile_look(validated) do
+    for {option, look} <- Options.violin_quantile_looks(),
+        Keyword.has_key?(validated, option),
+        into: %{},
+        do: {look, Keyword.fetch!(validated, option)}
   end
 
   # The layer `geom_count/3` and `stat_sum/3` add, points counting the rows at each place, its

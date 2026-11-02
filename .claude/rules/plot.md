@@ -34,10 +34,11 @@ stat and position" and "Each facet, coordinate system, geom, stat and position i
 - **The API is `new/2`, the geom functions (`geom_histogram/3`, `geom_freqpoly/3`,
   `geom_boxplot/3`, `geom_smooth/3`, `geom_density/3`, `geom_segment/3`, `geom_rug/3`,
   `geom_hex/3`, `geom_label/3`, `geom_tile/3`, `geom_raster/3`, `geom_hline/3`, `geom_vline/3`,
-  `geom_abline/3`, `geom_linerange/3`, `geom_pointrange/3`, `geom_errorbar/3` and
-  `geom_crossbar/3` among them),
+  `geom_abline/3`, `geom_linerange/3`, `geom_pointrange/3`, `geom_errorbar/3`,
+  `geom_crossbar/3` and `geom_violin/3` among them),
   `stat_sum/3`, `stat_bin/3`, `stat_bin_hex/3`,
-  `stat_smooth/3`, `stat_density/3`, `stat_summary/3`, `annotate/3`, the facet functions
+  `stat_smooth/3`, `stat_density/3`, `stat_ydensity/3`, `stat_summary/3`, `annotate/3`, the
+  facet functions
   (`facet_wrap/3`, `facet_grid/2`), the coordinate functions (`coord_cartesian/2`,
   `coord_radial/1`), the scale functions (`scale_x_continuous/2`, `scale_y_continuous/2`, their `_log10`, `_sqrt` and `_reverse` shortcuts,
   `scale_x_discrete/2`, `scale_y_discrete/2`, `scale_x_date/2`, `scale_y_date/2`,
@@ -113,6 +114,17 @@ stat and position" and "Each facet, coordinate system, geom, stat and position i
   (`validate_adjust/1`), `kernel:`, one of R's seven by name, `n:`, `trim:`, and `bounds:`, `{low,
   high}`, the low a number or `:neg_infinity`, the high a number or `:infinity`, not below the low
   (`validate_bounds/1`), where R keeps no row for bounds high to low, each number kept as a float.
+  **`geom_violin/3` and `stat_ydensity/3` add one layer, `%Geom.Violin{}` with `%Stat.Ydensity{}`
+  and `%Position.Dodge{}` unless `position:` says otherwise**, as R's two draw alike: `bw:`,
+  `adjust:`, `kernel:` and `bounds:` a density's, `trim:` (true), `scale:` (`:area`, `:count` or
+  `:width`), `quantiles:` (a list of probabilities from 0 to 1, each a float, or `:none`,
+  `validate_quantiles/1`), `drop:`, `width:` and `orientation:` the stat's, `width:` also set, so
+  the assembly fills it where the stat wrote none and puts it into the table last, as R's
+  `aes_params` do; `lineend:` (`:butt`) and `linejoin:` (`:mitre`) the geom's, which only its
+  keys read, and no `linemitre:`, which ggplot2 reads nowhere for a violin; and the quantile lines'
+  look a map in the geom, `quantile_linetype:` (`:blank`, so `:none`, drawing none) always in it,
+  `quantile_color:` (`quantile_colour:`) and `quantile_linewidth:` only where given, R's
+  `quantile.` options underscored, `stat_ydensity/3` taking them too, where R's ignores them.
   **`stat_summary/3` records `%Stat.Summary{}` with the geom `geom:` names and the position that
   geom's function takes, `:identity` unless given** (design-log §4, the entry beginning
   "`stat_summary/3` draws with eight geoms"): `fun_data:`, `fun:`, `fun_min:`, `fun_max:` and
@@ -328,7 +340,8 @@ stat and position" and "Each facet, coordinate system, geom, stat and position i
   `:weight` taken) and `Geom.Hex`'s, and a smooth layer against `Stat.Smooth`'s (`:x` and `:y` needed, `:weight`
   taken) and `Geom.Smooth`'s, which takes no band's ends, its stat writing them, and a density
   layer against `Stat.Density`'s (one of `:x` and `:y` needed and not both, `:weight` taken) and
-  its geom's. **An after_stat,
+  its geom's, and a violin layer against `Stat.Ydensity`'s (`:x` and `:y` needed, `:weight` and
+  `:width` taken) and `Geom.Violin`'s. **An after_stat,
   the layer's own or the plot's, is checked at the call against the variables the layer's stat
   documents** (`Stat.Count.computed_variables/0`; none for a layer that computes nothing, which
   refuses every one), never against the table, and refused for an aesthetic its stat consumes
@@ -362,14 +375,15 @@ stat and position" and "Each facet, coordinate system, geom, stat and position i
   found by sweeping each function against each position in R, and refuses the rest, saying why**
   (design-log §4, the entry beginning "Every layer takes the positions"), by the family of
   positions its option names (`Options.validate_position/2`'s argument): marks with a width of
-  their own (bars, bins, frequency polygons, error bars, crossbars, tiles, rasters, a summary's
-  bars) take every one; marks with none (points, lines, paths, segments, rugs, text, labels, counts,
+  their own (bars, bins, frequency polygons, error bars, crossbars, tiles, rasters, violins, a
+  summary's bars) take every one; marks with none (points, lines, paths, segments, rugs, text,
+  labels, counts,
   line and point ranges, ribbons, areas, densities, smooths, hexagons, a summary's other geoms)
   take `:dodge` and `:dodge2` only with their `width:`, as R warns "Width not defined" and moves
   none; marks with edges, those with a width, box plots and rectangles, refuse dodging by clusters'
   `width:`, which R ignores; and marks that say which way they run, their stat or geom writing
-  `flipped_aes` (bars, bins, frequency polygons, error bars, crossbars, box plots, lines, line and
-  point ranges, ribbons, areas, densities, smooths, every summary), refuse dodging's
+  `flipped_aes` (bars, bins, frequency polygons, error bars, crossbars, box plots, violins, lines,
+  line and point ranges, ribbons, areas, densities, smooths, every summary), refuse dodging's
   `orientation:`, which R ignores (design-log §4, the entry beginning "Dodging takes R's
   options"); a box plot and a rectangle refuse stacking, filling and jittering, R failing at a
   box's missing y and stacking no rectangle, which has no x, and failing to fill one; filling
@@ -378,7 +392,8 @@ stat and position" and "Each facet, coordinate system, geom, stat and position i
   only `:identity` and `:nudge`; a diagonal line and an annotation take no `position:`, as R's
   `geom_abline()` and `annotate()` take none. Each function's default is ggplot2's: stacking for
   bars, bins, areas and `stat_density/3`, nudging for text and labels, dodging by clusters for box
-  plots, jittering for `geom_jitter/3`, the identity elsewhere. `geom_boxplot/3` with `varwidth:
+  plots, dodging for violins, jittering for `geom_jitter/3`, the identity elsewhere.
+  `geom_boxplot/3` with `varwidth:
   true` records `{:dodge2, preserve: :single}`, keeping the padding and order given, and refuses
   any other position and `preserve: :total`, where R ignores a name, moves no box of its own width
   by dodging and drops the total. **Every layer function but `geom_abline/3` takes `nudge_x:` and
@@ -470,7 +485,8 @@ stat and position" and "Each facet, coordinate system, geom, stat and position i
   `geom_vline/3`, `geom_abline/3`, `stat_bin_hex/3`,
   `geom_rect/3`, `geom_tile/3`, `geom_raster/3`, `geom_ribbon/3`, `geom_area/3`, `geom_linerange/3`,
   `geom_pointrange/3`, `geom_errorbar/3`, `geom_crossbar/3`, `geom_smooth/3`, `stat_smooth/3`,
-  `geom_density/3`, `stat_density/3`, `stat_summary/3`, `annotate/3`, `coord_cartesian/2`, the
+  `geom_density/3`, `stat_density/3`, `geom_violin/3`, `stat_ydensity/3`, `stat_summary/3`,
+  `annotate/3`, `coord_cartesian/2`, the
   scale functions, the
   guide functions, `labs/2`, `theme/2` and the complete theme functions, every `position:` among
   them), so

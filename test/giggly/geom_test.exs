@@ -907,6 +907,338 @@ defmodule Giggly.GeomTest do
 
   # Golden: ggplot2 4.0.3's keys through vdiffr 1.0.9 (R 4.6.1), a 17.28-point key: a point at its
   # middle, and a bar's fill 15.86 points square, its border's 0.5 mm short of the key.
+  describe "setup_data/3, draw_panel/5 and draw_key/3 for violins" do
+    @violin %Geom.Violin{line_end: :butt, line_join: :mitre, quantile: %{linetype: :none}}
+
+    # A violin's rows as its densities and setup leave them, at x 1 in a room from 0.5 to 1.5, in
+    # one panel, group 1 unless given, with `columns` in place of its own or beside them.
+    defp violin_rows(columns) do
+      rows = length(Keyword.fetch!(columns, :y))
+
+      [
+        x: List.duplicate(1.0, rows),
+        xmin: List.duplicate(0.5, rows),
+        xmax: List.duplicate(1.5, rows),
+        panel: List.duplicate(1, rows),
+        group: List.duplicate(1, rows),
+        flipped_aes: List.duplicate(false, rows)
+      ]
+      |> Keyword.merge(columns)
+      |> DataFrame.new()
+    end
+
+    # Golden: `geom_violin(position = "identity")` of groups at x 1 and 3 in one facet and 10 and
+    # 10.5 in another, ggplot2 4.0.3's `layer_data()`: each 0.45 wide, 0.9 of the closest spacing
+    # counting from zero, 0.5, the smaller of the panels'.
+    test "a violin is 0.9 of the closest spacing in any panel wide, counting from zero" do
+      frame =
+        DataFrame.new(
+          x: [1.0, 3.0, 10.0, 10.5],
+          y: [1.0, 1.0, 1.0, 1.0],
+          panel: [1, 1, 2, 2],
+          group: [1, 2, 3, 4],
+          flipped_aes: [false, false, false, false]
+        )
+
+      set_up = Geom.setup_data(@violin, frame, @continuous)
+
+      assert DataFrame.pull(set_up, :width) == [0.45, 0.45, 0.45, 0.45]
+      assert DataFrame.pull(set_up, :xmin) == [0.775, 2.775, 9.775, 10.275]
+      assert DataFrame.pull(set_up, :xmax) == [1.225, 3.225, 10.225, 10.725]
+
+      # Golden: the same of groups at x 1 and 3 in one panel: 0.9 wide, the spacing from 0 to 1.
+      apart =
+        DataFrame.new(
+          x: [1.0, 3.0],
+          y: [1.0, 1.0],
+          panel: [1, 1],
+          group: [1, 2],
+          flipped_aes: [false, false]
+        )
+
+      set_apart = Geom.setup_data(@violin, apart, @continuous)
+      assert DataFrame.pull(set_apart, :xmin) == [0.55, 2.55]
+    end
+
+    # Golden: `geom_violin()` of x a and b at y 1, 2, 4, 1, 3 and 4 mapping a width of 0.5 for a
+    # and 0.7 for b, and a short group kept beside `width = 0.5`, whose width R leaves missing.
+    test "a violin keeps the width its rows hold, a missing one leaving its sides missing" do
+      frame =
+        DataFrame.new(
+          x: [1.0, 2.0, 3.0],
+          y: [1.0, 1.0, 1.0],
+          width: [0.5, 0.7, nil],
+          panel: [1, 1, 1],
+          group: [1, 2, 3],
+          flipped_aes: [false, false, false]
+        )
+
+      set_up = Geom.setup_data(@violin, frame, @continuous)
+
+      assert DataFrame.pull(set_up, :xmin) == [0.75, 1.65, nil]
+      assert DataFrame.pull(set_up, :xmax) == [1.25, 2.35, nil]
+    end
+
+    test "a horizontal violin is set up along y, as its densities say" do
+      frame =
+        DataFrame.new(
+          x: [1.0, 2.0],
+          y: [1.0, 2.0],
+          panel: [1, 1],
+          group: [1, 2],
+          flipped_aes: [true, true]
+        )
+
+      set_up = Geom.setup_data(@violin, frame, @continuous)
+
+      assert DataFrame.pull(set_up, :ymin) == [0.55, 1.55]
+      assert DataFrame.pull(set_up, :ymax) == [1.45, 2.45]
+      refute :xmin in DataFrame.names(set_up)
+    end
+
+    test "an outline runs up its left side and down its right, ties in their order, and closes" do
+      frame = violin_rows(y: [2.0, 1.0, 1.0], violinwidth: [1.0, 0.2, 0.4])
+
+      [%Polygons{outlines: [outline]}] = draw_panel(@violin, frame, @cartesian, @params)
+
+      left = [{0.45, 0.25}, {0.4, 0.25}, {0.25, 0.5}]
+      right = [{0.75, 0.5}, {0.55, 0.25}, {0.6, 0.25}]
+      expected = Enum.concat([left, right, [{0.45, 0.25}]])
+
+      assert Enum.map(outline, fn {x, y} -> {Float.round(x, 12), Float.round(y, 12)} end) ==
+               expected
+    end
+
+    test "violins are drawn in the order of their groups, a row missing x or y left out" do
+      frame =
+        violin_rows(
+          y: [1.0, 2.0, nil, 1.0, 2.0, :nan],
+          violinwidth: [1.0, 1.0, 1.0, 0.5, 0.5, 0.5],
+          group: [2, 2, 2, 1, 1, 1],
+          fill: ["#FF0000", "#FF0000", "#FF0000", "#0000FF", "#0000FF", "#0000FF"]
+        )
+
+      assert [
+               %Polygons{fill: ["#0000FF"], outlines: [first]},
+               %Polygons{fill: ["#FF0000"], outlines: [second]}
+             ] = draw_panel(@violin, frame, @cartesian, @params)
+
+      assert {Enum.count(first), Enum.count(second)} == {5, 5}
+    end
+
+    test "violins are drawn in the order of their groups however many a panel holds" do
+      groups = Enum.to_list(40..1//-1)
+
+      fills =
+        Enum.map(groups, fn group ->
+          "#0000" <> String.pad_leading(Integer.to_string(group), 2, "0")
+        end)
+
+      frame =
+        violin_rows(
+          y: List.duplicate(1.0, 40),
+          violinwidth: List.duplicate(1.0, 40),
+          group: groups,
+          fill: fills
+        )
+
+      drawn =
+        @violin
+        |> draw_panel(frame, @cartesian, @params)
+        |> Enum.map(fn %Polygons{fill: [fill]} -> fill end)
+
+      assert drawn == Enum.reverse(fills)
+    end
+
+    test "a missing width splits the outline, a run of two points or more drawn" do
+      split = violin_rows(y: [1.0, 2.0, 3.0], violinwidth: [1.0, nil, 1.0])
+      [%Polygons{outlines: pieces}] = draw_panel(@violin, split, @cartesian, @params)
+      lone = violin_rows(y: [1.0], violinwidth: [nil])
+
+      assert Enum.map(pieces, &length/1) == [2, 2]
+      assert draw_panel(@violin, lone, @cartesian, @params) == []
+    end
+
+    test "a violin's fill takes its alpha and its border never does" do
+      frame = violin_rows(y: [1.0, 2.0], violinwidth: [1.0, 1.0], alpha: [0.5, 0.5])
+
+      assert [%Polygons{color: ["#333333"], color_opacity: [1.0], fill_opacity: [0.5]}] =
+               draw_panel(@violin, frame, @cartesian, @params)
+    end
+
+    test "a border of no colour, a blank one or one of no width is left off, the fill drawn" do
+      for look <- [[color: [:none, :none]], [linetype: [:none, :none]], [linewidth: [nil, nil]]] do
+        frame = violin_rows(Keyword.merge([y: [1.0, 2.0], violinwidth: [1.0, 1.0]], look))
+
+        assert [%Polygons{color: [:none], fill: ["#FFFFFF"]}] =
+                 draw_panel(@violin, frame, @cartesian, @params)
+      end
+
+      unwidened = violin_rows(y: [1.0, 2.0], violinwidth: [1.0, 1.0], linewidth: [nil, nil])
+      [%Polygons{stroke_width: width}] = draw_panel(@violin, unwidened, @cartesian, @params)
+      assert width === 0.0
+    end
+
+    # Points of the lines a primitive draws, to 12 places.
+    defp rounded_lines(%Polylines{lines: lines}) do
+      Enum.map(lines, fn line ->
+        Enum.map(line, fn {x, y} -> {Float.round(x, 12), Float.round(y, 12)} end)
+      end)
+    end
+
+    # vdiffr: `geom_violin(quantile.linetype = 1)` draws each violin's polygon and then its
+    # quartiles' lines, lowest first, whatever order `quantiles` gives them in.
+    test "quantile lines follow their violin, side to side, in the order their quantiles appear" do
+      frame =
+        violin_rows(
+          y: [2.0, 3.0, 1.0, 2.0, 1.0, 3.0, 1.5],
+          violinwidth: [0.5, 1.0, 1.0, 0.5, 1.0, 1.0, 0.8],
+          quantile: [0.5, nil, nil, 0.75, nil, nil, 0.25],
+          group: [2, 2, 2, 1, 1, 1, 1]
+        )
+
+      geom = %{@violin | quantile: %{linetype: {}}}
+
+      assert [%Polygons{}, first_lines, %Polygons{}, second_lines] =
+               draw_panel(geom, frame, @cartesian, @params)
+
+      assert rounded_lines(first_lines) == [
+               [{0.3, 0.375}, {0.7, 0.375}],
+               [{0.375, 0.5}, {0.625, 0.5}]
+             ]
+
+      assert rounded_lines(second_lines) == [[{0.375, 0.5}, {0.625, 0.5}]]
+
+      assert {first_lines.line_end, first_lines.line_join, first_lines.mitre_limit} ==
+               {:butt, :round, 10.0}
+    end
+
+    test "quantile lines of a blank line type, or with no quantile marked, are not drawn" do
+      marked = violin_rows(y: [1.0, 2.0], violinwidth: [1.0, 1.0], quantile: [nil, 0.5])
+      unmarked = violin_rows(y: [1.0, 2.0], violinwidth: [1.0, 1.0])
+      solid = %{@violin | quantile: %{linetype: {}}}
+
+      assert [%Polygons{}] = draw_panel(@violin, marked, @cartesian, @params)
+      assert [%Polygons{}] = draw_panel(solid, unmarked, @cartesian, @params)
+    end
+
+    # vdiffr: `geom_violin(quantile.colour = NA, quantile.linetype = 1)` writes each line with no
+    # stroke, so none shows, and so does a line whose row's colour a scale left missing.
+    test "quantile lines of no colour are not drawn, beside those of a colour" do
+      frame =
+        violin_rows(
+          y: [1.0, 2.0, 3.0],
+          violinwidth: [1.0, 1.0, 1.0],
+          quantile: [nil, 0.25, 0.75],
+          color: ["#333333", nil, "#FF0000"]
+        )
+
+      solid = %{@violin | quantile: %{linetype: {}}}
+      uncoloured = %{@violin | quantile: %{linetype: {}, color: :none}}
+
+      assert [%Polygons{}, %Polylines{color: ["#FF0000"]} = drawn] =
+               draw_panel(solid, frame, @cartesian, @params)
+
+      assert rounded_lines(drawn) == [[{0.25, 0.75}, {0.75, 0.75}]]
+      assert [%Polygons{}] = draw_panel(uncoloured, frame, @cartesian, @params)
+    end
+
+    # vdiffr: `geom_violin(quantiles = c(0, 1), quantile.linetype = 1)` draws quantile 0's line
+    # left, right and left again.
+    test "the line of a quantile beginning the outline goes back to its left side" do
+      frame = violin_rows(y: [1.0, 2.0], violinwidth: [1.0, 1.0], quantile: [0.0, nil])
+      geom = %{@violin | quantile: %{linetype: {}}}
+
+      assert [%Polygons{}, lines] = draw_panel(geom, frame, @cartesian, @params)
+      assert rounded_lines(lines) == [[{0.25, 0.25}, {0.75, 0.25}, {0.25, 0.25}]]
+    end
+
+    # vdiffr: `geom_violin(quantile.linetype = 1)` of horizontal violins draws each line up across.
+    test "a horizontal violin's quantile lines run up across it" do
+      frame =
+        DataFrame.new(
+          y: [1.0, 1.0, 1.0],
+          ymin: [0.5, 0.5, 0.5],
+          ymax: [1.5, 1.5, 1.5],
+          x: [1.0, 2.0, 1.5],
+          violinwidth: [1.0, 1.0, 0.5],
+          quantile: [nil, nil, 0.5],
+          panel: [1, 1, 1],
+          group: [1, 1, 1],
+          flipped_aes: [true, true, true]
+        )
+
+      geom = %{@violin | quantile: %{linetype: {}}}
+
+      assert [%Polygons{}, lines] = draw_panel(geom, frame, @cartesian, @params)
+      assert rounded_lines(lines) == [[{0.75, 0.1875}, {0.75, 0.3125}]]
+    end
+
+    # vdiffr: `geom_violin(aes(colour = after_stat(density)), alpha = 0.5, quantile.linetype = 1)`
+    # draws each line in its own row's colour at the violins' alpha; `quantile.colour` and
+    # `quantile.linewidth` replace the colour and the width.
+    test "each quantile line is in its row's colour, alpha and width unless the lines give theirs" do
+      frame =
+        violin_rows(
+          y: [1.0, 2.0, 3.0],
+          violinwidth: [1.0, 1.0, 1.0],
+          quantile: [nil, 0.25, 0.75],
+          color: ["#333333", "#FF0000", "#0000FF"],
+          alpha: [0.5, 0.5, 0.5],
+          linewidth: [1.0, 1.0, 1.0]
+        )
+
+      own = %{@violin | quantile: %{linetype: {}}}
+
+      assert [%Polygons{}, %Polylines{color: ["#FF0000", "#0000FF"], opacity: [0.5, 0.5]} = drawn] =
+               draw_panel(own, frame, @cartesian, @params)
+
+      assert drawn.stroke_width == Geom.Mark.stroke_width(1.0)
+
+      given = %{@violin | quantile: %{linetype: {4, 4}, color: "#00FF00", linewidth: 2.0}}
+
+      assert [%Polygons{}, %Polylines{color: ["#00FF00", "#00FF00"]} = styled] =
+               draw_panel(given, frame, @cartesian, @params)
+
+      assert {styled.stroke_width, styled.dashes} ==
+               {Geom.Mark.stroke_width(2.0), Geom.Mark.dashes({4, 4}, 2.0)}
+    end
+
+    # vdiffr: `geom_violin(lineend = "square", linejoin = "mitre", linemitre = 3)` draws the same
+    # SVG as `geom_violin()`, every border butt, round and limited at 10.
+    test "a violin's border is cut square and rounded whatever ends and corners its layer gives" do
+      frame = violin_rows(y: [1.0, 2.0], violinwidth: [1.0, 1.0])
+
+      [drawn] =
+        draw_panel(%{@violin | line_end: :square, line_join: :bevel}, frame, @cartesian, @params)
+
+      assert {drawn.line_end, drawn.line_join, drawn.mitre_limit} == {:butt, :round, 10.0}
+    end
+
+    # vdiffr: `geom_violin(aes(fill = factor(cyl)), lineend = "round", linejoin = "bevel")` keys
+    # each fill bevelled, where the default keys them mitred.
+    test "a violin's key is a rectangle's, its ends and corners the layer's" do
+      [mitred] = draw_key(@violin, %{fill: "#FF0000"})
+      [bevelled] = draw_key(%{@violin | line_join: :bevel, line_end: :round}, %{})
+
+      assert {mitred.line_join, mitred.line_end, mitred.fill} == {:mitre, :butt, ["#FF0000"]}
+      assert {bevelled.line_join, bevelled.line_end} == {:bevel, :round}
+    end
+
+    test "a violin is ggplot2's default under the theme, its weight 1" do
+      assert Geom.default_aesthetics(@violin, @element) == [
+               weight: 1.0,
+               color: "#333333",
+               fill: "#FFFFFF",
+               linewidth: @element.borderwidth,
+               linetype: @element.bordertype,
+               alpha: nil
+             ]
+
+      assert {@element.borderwidth, @element.bordertype} == {0.5, {}}
+    end
+  end
+
   describe "setup_data/3 for lines" do
     test "rows are put in order of panel, group and x, rows that tie keeping their order" do
       frame =

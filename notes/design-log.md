@@ -79,6 +79,39 @@ stops the question being reopened from scratch. A new entry is about 150 words: 
 sentence or two of why, and one line per rejected alternative. What a later decision replaces is
 deleted from the entry it was in, never marked superseded; git history keeps every version.
 
+- **A violin's width is R's, in R's order (2026-11-02, violins step 2, within the scope Steve
+  agreed; checked against ggplot2 4.0.3).** `width:` is the stat's and a set aesthetic, as R hands
+  it to both, so the assembly's set-size stage fills it where the stat wrote none and writes it
+  into the table last. The geom keeps the width its rows hold, else 0.9 of the spacing counting
+  from zero. So a violin spanning several x is drawn at 0.9 of their range while `layer_data()`
+  shows the set width, and a short group kept beside `width:` has no room, as R draws them. A
+  mapped width rides along to each group of one x, and one varying within such a group drops
+  every width, as R drops the column. *Rejected: a `width` field on the geom*, R's `params$width`:
+  the set-size stage already gives it. *Rejected: drawing every violin at the set width*: the
+  table would match its drawing, but neither would match R's.
+
+- **A violin's border is always butt-ended and round-cornered, as R draws it (2026-11-02, Steve:
+  "Yes", violins step 3's probe; checked against ggplot2 4.0.3).** `GeomViolin$parameters()` names
+  only `...`, so `draw_layer()` drops the layer's `lineend`, `linejoin` and `linemitre`, and every
+  violin and quantile line takes `GeomPolygon`'s and `GeomPath`'s defaults, butt, round and 10:
+  vdiffr draws `geom_violin(lineend = "square", linejoin = "mitre", linemitre = 3)` identical to
+  `geom_violin()`. Its key keeps them, as `draw_key_polygon()` reads the layer's `lineend` and
+  `linejoin` (butt and mitred unless given), never a mitre limit. So `lineend:` and `linejoin:`
+  shape the keys alone and `linemitre:` is refused, as Giggly refuses what R ignores.
+  *Rejected: honouring them on the violins*, what the options promise: a drawing no ggplot2 user
+  gets. *Rejected: taking `linemitre:` and ignoring it*: an option that silently does nothing.
+
+- **A violin's quantile lines are R's, and `stat_ydensity/3` draws them too (2026-11-02, violins
+  step 3, Steve's brief: "quantile lines on geom_violin/3 and stat_ydensity/3"; checked against
+  ggplot2 4.0.3).** `quantile_color:`, `quantile_linetype:` (`:blank`) and `quantile_linewidth:`
+  are a look map in the geom, as a box plot's parts are, and the lines are drawn as
+  `GeomViolin$draw_group()` draws them, through `GeomPath`: each in its quantile row's colour,
+  alpha and width unless given, so the violin's alpha fades its lines though never its border. R's
+  `stat_ydensity()` warns and ignores the `quantile.` options, which only `geom_violin()` turns into
+  `quantile_gp`; Giggly's two functions add one layer from one schema, so both take them.
+  *Rejected: refusing them on `stat_ydensity/3`*, as Giggly refuses what R ignores: the two
+  functions would differ only there, where R's split is how `geom_violin()` builds a parameter.
+
 - **A range is widened by `Scales.Bounds.expand_range/2`, R's `expand_range()`, and Giggly's
   extents through it (2026-11-02, Steve: "A" twice, increment 4's step 10; checked against
   scales 1.4.0).** `mult:`, `add:` and `zero_width:`, R's `mul`, `add` and `zero_width` with
@@ -145,6 +178,18 @@ deleted from the entry it was in, never marked superseded; git history keeps eve
   scale's kind from its transformation's name, and scales already has it, so it needs no scales
   release later. *Rejected: R's whole, `:date` on a continuous scale and on colour*, which has no
   date scale yet.
+
+- **A violin's densities share the density's estimate, as ggplot2's stats share
+  `compute_density()` (2026-11-01, violins step 1, agreed with Steve; checked against ggplot2
+  4.0.3).** `Giggly.Stat.KernelDensity` holds the estimate, its frame passes, grid, convolution
+  and bounds, and takes as settings what the two stats hand it differently: the span (the panel's
+  axis, or the group's extent widened by a number of the rule's bandwidths) and which rows the
+  bandwidth reads (inside the bounds for a density, every row for a violin, as `stat_ydensity()`
+  works its bandwidth out before handing it over). With `drop: false` and a short first group,
+  R's `layer_data()` lists its columns in another order; Giggly keeps its usual one, the values
+  and the drawing alike. *Rejected: a violin building a `%Stat.Density{}` and running it*: its
+  span depends on the bandwidth, worked out inside. *Rejected: a second copy of the estimate*:
+  two homes for R's `density()`.
 
 - **A non-position scale keeps the infinities its palette gives, and the geoms draw them as
   ggplot2 4.0.3 does (2026-11-01, Steve: "A", "A", "A", "A", increment 4's step 7's C3, C3a-c;
@@ -4283,8 +4328,16 @@ tells the story (`git show <hash>`). Until 2026-10-15 each milestone also had a 
 `git log -S "<title>" -- notes/design-log.md` finds it in this file's history. The phases are
 §1's roadmap.
 
+- 2026-11-02 — Draw a violin's quantile lines, as ggplot2's GeomViolin draws them (violins, step 3)
+  (`2a4cd6f`); §4: "A violin's quantile lines are R's"
+- 2026-11-02 — Draw every violin's border butt-ended and round-cornered, as ggplot2 does, its key
+  alone taking lineend and linejoin (`f3968b1`); §4: "A violin's border is always"
 - 2026-11-02 — Add Scales.Bounds.expand_range/2, R's expand_range(), and widen Giggly's extents
   through it (transforms, step 10) (`24db15d`); §4: "A range is widened"
+- 2026-11-02 — Add geom_violin() and stat_ydensity(): a violin per group, drawn as ggplot2's
+  GeomViolin (violins, step 2) (`a6dea4d`); §4: "A violin's width is R's"
+- 2026-11-02 — Add stat_ydensity(), a violin's densities, sharing the density's estimate (violins,
+  step 1) (`2117be1`); §4: "A violin's densities share the density's estimate"
 - 2026-11-02 — Take transform: on Giggly's continuous non-position scales, any transformation on x
   and y (transforms, step 8) (`1b40993`); §4: "`transform:` takes every", "A column of an
   aesthetic other than position", "gradient2's midpoint", "A given limit outside", "A

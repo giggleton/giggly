@@ -418,3 +418,30 @@ beginning "Each layer's defaults are filled in from the theme".
   `size` and `linewidth` added, in millimetres. A box in radial coordinates is drawn between its
   placed corners, not curved. Every part and key is checked against vdiffr's drawing
   (`test/golden/boxplot*.svg`).
+- **A violin (`Geom.Violin`) is set up and drawn as ggplot2's `GeomViolin` does it**: its setup
+  works along its stat's `flipped_aes`, flipped and flipped back, keeps the `width` its rows hold,
+  the stat's or the layer's set one, which the assembly fills in where the stat wrote none, else
+  0.9 of the closest spacing of the x positions in any panel, counting from zero, as
+  `compute_data_size()` reads it, and puts its sides at x ∓ width/2, keeping `width` in the table,
+  as R does. **Each panel's violins are drawn in the order of their groups**, rows missing `x` or
+  `y` left out first: an outline up the left side in order of `y` and down the right, ties kept in
+  their order both ways, as R's `order()` keeps them, back to its first point, each row's side its
+  `violinwidth` of the way from x to `xmin` or `xmax`, placed and munched as one path, as
+  `GeomPolygon` munches a closed outline, a point missing a coordinate splitting it, each run of
+  two points or more drawn. It takes its look from its first row: its fill at its alpha, its border
+  in its colour, width and line type, left off where no line would draw; **its border always butt,
+  round and limited at 10, `GeomPolygon`'s defaults, whatever the layer gives**, as ggplot2's
+  `draw_layer()` drops a violin's `lineend` and `linejoin` (its `parameters()` name only `...`),
+  while its key takes them, as `draw_key_polygon()` reads the layer's, mitred and butt unless
+  given (design-log §4, the entry beginning "A violin's border is always"). Its defaults are
+  ggplot2's under the theme: a weight of 1, ink mixed 20% toward paper (`#333333`), a fill of
+  paper, the borders' width and line type; its key is `Rect.polygon_key/3`'s, no quantile line in
+  it. **Its quantile lines follow it, unless their line type is blank, the default**, as
+  `draw_group()` draws them: its outline's rows marking a quantile, in the outline's order, both
+  sides and its first point again where a quantile begins it, each quantile a line, the lines in
+  the order their quantiles first appear, drawn through `Geom.Path` with butt ends and round
+  corners, as `GeomPath$draw_panel()` draws them handed no line style, each in its row's colour,
+  alpha and width, which the struct's `quantile` look replaces where the layer gives one, and in
+  its line type; so the violin's alpha fades its lines and never its border (design-log §4, the
+  entry beginning "A violin's quantile lines are R's"). Every drawing is
+  checked against vdiffr's (`test/golden/violin*.svg`), radial coordinates included.

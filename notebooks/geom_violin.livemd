@@ -5,6 +5,17 @@ Mix.install([
   {:giggly, path: Path.join(__DIR__, "..")},
   {:kino, "~> 0.19"}
   ])
+
+alias Giggly.Plot
+
+mtcars = Giggly.Datasets.mtcars()
+
+render = fn plot ->
+  plot
+  |> Giggly.to_svg()
+  |> IO.iodata_to_binary()
+  |> Kino.Image.new(:svg)
+end
 ```
 
 ## About this notebook
@@ -17,8 +28,15 @@ waiting for, so the page is also a list of what remains.
 
 A violin plot is a compact display of a continuous distribution, a blend of a box plot and a
 density plot: each group's density estimate, mirrored, drawn where a box plot would draw its box.
-`stat_ydensity()` computes the densities, and `geom_violin()` draws them. Giggly has none of this
-yet.
+`stat_ydensity()` computes the densities, and `geom_violin()` draws them. Giggly has
+`Giggly.Plot.geom_violin/3` and `Giggly.Plot.stat_ydensity/3`, which add the same layer, take
+ggplot2's options as keyword options (`scale:`, `trim:`, `adjust:`, `quantiles:` and the quantile
+lines' look), and set violins that share a position side by side, as ggplot2 does. It has no
+`cut_width()` and no `coord_transform()`. A plot is described with `Giggly.Plot` and drawn with
+`Giggly.to_svg/2`, which returns an SVG document. The setup cell aliases `Giggly.Plot`, so the cells
+write `Plot.new/2`, and defines `render`, which draws a plot and shows it below the cell with
+`Kino.Image`. The cells draw `Giggly.Datasets.mtcars/0`, R's `mtcars`: 32 cars from the 1974 *Motor
+Trend* US magazine, which the setup cell binds to `mtcars`.
 
 ## Violins by number of cylinders
 
@@ -27,7 +45,15 @@ p <- ggplot(mtcars, aes(factor(cyl), mpg))
 p + geom_violin()
 ```
 
-Not in Giggly yet: `geom_violin()`.
+Giggly writes `factor(cyl)` as `{:factor, [:cyl]}`.
+
+```elixir
+p = Plot.new(mtcars, %{x: {:factor, [:cyl]}, y: :mpg})
+
+p
+|> Plot.geom_violin()
+|> render.()
+```
 
 ## Horizontal violins
 
@@ -37,7 +63,13 @@ ggplot(mtcars, aes(mpg, factor(cyl))) +
   geom_violin()
 ```
 
-Not in Giggly yet: `geom_violin()`.
+Giggly's violins stand along the discrete axis too, here `y`.
+
+```elixir
+Plot.new(mtcars, %{x: :mpg, y: {:factor, [:cyl]}})
+|> Plot.geom_violin()
+|> render.()
+```
 
 ## Violins with jittered points
 
@@ -45,7 +77,16 @@ Not in Giggly yet: `geom_violin()`.
 p + geom_violin() + geom_jitter(height = 0, width = 0.1)
 ```
 
-Not in Giggly yet: `geom_violin()`.
+The points are jittered by Erlang's random numbers, not R's, so they land elsewhere than ggplot2's,
+each within the same 0.1 of its place across and none moved up or down; nothing else in the drawing
+moves (`geom_jitter()`'s notebook says more).
+
+```elixir
+p
+|> Plot.geom_violin()
+|> Plot.geom_jitter(height: 0, width: 0.1)
+|> render.()
+```
 
 ## Scaling the widths
 
@@ -59,7 +100,17 @@ p + geom_violin(scale = "width")
 
 By default every violin has the same area, `scale = "area"`.
 
-Not in Giggly yet: `geom_violin()` and its `scale` option.
+```elixir
+p
+|> Plot.geom_violin(scale: :count)
+|> render.()
+```
+
+```elixir
+p
+|> Plot.geom_violin(scale: :width)
+|> render.()
+```
 
 ## Untrimmed tails
 
@@ -68,7 +119,11 @@ Not in Giggly yet: `geom_violin()` and its `scale` option.
 p + geom_violin(trim = FALSE)
 ```
 
-Not in Giggly yet: `geom_violin()` and its `trim` option.
+```elixir
+p
+|> Plot.geom_violin(trim: false)
+|> render.()
+```
 
 ## A smaller bandwidth
 
@@ -79,7 +134,11 @@ p + geom_violin(adjust = .5)
 
 `adjust` multiplies the bandwidth the density estimate would otherwise use.
 
-Not in Giggly yet: `geom_violin()` and its `adjust` option.
+```elixir
+p
+|> Plot.geom_violin(adjust: 0.5)
+|> render.()
+```
 
 ## Mapping fill
 
@@ -96,7 +155,29 @@ p + geom_violin(aes(fill = factor(am)))
 Mapping `fill` to something discrete that varies within each `x`, as `factor(vs)` does, splits a
 violin into one for each value, dodged side by side.
 
-Not in Giggly yet: `geom_violin()`.
+```elixir
+p
+|> Plot.geom_violin(%{fill: :cyl})
+|> render.()
+```
+
+```elixir
+p
+|> Plot.geom_violin(%{fill: {:factor, [:cyl]}})
+|> render.()
+```
+
+```elixir
+p
+|> Plot.geom_violin(%{fill: {:factor, [:vs]}})
+|> render.()
+```
+
+```elixir
+p
+|> Plot.geom_violin(%{fill: {:factor, [:am]}})
+|> render.()
+```
 
 ## A fixed fill and colour
 
@@ -105,7 +186,13 @@ Not in Giggly yet: `geom_violin()`.
 p + geom_violin(fill = "grey80", colour = "#3366FF")
 ```
 
-Not in Giggly yet: `geom_violin()`.
+`"grey80"` is a colour only R names, so Giggly writes it as its hex, `"#CCCCCC"`.
+
+```elixir
+p
+|> Plot.geom_violin(fill: "#CCCCCC", colour: "#3366FF")
+|> render.()
+```
 
 ## Quartiles
 
@@ -114,9 +201,15 @@ Not in Giggly yet: `geom_violin()`.
 p + geom_violin(draw_quantiles = c(0.25, 0.5, 0.75))
 ```
 
-ggplot2 has deprecated `draw_quantiles`, in favour of `quantiles` and `quantile.linetype`.
+ggplot2 has deprecated `draw_quantiles`, in favour of `quantiles` and `quantile.linetype`, which
+draw the same violins: `quantiles` says where the lines go, and a `quantile.linetype` other than
+blank draws them. Giggly offers those alone, as `quantiles:` and `quantile_linetype:`.
 
-Not in Giggly yet: `geom_violin()` and its `draw_quantiles` option.
+```elixir
+p
+|> Plot.geom_violin(quantiles: [0.25, 0.5, 0.75], quantile_linetype: :solid)
+|> render.()
+```
 
 ## Scale and coordinate transformations
 
@@ -146,9 +239,8 @@ m +
 `cut_width(rating, 0.5)` groups the films into bins of rating half a point wide, a violin for
 each.
 
-Not in Giggly yet: `geom_violin()`, a whole-column function in a mapping, such as `cut_width(rating,
-0.5)`, `cut_width()`, `coord_transform()`, and the `movies` dataset from the `ggplot2movies`
-package.
+Not in Giggly yet: a whole-column function in a mapping, such as `cut_width(rating, 0.5)`,
+`cut_width()`, `coord_transform()`, and the `movies` dataset from the `ggplot2movies` package.
 
 ## Violins along a continuous x
 
@@ -162,6 +254,5 @@ ggplot(movies, aes(year, budget)) +
 }
 ```
 
-Not in Giggly yet: `geom_violin()` and its `scale` option, a whole-column function in a mapping,
-such as `cut_width(year, 10)`, `cut_width()`, and the `movies` dataset from the `ggplot2movies`
-package.
+Not in Giggly yet: a whole-column function in a mapping, such as `cut_width(year, 10)`,
+`cut_width()`, and the `movies` dataset from the `ggplot2movies` package.

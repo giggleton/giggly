@@ -9157,6 +9157,182 @@ defmodule GigglyTest do
       assert svg == File.read!("test/golden/jitterdodge_boxplot.svg")
     end
 
+    # Golden: test/golden/violin.svg, checked against ggplot2's drawing of the same plot, made by
+    # test/golden/violin.R: every element matches it, the x axis drawn before the y as in
+    # test/golden/point.svg, and every clip path. geom_violin()'s first example from ggplot2's reference page: mtcars' mileage by
+    # cylinders, a violin each, the same area, trimmed to its rows. It moves with the violin geom and
+    # its densities.
+    test "a violin for each cylinder count, each the same area" do
+      svg =
+        Giggly.Datasets.mtcars()
+        |> Plot.new(%{x: {:factor, [:cyl]}, y: :mpg})
+        |> Plot.geom_violin()
+        |> to_svg()
+
+      assert svg == File.read!("test/golden/violin.svg")
+    end
+
+    # Golden: test/golden/violin_horizontal.svg, checked against ggplot2's drawing of the same plot, made by
+    # test/golden/violin_horizontal.R: every element matches it, the x axis drawn before the y as in
+    # test/golden/point.svg, and every clip path. The reference page's horizontal violins, standing along the discrete y. It
+    # moves with what moves test/golden/violin.svg, and with orientation.
+    test "violins stand along a discrete y, estimated along x" do
+      svg =
+        Giggly.Datasets.mtcars()
+        |> Plot.new(%{x: :mpg, y: {:factor, [:cyl]}})
+        |> Plot.geom_violin()
+        |> to_svg()
+
+      assert svg == File.read!("test/golden/violin_horizontal.svg")
+    end
+
+    # Golden: test/golden/violin_count.svg, checked against ggplot2's drawing of the same plot, made by
+    # test/golden/violin_count.R: every element matches it, the x axis drawn before the y as in
+    # test/golden/point.svg, and every clip path. The reference page's violins scaled by their rows. It moves with what moves
+    # test/golden/violin.svg.
+    test "violins scaled by their rows grow with them" do
+      svg =
+        Giggly.Datasets.mtcars()
+        |> Plot.new(%{x: {:factor, [:cyl]}, y: :mpg})
+        |> Plot.geom_violin(scale: :count)
+        |> to_svg()
+
+      assert svg == File.read!("test/golden/violin_count.svg")
+    end
+
+    # Golden: test/golden/violin_untrimmed.svg, checked against ggplot2's drawing of the same plot, made by
+    # test/golden/violin_untrimmed.R: every element matches it, the x axis drawn before the y as in
+    # test/golden/point.svg, and every clip path. The reference page's untrimmed violins, their tails reaching past their rows. It
+    # moves with what moves test/golden/violin.svg.
+    test "untrimmed violins show their tails" do
+      svg =
+        Giggly.Datasets.mtcars()
+        |> Plot.new(%{x: {:factor, [:cyl]}, y: :mpg})
+        |> Plot.geom_violin(trim: false)
+        |> to_svg()
+
+      assert svg == File.read!("test/golden/violin_untrimmed.svg")
+    end
+
+    # Golden: test/golden/violin_dodged.svg, checked against ggplot2's drawing of the same plot, made by
+    # test/golden/violin_dodged.R: every element matches it, the x axis drawn before the y as in
+    # test/golden/point.svg, and every clip path. The reference page's violins filled by factor(vs): each cylinder count's violins
+    # dodged, a group of one row left out, and a legend of polygon keys. It moves with what moves
+    # test/golden/violin.svg, and with dodging and the legend.
+    test "violins filled by a factor are dodged, and key a legend" do
+      svg =
+        Giggly.Datasets.mtcars()
+        |> Plot.new(%{x: {:factor, [:cyl]}, y: :mpg})
+        |> Plot.geom_violin(%{fill: {:factor, [:vs]}})
+        |> to_svg()
+
+      assert svg == File.read!("test/golden/violin_dodged.svg")
+    end
+
+    # Golden: test/golden/violin_radial.svg, checked against ggplot2's drawing of the same plot, made by
+    # test/golden/violin_radial.R: every element matches it, the x axis drawn before the y as in
+    # test/golden/point.svg, and every clip path. Violins in radial coordinates, each outline munched to follow the panel's curves.
+    # It moves with what moves test/golden/violin.svg, and with radial coordinates.
+    test "violins in radial coordinates follow the panel's curves" do
+      svg =
+        Giggly.Datasets.mtcars()
+        |> Plot.new(%{x: {:factor, [:cyl]}, y: :mpg})
+        |> Plot.geom_violin()
+        |> Plot.coord_radial()
+        |> to_svg()
+
+      assert svg == File.read!("test/golden/violin_radial.svg")
+    end
+
+    # Golden: test/golden/violin_quantiles.svg, checked against ggplot2's drawing of the same plot,
+    # made by test/golden/violin_quantiles.R: every element matches it, the x axis drawn before the y
+    # as in test/golden/point.svg, and every clip path. The reference page's `draw_quantiles`
+    # example, drawn with its replacement: each violin's quartiles a line from side to side in its
+    # border's colour and width. It moves with what moves test/golden/violin.svg, and with paths.
+    test "violins with a quantile line type draw a line across at each quartile" do
+      svg =
+        Giggly.Datasets.mtcars()
+        |> Plot.new(%{x: {:factor, [:cyl]}, y: :mpg})
+        |> Plot.geom_violin(quantile_linetype: 1)
+        |> to_svg()
+
+      assert svg == File.read!("test/golden/violin_quantiles.svg")
+    end
+
+    # Golden: test/golden/violin_quantiles_styled.svg, checked against ggplot2's drawing of the same
+    # plot, made by test/golden/violin_quantiles_styled.R: every element matches it, the x axis
+    # drawn before the y as in test/golden/point.svg, and every clip path. Quantile lines of their
+    # own colour, dashes and width, at the violins' alpha, which leaves the borders alone, the
+    # lowest's line running left, right and left again as it begins the outline. It moves with
+    # what moves test/golden/violin_quantiles.svg.
+    test "quantile lines take their own look and the violins' alpha" do
+      svg =
+        Giggly.Datasets.mtcars()
+        |> Plot.new(%{x: {:factor, [:cyl]}, y: :mpg})
+        |> Plot.geom_violin(
+          alpha: 0.5,
+          quantiles: [0, 0.5, 1],
+          quantile_colour: "red",
+          quantile_linetype: :dashed,
+          quantile_linewidth: 1
+        )
+        |> to_svg()
+
+      assert svg == File.read!("test/golden/violin_quantiles_styled.svg")
+    end
+
+    # Golden: test/golden/violin_quantiles_radial.svg, checked against ggplot2's drawing of the same
+    # plot, made by test/golden/violin_quantiles_radial.R: every element matches it, in R's order,
+    # and every clip path but svglite's round the whole drawing. Quantile lines munched to follow the
+    # panel's curves. It moves with what moves test/golden/violin_radial.svg and
+    # test/golden/violin_quantiles.svg.
+    test "quantile lines in radial coordinates follow the panel's curves" do
+      svg =
+        Giggly.Datasets.mtcars()
+        |> Plot.new(%{x: {:factor, [:cyl]}, y: :mpg})
+        |> Plot.geom_violin(quantile_linetype: 1)
+        |> Plot.coord_radial()
+        |> to_svg()
+
+      assert svg == File.read!("test/golden/violin_quantiles_radial.svg")
+    end
+
+    # Golden: ggplot2 4.0.3's `layer_data()` of `geom_violin(width = 0.5, position = "identity")`
+    # over groups at x 1, 2 and 3 and at 5, and of the same beside a short group kept: the set width
+    # fills the table last, but a violin of several x is set up at 0.9 of their range, and a short
+    # group's room is missing, as its densities hold its width so.
+    test "a set width fills the violins' table, a several-x violin's room its range's" do
+      several =
+        %{
+          "x" => [1.0, 2.0, 3.0, 5.0, 5.0, 5.0],
+          "y" => [1.0, 2.0, 3.0, 1.0, 2.0, 4.0],
+          "g" => [1, 1, 1, 2, 2, 2]
+        }
+        |> Plot.new(%{x: :x, y: :y, group: :g})
+        |> Plot.geom_violin(width: 0.5, position: :identity)
+        |> Giggly.layer_data()
+
+      firsts = fn frame, name ->
+        frame
+        |> DataFrame.pull(name)
+        |> Enum.uniq()
+      end
+
+      assert firsts.(several, :width) == [0.5]
+      assert firsts.(several, :xmin) == [1.1, 4.75]
+      assert firsts.(several, :xmax) == [2.9, 5.25]
+
+      short =
+        %{"x" => ["a", "b", "b", "b"], "y" => [1.0, 1.0, 2.0, 3.0]}
+        |> Plot.new(%{x: :x, y: :y})
+        |> Plot.geom_violin(width: 0.5, drop: false, position: :identity)
+        |> Giggly.layer_data()
+
+      assert firsts.(short, :width) == [0.5]
+      assert firsts.(short, :xmin) == [nil, 1.75]
+      assert firsts.(short, :xmax) == [nil, 2.25]
+    end
+
     # Golden: test/golden/jitter.svg, checked against ggplot2's drawing of the same plot, made by
     # test/golden/jitter.R, as test/golden/jitter_boxplot.svg is: every element matches it, the x
     # axis drawn before the y, and every clip path. geom_jitter()'s first jittered example: mpg's
