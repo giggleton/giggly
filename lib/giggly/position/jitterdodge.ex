@@ -19,8 +19,8 @@ defmodule Giggly.Position.Jitterdodge do
   # `dodge_width`, each ranked by its group among them, lowest first: the mark of rank k is centred
   # `dodge_width · ((k - 0.5) / n - 0.5)` from its x and is the widest mark's width over n wide, so
   # an `xmin` with one group keeps its marks as they are. A mark with no `ymax`, a point, is given
-  # its y as one, as `collide()` gives it. Every dodged x comes out a double, as R's are, and a row
-  # missing its x stays missing.
+  # its y as one, as `collide()` gives it. A mark missing its x is missing its sides too, so the
+  # marks that lost theirs share a missing `xmin`, which has no width to share, and stay missing.
   #
   # The jitter is then `Giggly.Position.Jitter`'s, its sideways amount `jitter_width` over the most
   # groups at one x in any panel plus 2, as ggplot2's `setup_params()` divides it whether given or
@@ -28,7 +28,8 @@ defmodule Giggly.Position.Jitterdodge do
   # the layer's positions along x before they are dodged (`Giggly.Resolution`, not counting from
   # zero), worked out over every panel at once, as R's `setup_params()` works it out, 0.4 on a
   # discrete axis. Its distances are drawn from `seed`, each panel's afresh, and move every column
-  # of each axis's family by its row's distance along it, as jittering moves them.
+  # of each axis's family by its row's distance along it, as jittering moves them, so every
+  # position comes out a double, as R's are, whether or not it was dodged.
 
   @enforce_keys [:jitter_width, :jitter_height, :dodge_width, :seed]
   defstruct @enforce_keys
@@ -130,7 +131,7 @@ defmodule Giggly.Position.Jitterdodge do
         |> Enum.sort_by(fn row -> row.index end)
 
       Enum.reduce([:x, :xmin, :xmax], frame, fn name, placed ->
-        DataFrame.put(placed, name, Enum.map(dodged, fn row -> double(Map.fetch!(row, name)) end))
+        DataFrame.put(placed, name, Enum.map(dodged, fn row -> Map.fetch!(row, name) end))
       end)
     end
 
@@ -140,14 +141,9 @@ defmodule Giggly.Position.Jitterdodge do
       |> Map.new()
     end
 
-    # Positions as R holds them once dodged, doubles, so a column of a discrete axis's level
-    # positions stays one type when only some of its marks move.
-    defp double(position) when is_number(position), do: position / 1
-    defp double(missing), do: missing
-
     # ggplot2's `pos_dodge()` for the marks at one `xmin`: each of the n groups there takes its
     # share of `width`, ranked by group, as `match_sorted()` ranks them. Marks that lost their x
-    # share a missing `xmin`, and stay as they are.
+    # share a missing `xmin`, with no width among them, and stay as they are.
     defp dodge(marks, width) do
       ranks =
         marks
@@ -176,11 +172,9 @@ defmodule Giggly.Position.Jitterdodge do
       end)
     end
 
-    defp placed(%{x: x} = mark, offset, half_width) when is_number(x) do
+    defp placed(%{x: x} = mark, offset, half_width) do
       centre = x + offset
       %{mark | x: centre, xmin: centre - half_width, xmax: centre + half_width}
     end
-
-    defp placed(mark, _offset, _half_width), do: mark
   end
 end

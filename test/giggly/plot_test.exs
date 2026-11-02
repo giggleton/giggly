@@ -5661,7 +5661,7 @@ defmodule Giggly.PlotTest do
     test "a refusal of a nudge names the position beside it" do
       plot = Plot.new(@placed, %{x: :g, y: :y})
 
-      for position <- [:stack, :fill, :dodge, :dodge2, :jitter] do
+      for position <- [:stack, :fill, :dodge, :dodge2, :jitter, :jitterdodge] do
         error =
           assert_raise ArgumentError, fn ->
             Plot.geom_col(plot, nudge_x: 0.1, nudge_y: 0.1, position: position)

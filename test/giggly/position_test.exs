@@ -1005,6 +1005,100 @@ defmodule Giggly.PositionTest do
              ]
     end
 
+    # R: points at p and r of a discrete axis whose scale holds p, q and r move at most 0.0996,
+    # inside 0.4 / 4, where their positions, 1 and 3, are 2 apart (`jd_mutants.R`).
+    test "a discrete axis's positions are 1 apart, whatever levels the layer holds" do
+      frame =
+        DataFrame.new(
+          panel: [1, 1, 1, 1],
+          group: [1, 2, 1, 2],
+          x: [1, 1, 3, 3],
+          y: [0.0, 0.0, 0.0, 0.0]
+        )
+
+      jittered =
+        Position.compute_layer(
+          %Position.Jitterdodge{
+            jitter_width: :none,
+            jitter_height: 0.0,
+            dodge_width: 0.75,
+            seed: 5
+          },
+          frame,
+          %{x: :discrete, y: :continuous}
+        )
+
+      [first, _, second, _, third, _, fourth, _] = draws(5, 8)
+
+      # 0.4 of a discrete axis's spacing, 1, over two groups at each x plus 2.
+      amount = 0.4 / 4
+
+      assert DataFrame.pull(jittered, :x) === [
+               0.8125 + distance(first, amount),
+               1.1875 + distance(second, amount),
+               2.8125 + distance(third, amount),
+               3.1875 + distance(fourth, amount)
+             ]
+    end
+
+    # R: continuous x at 0.25 and 2.25 move at most 0.199, inside 0.4 * 2 / 4, where counting the
+    # gap from zero would make the spacing 0.25 (`jd_mutants.R`).
+    test "a continuous axis's spacing is the closest gap between its positions, not from zero" do
+      frame =
+        DataFrame.new(
+          panel: [1, 1, 1, 1],
+          group: [1, 2, 1, 2],
+          x: [0.25, 0.25, 2.25, 2.25],
+          y: [0.0, 0.0, 0.0, 0.0]
+        )
+
+      jittered =
+        Position.compute_layer(
+          %Position.Jitterdodge{
+            jitter_width: :none,
+            jitter_height: 0.0,
+            dodge_width: 0.75,
+            seed: 5
+          },
+          frame,
+          @continuous
+        )
+
+      [first, _, second, _, third, _, fourth, _] = draws(5, 8)
+      amount = 0.4 * 2.0 / 4
+
+      assert DataFrame.pull(jittered, :x) === [
+               0.0625 + distance(first, amount),
+               0.4375 + distance(second, amount),
+               2.0625 + distance(third, amount),
+               2.4375 + distance(fourth, amount)
+             ]
+    end
+
+    # R: `geom_col(aes(width = w))` of bars at 1 and 1.25, 0.5 and 1 wide, both from xmin 0.75:
+    # two groups share the widest bar's width; one group keeps each bar as it is.
+    test "the marks at one xmin take the widest one's width over n, one group none" do
+      bars = fn group ->
+        DataFrame.new(
+          panel: [1, 1],
+          group: group,
+          x: [1.0, 1.25],
+          xmin: [0.75, 0.75],
+          xmax: [1.25, 1.75],
+          y: [2.0, 3.0]
+        )
+      end
+
+      apart = Position.compute_layer(still(), bars.([1, 2]), @continuous)
+      together = Position.compute_layer(still(), bars.([1, 1]), @continuous)
+
+      assert Enum.map([:x, :xmin, :xmax], fn name -> DataFrame.pull(apart, name) end) ===
+               [[0.8125, 1.4375], [0.5625, 1.1875], [1.0625, 1.6875]]
+
+      assert Enum.map([:x, :xmin, :xmax], fn name -> DataFrame.pull(together, name) end) ===
+               [[1.0, 1.25], [0.75, 0.75], [1.25, 1.75]]
+    end
+
     # R: positions 0.5 apart in one panel and alone in the others move at most 0.4 * 0.5 / 4 in
     # every panel, where jittering alone works out each panel's.
     test "the amount not given is worked out over the whole layer, before dodging" do
@@ -1073,9 +1167,11 @@ defmodule Giggly.PositionTest do
                ]
     end
 
-    # R: points over a continuous x and a discrete y are dodged and jittered sideways along y.
+    # R: points over a continuous x and a discrete y are dodged and jittered sideways along y, the
+    # levels 1 apart however many the layer holds, as along x.
     test "marks whose one discrete axis is y are dodged and jittered sideways along y" do
-      frame = DataFrame.new(panel: [1, 1], group: [1, 2], x: [2.0, 3.0], y: [1, 1])
+      frame =
+        DataFrame.new(panel: [1, 1, 1], group: [1, 2, 1], x: [2.0, 3.0, 4.0], y: [1, 1, 3])
 
       jittered =
         Position.compute_layer(
@@ -1089,18 +1185,32 @@ defmodule Giggly.PositionTest do
           %{x: :continuous, y: :discrete}
         )
 
-      [first_across, first_up, second_across, second_up] = draws(6, 4)
+      [first_across, first_up, second_across, second_up, third_across, third_up] = draws(6, 6)
       # 0.4 of a discrete axis's spacing, 1, over two groups plus 2.
       sideways = 0.4 / 4
 
       assert Enum.map([:x, :y, :ymin], fn name -> DataFrame.pull(jittered, name) end) === [
-               [2.0 + distance(first_across, 0.3), 3.0 + distance(second_across, 0.3)],
-               [0.8125 + distance(first_up, sideways), 1.1875 + distance(second_up, sideways)],
-               [0.625 + distance(first_up, sideways), 1.0 + distance(second_up, sideways)]
+               [
+                 2.0 + distance(first_across, 0.3),
+                 3.0 + distance(second_across, 0.3),
+                 4.0 + distance(third_across, 0.3)
+               ],
+               [
+                 0.8125 + distance(first_up, sideways),
+                 1.1875 + distance(second_up, sideways),
+                 3 + distance(third_up, sideways)
+               ],
+               [
+                 0.625 + distance(first_up, sideways),
+                 1.0 + distance(second_up, sideways),
+                 2.625 + distance(third_up, sideways)
+               ]
              ]
     end
 
-    # R: x 1, 1, NA, 2, 2 of groups a, b, a, a, b dodge to 0.8125, 1.1875, NA, 1.8125, 2.1875.
+    # R: x 1, 1, NA, 2, 2 of groups a, b, a, a, b dodge to 0.8125, 1.1875, NA, 1.8125, 2.1875;
+    # and x 1, 1, NA, NA, 2 of groups a, b, a, b, a to 0.8125, 1.1875, NA, NA, 2, the missing
+    # pair two groups at no position (`jd_mutants.R`).
     test "a row missing its x or y stays missing, and the rest dodge as R's" do
       frame =
         DataFrame.new(
@@ -1110,10 +1220,22 @@ defmodule Giggly.PositionTest do
           y: [1.0, 2.0, 3.0, nil, 5.0]
         )
 
+      pair =
+        DataFrame.new(
+          panel: [1, 1, 1, 1, 1],
+          group: [1, 2, 1, 2, 1],
+          x: [1.0, 1.0, nil, nil, 2.0],
+          y: [1.0, 2.0, 3.0, 4.0, 5.0]
+        )
+
       dodged = Position.compute_layer(still(), frame, @continuous)
+      dodged_pair = Position.compute_layer(still(), pair, @continuous)
 
       assert {DataFrame.pull(dodged, :x), DataFrame.pull(dodged, :y)} ===
                {[0.8125, 1.1875, nil, 1.8125, 2.1875], [1.0, 2.0, 3.0, nil, 5.0]}
+
+      assert Enum.map([:x, :xmin], fn name -> DataFrame.pull(dodged_pair, name) end) ===
+               [[0.8125, 1.1875, nil, nil, 2.0], [0.625, 1.0, nil, nil, 1.625]]
     end
   end
 
