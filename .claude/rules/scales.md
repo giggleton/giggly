@@ -154,8 +154,9 @@ R's regular ones: the entry beginning "The panel's grid lines are placed by the 
   frame as the scale is handed them. The rule exists once, and grouping does not depend on scales
   to use it.
 - **A transformation is a module implementing `Scales.Transform`**, resolved from its name
-  there and handed to each of its callbacks, so the date-time one reads its zone; it carries what
-  R's object carries and a scale reads: the transformation, its inverse,
+  there (a user's own from the `%Scales.Transform{}` that `Transform.new/2` makes, a composition
+  from `{:compose, parts}`) and handed to each of its callbacks, so the date-time one reads its
+  zone; it carries what R's object carries and a scale reads: the transformation, its inverse,
   its domain, and its axis's default breaks, minor breaks and labels (`breaks`, `minor_breaks`,
   `format`). **A label is made from the break and the extent** (`format/2`), since a date's
   format is the step chosen for the whole axis; a number's ignores the extent and is written once
@@ -238,6 +239,26 @@ R's regular ones: the entry beginning "The panel's grid lines are placed by the 
   numbers where R gives one; `Breaks.timespan/2` on the extent turned back into its unit, its
   labels `Labels.timespan/2`'s in the unit, minor breaks regular, no `n:` and no derivatives, as
   R's take none, `trim_to_domain/2` R's.
+- **A composition is `{:compose, [part, ...]}`** (`Transform.Composition`, R's
+  `transform_compose()`; design-log §4, the entries beginning "A composition is", "A
+  composition's breaks", "A composition's labels", "A composition's domain" and "A date,
+  date-time or time transformation comes first"): values through each part and back through each
+  inverse, a `nil` passed back uncalled, since built-in inverses take positions; derivatives R's
+  running chain-rule product, only where every part has one; breaks and labels the first part's,
+  on the extent turned back into its space, `n:` handed on; minor breaks R's regular ones
+  unreversed; its domain R's rule but -0 below +0, none left `ArgumentError`; a date, date-time
+  or time part first only, the composition then never squished, its steps laid through
+  `width/3`. Its tests pin R's doubles at the nine doubles and the edges, the domains and trims,
+  ggplot2's axes, and its reversed date, date-time and time axes.
+- **A transformation of your own is a `%Scales.Transform{}` made by `Transform.new/2`**
+  (`Transform.Custom`, R's `new_transform()`; the entries beginning "`Transform.new/2` takes"
+  and "A transformation of your own"): its functions, of one value, are handed every value in
+  its domain, its ends and their infinities among them, an integer as a float, `nil` and `:nan`
+  kept and a value outside the domain `:nan` uncalled, an answer but a double, an infinity,
+  `:nan` or `nil` refused with `ArgumentError`; its breaks its function's on the extent turned
+  back, an end turning back to anything but a number set aside as Box-Cox's are; its labels its
+  function's of the breaks turned back. Its tests pin ggplot2's axes of user transformations, alone
+  and as a composition's part.
 - **A date scale works in days since 1970-01-01, as R stores a date** (`Transform.Date`, R's
   `transform_date()`): a date is a float of its days, a missing one `nil`, and a position turned
   back the day it falls on, rounded down, as R's `format()` writes it; it trains, expands and
@@ -308,7 +329,8 @@ R's regular ones: the entry beginning "The panel's grid lines are placed by the 
 - **Every transformation's minor breaks are R's `scales::regular_minor_breaks()`**
   (`Scales.MinorBreaks`), in transformed space, with two intervals per gap, on the breaks in the
   transformation's order, the first gap's step added before and after them as R adds it, with
-  `reverse = TRUE` for reverse alone: one more step past an outermost break the extent reaches beyond,
+  `reverse = TRUE` for reverse alone, a composition's unreversed whichever way it runs, as R's:
+  one more step past an outermost break the extent reaches beyond,
   then each gap's middle as R's `seq()` finds it, its start plus half its width, which differs
   from the two ends' mean in the last bit (an example pins it), and none for fewer than two breaks.
 - **A number or a width of minor breaks to each gap is exactly R's `minor_breaks_n()` and
@@ -332,7 +354,9 @@ R's regular ones: the entry beginning "The panel's grid lines are placed by the 
   from 1; R's `pretty()` under the date and date-time
   transformations, from 0, as R takes it, and their labels found with the same `n:`, as R's
   breaks carry theirs as names. Time and a span of time refuse it, as R's `transform_hms()` and
-  `transform_timespan()` take no number.
+  `transform_timespan()` take no number. A composition hands it to its first part, where ggplot2
+  ignores it with a warning; a user's breaks function of two arguments is handed it, and one of
+  one refuses it.
 - **A width's breaks are exactly R's `fullseq()` and `breaks_width()`, on numbers, dates,
   date-times and times** (`Breaks.fullseq/3`, `Breaks.width/3`; design-log §4, the entry
   beginning "Breaks a width apart"): numbers from the low limit rounded down to a multiple of the

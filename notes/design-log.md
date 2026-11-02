@@ -79,6 +79,88 @@ stops the question being reopened from scratch. A new entry is about 150 words: 
 sentence or two of why, and one line per rejected alternative. What a later decision replaces is
 deleted from the entry it was in, never marked superseded; git history keeps every version.
 
+- **A composition is the name `{:compose, [part, ...]}` (2026-11-01, Steve: "A", increment 4's
+  step 6's C1; checked against scales 1.4.0).** R's `transform_compose("log10", "reverse")`, or
+  `transform = c("log10", "reverse")`, is `{:compose, [:log10, :reverse]}`, resolved as every
+  name is, each part a name, a user's own transformation or another composition, so a
+  composition of built-ins stays a value that compares and prints. One part is allowed, as R's;
+  none is refused. *Rejected: a bare list, R's `c()`*: the one compound name without a tag, and
+  `[]` and one part would need rules of their own. *Rejected: `Transform.compose/1` returning a
+  value of functions*, as R's returns a `new_transform()`: built-ins would stop being names.
+
+- **A composition's breaks are its first part's, `n:` reaching them, and its minor breaks R's
+  regular ones unreversed (2026-11-01, Steve: "A", "A", increment 4's step 6's C6 and C8;
+  checked against ggplot2 4.0.3).** As R's, the extent is turned back through the later parts
+  into the first part's space and broken there by that part, so its rules hold: an exponential's
+  or Yeo-Johnson's end past its bound is set aside (exp then reverse on 0 to 5 draws R's five
+  stacked breaks). R calls the first part's breaks without `n`, and ggplot2 warns "Ignoring
+  `n.breaks`"; here `n:` is handed on, so log10 then reverse with `n: 2` draws log10's one
+  break, and a first part refusing it (time, a span of time) refuses it here; a user's breaks
+  function of two arguments is handed it, one of one refuses it, as `:time`. Minor breaks are
+  R's `regular_minor_breaks()` with `reverse` off, whichever way the composition runs, so log10
+  then reverse on 0.01 to 5 draws 1.5 and 0.5 but not -0.5, R's drawing. *Rejected: refusing
+  `n:`*: a plot R draws fails. *Rejected: minor breaks reversed when the composition falls*: a
+  gridline ggplot2 does not draw.
+
+- **A composition's labels are its first part's (2026-11-01, Steve: "A", increment 4's step 6's
+  C5; checked against ggplot2 4.0.3).** R writes every composition's labels with `format()`;
+  Giggly replaced `format()` long ago with each transformation's own rule, so here the breaks
+  and the extent are turned back through the later parts to the first part's `format/4`: Box-Cox
+  in 2 then reverse writes `0.000 0.002 0.004 0.006` from data units as R does, a date first
+  writes its dates, and a span of minutes then reverse `20m`, as R's timespan alone writes it,
+  where R's composition writes `20 mins`. A later part with an inexact inverse leaves its round
+  trip, as R's does under `format()`'s seven digits: log10 then sqrt labels 1000 as
+  `999.999999999999`; re-finding the first part's breaks to hand it exactly, as Box-Cox's labels
+  do, is left until a composition needs it. *Rejected: plain labels from the round trip*:
+  `0.002000000000001` under Box-Cox, and a date first unlabelled.
+
+- **A composition's domain is R's, but a negative zero is below a positive one (2026-11-01,
+  Steve: "A", increment 4's step 6's C4; checked against scales 1.4.0).** As R's: the first
+  part's domain transformed, cut to each later part's domain and transformed again, turned back
+  through every inverse and sorted, `ArgumentError` when nothing is left (sqrt, reverse, log10),
+  as R aborts; so sqrt then log10 takes 1e-200 up and exp then log -230.26 up. R's `min()` and
+  `max()` of an equal pair keep the first, so the reciprocal's -0 and +0 both come out -0 and
+  the reciprocal then reverse has the domain `-Inf, -Inf`, its `trim_to_domain()` of -5 to 1000
+  `0, 0`; no drawing shows it, ggplot2 squishing nothing into a domain of no width. Here the
+  domain is the reciprocal's own line and the trim `-0.001, 0.2`. *Rejected: R's exactly*: a
+  package function's wrong answer copied for no drawing.
+
+- **A date, date-time or time transformation comes first in a composition, or nowhere
+  (2026-11-01, Steve: "A", increment 4's step 6's C7; checked against ggplot2 4.0.3).**
+  `scale_y_date()` takes no `transform`, so R's reversed date axis is
+  `scale_y_continuous(transform = c("date", "reverse"))`, and ggplot2 draws date, date-time and
+  `hms` then reverse with the first part's labels; the composition here takes and gives the
+  first part's values, its breaks and labels, and `width/3` lays steps through it (two weeks: R's
+  full dates from 2024-01-08), with no derivatives and no `trim_to_domain/2`, never squished. A
+  temporal part elsewhere raises `ArgumentError`, as R's reverse then date-time fails to build
+  (its `hms` is a number, ours a `Time`). *Rejected: compositions of numbers only*: a reversed
+  date axis in Giggly would reopen scales for a release.
+
+- **`Transform.new/2` takes a name and keyword functions, checked at the call (2026-11-01,
+  Steve: "A", increment 4's step 6's C2; checked against scales 1.4.0).**
+  `Transform.new("cube", transform: f, inverse: g, ...)`: the name a string, as R's
+  `new_transform()` requires one, read by messages and `inspect`; `derivative:`,
+  `inverse_derivative:`, `domain:` (the line unless given), `breaks:` (limits in data units),
+  `minor_breaks:` (breaks and extent in transformed space) and `labels:` (breaks in data units)
+  optional, R's defaults; a `%Scales.Transform{}` comes back. NimbleOptions refuses a missing
+  function, an unknown option, another arity and a domain not low to high, where R checks
+  nothing and fails when an axis first calls it, or keeps `c(Inf, 0)` backwards. *Rejected: no
+  name, `new(&cube/1, inverse: ...)`*: messages would say "a user's transformation", and the
+  required inverse would be an option.
+
+- **A transformation of your own is handed every value in its domain, its ends among them
+  (2026-11-01, Steve: "A", increment 4's step 6's C3; checked against scales 1.4.0).** R's help
+  says the function "is expected to be able to transform the `domain` argument", and ggplot2
+  transforms the domain's ends on every axis, so on the default line a user's function is
+  handed `:neg_infinity` and `:infinity`, and an annotation at `Inf` one too: Erlang's arithmetic
+  raises on them where R's IEEE arithmetic gives the cube of `Inf` as `Inf`, so a function on an
+  unbounded domain writes a clause for each, the moduledoc showing how. An integer is handed as
+  a float; `nil` and `:nan` are kept uncalled; a value outside the domain is `:nan` uncalled, a
+  departure (R's cube with a domain from 0 gives -8 for -2), so `&:math.sqrt/1` on a domain from
+  0 never meets a negative. It returns a number, an infinity, `:nan` or `nil`; anything else
+  raises `ArgumentError` naming it. *Rejected: finite floats only*: a falling function's `Inf`
+  drawn on the wrong edge, a bounded one never squished, its inverse handed 1.05.
+
 - **Box-Cox, modulus, Yeo-Johnson and a span of time are `{:boxcox, exponent}`, `{:modulus,
   exponent}`, `{:yj, exponent}` and `{:timespan, unit}`, a modulus offset from 1 (2026-11-01,
   Steve: "A", "A", increment 4's step 5; checked against scales 1.4.0).** The exponent, R's

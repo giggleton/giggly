@@ -18,6 +18,79 @@ defmodule Scales.Transform do
   A value the transformation cannot place, below a logarithm's or the square root's domain,
   becomes `:nan`, R's `NaN`; a value placed at an infinity is `:infinity` or `:neg_infinity`, and a
   missing one stays `nil`.
+
+  ## Compositions
+
+  `{:compose, [first, second, ...]}` puts values through each transformation in turn, R's
+  `transform_compose()`: `{:compose, [:log10, :reverse]}` is a log axis drawn high to low. Its
+  breaks and labels are its first part's, found on the extent turned back into that part's space,
+  and `n:` reaches them as it reaches that part; its minor breaks are
+  `Scales.MinorBreaks.regular/3`'s, unreversed whichever way it runs, as R's; it has derivatives
+  where every part has them, by the chain rule. Its domain is what every part takes: the first
+  part's domain transformed, cut to the next part's, transformed again, and so on, turned back
+  into data units, so `{:compose, [:sqrt, :log10]}` takes values from 1e-200 up, and a
+  composition no value passes raises `ArgumentError`. A date, date-time or time transformation
+  may come first, and the composition then takes and gives its values, its breaks, labels and
+  steps (`width/3`) its first part's, so `{:compose, [:date, :reverse]}` is a date axis drawn
+  late to early; anywhere else it raises `ArgumentError`.
+
+      iex> Scales.Transform.transform({:compose, [:log10, :reverse]}, [1, 10, 100])
+      [-0.0, -1.0, -2.0]
+
+      iex> Scales.Transform.format({:compose, [:log10, :reverse]}, [-0.0, -1.0, -2.0], {-2.1, 0.1})
+      ["1", "10", "100"]
+
+  ## A transformation of your own
+
+  `new/2` makes one from its functions, R's `new_transform()`, and it is given wherever a name is,
+  a composition's parts too. Each function takes one value and returns a number, `:infinity`,
+  `:neg_infinity`, `:nan` or `nil`. The transformation is handed every value in its domain, an
+  integer as a float, and the domain's own ends among them, since an axis is bounded by them;
+  `nil` and `:nan` are never handed over, and a value outside the domain becomes `:nan` without
+  it. So a transformation on the whole line, the default domain, handles both infinities, as R's
+  functions do through their arithmetic; its inverse is handed the transformation's values at
+  the domain's ends, and handles them too.
+
+      iex> cube =
+      ...>   Scales.Transform.new("cube",
+      ...>     transform: fn
+      ...>       :infinity -> :infinity
+      ...>       :neg_infinity -> :neg_infinity
+      ...>       value -> value * value * value
+      ...>     end,
+      ...>     inverse: fn
+      ...>       :infinity -> :infinity
+      ...>       :neg_infinity -> :neg_infinity
+      ...>       position when position < 0 -> -:math.pow(-position, 1 / 3)
+      ...>       position -> :math.pow(position, 1 / 3)
+      ...>     end
+      ...>   )
+      iex> Scales.Transform.transform(cube, [2, -0.5, nil])
+      [8.0, -0.125, nil]
+      iex> Scales.Transform.breaks(cube, {-1100.0, 1100.0})
+      [-1000.0, -125.0, 0.0, 125.0, 1000.0]
+      iex> Scales.Transform.format(cube, [-1000.0, -125.0, 0.0, 125.0, 1000.0], {-1100.0, 1100.0})
+      ["-10", "-5", "0", "5", "10"]
+
+  Any distribution's quantile is one, as `:probit` is the normal's: the Cauchy distribution's on
+  the probabilities from 0 to 1, its ends the infinities.
+
+      iex> cauchy =
+      ...>   Scales.Transform.new("cauchy",
+      ...>     transform: fn
+      ...>       probability when probability == 0 -> :neg_infinity
+      ...>       probability when probability == 1 -> :infinity
+      ...>       probability -> :math.tan(:math.pi() * (probability - 0.5))
+      ...>     end,
+      ...>     inverse: fn
+      ...>       :neg_infinity -> 0.0
+      ...>       :infinity -> 1.0
+      ...>       quantile -> 0.5 + :math.atan(quantile) / :math.pi()
+      ...>     end,
+      ...>     domain: {0, 1}
+      ...>   )
+      iex> Scales.Transform.transform(cauchy, [0, 0.5, 1, 1.5])
+      [:neg_infinity, 0.0, :infinity, :nan]
   """
 
   # The transformation a continuous scale puts its values through before it trains on them: R's
@@ -58,7 +131,92 @@ defmodule Scales.Transform do
   # `format/2` is handed both, or `:given` for breaks it did not choose, which a date writes in
   # full.
 
-  alias Scales.{Bounds, Double, Transform}
+  alias Scales.{Bounds, Breaks, Double, Labels, MinorBreaks, Transform}
+
+  @derive {Inspect, only: [:name, :domain]}
+  defstruct [
+    :name,
+    :transform,
+    :inverse,
+    :derivative,
+    :inverse_derivative,
+    :domain,
+    :breaks,
+    :minor_breaks,
+    :labels
+  ]
+
+  @typedoc """
+  A transformation of your own, made by `new/2`: its name, its functions and its domain.
+  """
+  @type t :: %__MODULE__{
+          name: String.t(),
+          transform: (term() -> term()),
+          inverse: (term() -> term()),
+          derivative: (term() -> term()) | nil,
+          inverse_derivative: (term() -> term()) | nil,
+          domain: {number() | :neg_infinity, number() | :infinity},
+          breaks:
+            ({float(), float()} -> [number()]) | ({float(), float()}, keyword() -> [number()]),
+          minor_breaks: ([float()], {float(), float()} -> [float()]),
+          labels: ([term()] -> [String.t()])
+        }
+
+  @new_options NimbleOptions.new!(
+                 transform: [
+                   type: {:fun, 1},
+                   required: true,
+                   doc:
+                     "The transformation, of one value: a number, an integer as a float, or " <>
+                       "an infinity in the domain, to a number, `:infinity`, `:neg_infinity`, " <>
+                       "`:nan` or `nil`."
+                 ],
+                 inverse: [
+                   type: {:fun, 1},
+                   required: true,
+                   doc: "Its inverse, of one position in transformed space, returning as it does."
+                 ],
+                 derivative: [
+                   type: {:fun, 1},
+                   doc:
+                     "Its derivative, of one value, for `derivative/2`; without one, " <>
+                       "`derivative/2` raises."
+                 ],
+                 inverse_derivative: [
+                   type: {:fun, 1},
+                   doc:
+                     "Its inverse's derivative, of one position, for `inverse_derivative/2`; " <>
+                       "without one, `inverse_derivative/2` raises."
+                 ],
+                 domain: [
+                   type: {:custom, __MODULE__, :validate_domain, []},
+                   default: {:neg_infinity, :infinity},
+                   doc:
+                     "The values it takes, `{low, high}` in data units, each a number or an " <>
+                       "infinity, `low` below `high`."
+                 ],
+                 breaks: [
+                   type: {:or, [{:fun, 1}, {:fun, 2}]},
+                   default: &Breaks.extended/2,
+                   doc:
+                     "An axis's breaks, from its limits in data units, `{low, high}`, to " <>
+                       "breaks in data units; one of two arguments is also handed " <>
+                       "`breaks/3`'s options, so `n:` reaches it, and one of one argument " <>
+                       "takes none."
+                 ],
+                 minor_breaks: [
+                   type: {:fun, 2},
+                   default: &MinorBreaks.regular/2,
+                   doc:
+                     "An axis's minor breaks, from its breaks and its extent, both in " <>
+                       "transformed space, to minor breaks there."
+                 ],
+                 labels: [
+                   type: {:fun, 1},
+                   default: &Labels.plain/1,
+                   doc: "An axis's labels, from its breaks turned back into data units."
+                 ]
+               )
 
   @breaks_options NimbleOptions.new!(
                     n: [
@@ -92,8 +250,10 @@ defmodule Scales.Transform do
   a `Date` as its days since 1970-01-01, R's `transform_date()`; `{:datetime, zone, database}`, a
   `DateTime` or `NaiveDateTime` as its seconds since 1970-01-01 00:00 UTC, its breaks laid on
   the clock of `zone`, read by the time zone database `database`, R's `transform_time(tz)`, the
-  zone `:default` until a column settles it and `:naive` for naive date-times; and `:time`, a
-  `Time` as its seconds since midnight, R's `transform_hms()`.
+  zone `:default` until a column settles it and `:naive` for naive date-times; `:time`, a
+  `Time` as its seconds since midnight, R's `transform_hms()`; `{:compose, [first, second,
+  ...]}`, each in turn, R's `transform_compose()`; and a transformation of your own, `t:t/0`,
+  made by `new/2`.
 
   A base is a number above 1, a sigma, a standard deviation or a scale a number above 0, a
   mean, a location or an exponent a number, a Box-Cox offset a number from 0 up and a modulus
@@ -133,6 +293,8 @@ defmodule Scales.Transform do
           | {:yj, number()}
           | :timespan
           | {:timespan, Scales.Breaks.timespan_unit()}
+          | {:compose, [name(), ...]}
+          | t()
 
   @typedoc "A break in transformed space: a number, or an infinity or NaN where R's lands one."
   @type break :: float() | :infinity | :neg_infinity | :nan
@@ -140,6 +302,9 @@ defmodule Scales.Transform do
   # The date, date-time and time transformations, whose data are not numbers.
   defguardp is_temporal(name)
             when name in [:date, :time] or (is_tuple(name) and elem(name, 0) == :datetime)
+
+  # A number or an infinity.
+  defguardp is_bound(value) when is_number(value) or value in [:infinity, :neg_infinity]
 
   # The span of time transformation, of numbers but with no derivatives, as R's has none.
   defguardp is_timespan(name)
@@ -222,6 +387,54 @@ defmodule Scales.Transform do
             ) :: [String.t()]
 
   @doc """
+  A transformation of your own named `name`, R's `new_transform()`, from its functions, each of
+  one value: given wherever a transformation's name is, and as a composition's part. Its domain
+  is the whole line unless `domain:` says, its breaks `Scales.Breaks.extended/2`'s on an axis's
+  limits in data units, its minor breaks `Scales.MinorBreaks.regular/3`'s and its labels
+  `Scales.Labels.plain/1`'s of the breaks turned back, unless `breaks:`, `minor_breaks:` or
+  `labels:` say. A missing function, an unknown option, a function of another arity or a domain
+  not `{low, high}` raises `NimbleOptions.ValidationError`.
+
+  It is handed every value in its domain, the domain's ends among them, as the module
+  documentation describes, and its inverse every position but `nil` and `:nan`: on the whole
+  line it handles `:infinity` and `:neg_infinity`.
+
+  ## Options
+
+  #{NimbleOptions.docs(@new_options)}
+
+  ## Examples
+
+      iex> square_root =
+      ...>   Scales.Transform.new("square root",
+      ...>     transform: &:math.sqrt/1,
+      ...>     inverse: fn position -> position * position end,
+      ...>     domain: {0, 1.0e300}
+      ...>   )
+      iex> Scales.Transform.transform(square_root, [4, -1, nil])
+      [2.0, :nan, nil]
+  """
+  @spec new(String.t(), keyword()) :: t()
+  def new(name, options) when is_binary(name) do
+    validated = NimbleOptions.validate!(options, @new_options)
+    struct!(__MODULE__, [name: name] ++ validated)
+  end
+
+  # A domain `new/2` takes: two numbers or infinities, the first below the second.
+  @doc false
+  @spec validate_domain(term()) :: {:ok, {term(), term()}} | {:error, String.t()}
+  def validate_domain({low, high} = domain)
+      when is_bound(low) and is_bound(high) and low != :infinity and high != :neg_infinity do
+    if Double.less?(low, high),
+      do: {:ok, domain},
+      else: {:error, "expected a domain's low end below its high end, got: #{inspect(domain)}"}
+  end
+
+  def validate_domain(domain),
+    do:
+      {:error, "expected a domain {low, high} of numbers or infinities, got: #{inspect(domain)}"}
+
+  @doc """
   The values put through the transformation `name`.
 
   ## Examples
@@ -264,12 +477,14 @@ defmodule Scales.Transform do
       {-100.0, 2.0}
   """
   @spec squish(name(), {float(), float()}) :: {float(), float()}
-  def squish(name, extent) when is_temporal(name), do: extent
-
   def squish(name, extent) do
-    {domain_low, domain_high} = module(name).domain(name)
-    [first, second] = transform(name, [domain_low, domain_high])
-    squished(extent, {Double.minimum(first, second), Double.maximum(first, second)})
+    if temporal?(name) do
+      extent
+    else
+      {domain_low, domain_high} = domain(name)
+      [first, second] = transform(name, [domain_low, domain_high])
+      squished(extent, {Double.minimum(first, second), Double.maximum(first, second)})
+    end
   end
 
   defp squished({low, high} = extent, domain) do
@@ -308,6 +523,12 @@ defmodule Scales.Transform do
   """
   @spec trim_to_domain(name(), [Scales.double()]) :: {Scales.double(), Scales.double()} | :none
   def trim_to_domain(name, values) when not is_temporal(name) do
+    if temporal?(name) do
+      raise ArgumentError,
+            "#{inspect(name)} takes dates, date-times or times, not numbers, so it has no " <>
+              "range to trim to its domain"
+    end
+
     case Enum.reduce(values, :none, &widened/2) do
       :none -> :none
       {low, high} -> trimmed(name, [low, high])
@@ -323,7 +544,7 @@ defmodule Scales.Transform do
     do: {Double.minimum(low, value), Double.maximum(high, value)}
 
   defp trimmed(name, ends) do
-    [first, last] = transform(name, Bounds.squish(ends, module(name).domain(name)))
+    [first, last] = transform(name, Bounds.squish(ends, domain(name)))
     {Double.minimum(first, last), Double.maximum(first, last)}
   end
 
@@ -483,7 +704,7 @@ defmodule Scales.Transform do
       [19723.0, 19737.0, 19751.0]
   """
   @spec width(
-          :date | {:datetime, term(), module()} | :time,
+          :date | {:datetime, term(), module()} | :time | {:compose, [name(), ...]},
           keyword(pos_integer()),
           {float(), float()}
         ) :: [float()]
@@ -493,6 +714,22 @@ defmodule Scales.Transform do
     do: Transform.Datetime.width(name, step, extent)
 
   def width(:time = name, step, extent), do: Transform.Time.width(name, step, extent)
+
+  def width({:compose, [_first | _rest]} = name, step, extent),
+    do: Transform.Composition.width(name, step, extent)
+
+  # The domain of the transformation `name` in data units, R's `domain`.
+  @doc false
+  @spec domain(name()) :: Bounds.range()
+  def domain(name), do: module(name).domain(name)
+
+  # Whether the transformation `name` takes dates, date-times or times: one of theirs, or a
+  # composition whose first part is.
+  @doc false
+  @spec temporal?(name()) :: boolean()
+  def temporal?({:compose, [first | _rest]}), do: temporal?(first)
+  def temporal?(name) when is_temporal(name), do: true
+  def temporal?(_name), do: false
 
   defp module(:identity), do: Transform.Identity
   defp module(:date), do: Transform.Date
@@ -547,4 +784,6 @@ defmodule Scales.Transform do
   defp module({:yj, exponent}) when is_number(exponent), do: Transform.YeoJohnson
   defp module(:timespan), do: Transform.Timespan
   defp module({:timespan, unit}) when is_unit(unit), do: Transform.Timespan
+  defp module({:compose, [_first | _rest]} = name), do: Transform.Composition.checked!(name)
+  defp module(%Transform{}), do: Transform.Custom
 end
