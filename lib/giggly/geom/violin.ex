@@ -101,13 +101,9 @@ defmodule Giggly.Geom.Violin do
 
     # The orientation the densities wrote in every row, vertical for a table of none.
     defp flipped?(frame) do
-      if :flipped_aes in DataFrame.names(frame) do
-        frame
-        |> DataFrame.pull(:flipped_aes)
-        |> Enum.find(false, fn flipped -> is_boolean(flipped) end)
-      else
-        false
-      end
+      frame
+      |> DataFrame.pull(:flipped_aes)
+      |> Enum.find(false, fn flipped -> is_boolean(flipped) end)
     end
 
     # Each row's width, ggplot2's `compute_data_size()` across panels: the one its rows hold, else
@@ -248,10 +244,10 @@ defmodule Giggly.Geom.Violin do
     end
 
     # A violin's polygon: filled with its fill at its alpha and bordered in its colour, width and
-    # line type, a border no line draws left off.
+    # line type, a border no line draws left off, as a colour of `:none` leaves it.
     defp polygon(geom, pieces, look) do
       width = look.linewidth || 0.0
-      drawn = look.color != :none and is_number(look.linewidth) and look.linetype != :none
+      drawn = is_number(look.linewidth) and look.linetype != :none
       border = if drawn, do: look.color, else: :none
       each = fn value -> List.duplicate(value, length(pieces)) end
       border_color = Mark.hex(border)

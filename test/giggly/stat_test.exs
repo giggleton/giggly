@@ -3555,12 +3555,37 @@ defmodule Giggly.StatTest do
 
       kept = violins(short, width: 0.2, drop: false)
       assert at_rows(kept, :width, [1, 2]) == [0.5, 0.2]
+
+      # Golden: x a, a, b, b and b at y 1, 2, 1, 2 and 4 mapping widths 0.5 and 0.7 with `width =
+      # 0.2`: a group of two rows is estimated, so the stat's width is its own.
+      pair =
+        DataFrame.new(
+          x: [1, 1, 2, 2, 2],
+          y: [1.0, 2.0, 1.0, 2.0, 4.0],
+          width: [0.5, 0.5, 0.7, 0.7, 0.7],
+          panel: List.duplicate(1, 5),
+          group: [1, 1, 2, 2, 2]
+        )
+
+      paired = violins(pair, width: 0.2)
+      assert at_rows(paired, :width, [1, 516]) == [0.2, 0.2]
+    end
+
+    # Golden: x a, a and a at y 1, 2 and 4 mapping a width of 1L, and one of NA in every row.
+    test "a mapped width of integers or of none at all is taken" do
+      integers = violins(single_frame([1.0, 2.0, 4.0], width: [1, 1, 1]))
+      assert at_rows(integers, :width, [1, 515]) === [1, 1]
+
+      missing = violins(single_frame([1.0, 2.0, 4.0], width: [nil, nil, nil]))
+      assert at_rows(missing, :width, [1, 515]) == [nil, nil]
     end
 
     test "a mapped width that is not a number is refused" do
       frame = single_frame([1.0, 2.0, 3.0], width: ["a", "b", "c"])
+      error = assert_raise ArgumentError, fn -> violins(frame) end
 
-      assert_raise ArgumentError, ~r/a width must be a number/, fn -> violins(frame) end
+      assert String.starts_with?(error.message, "a violin is drawn as wide as its group's width")
+      assert error.message =~ ":string column"
     end
 
     test "names what an after_stat can read, the aesthetics it takes, needs and consumes" do

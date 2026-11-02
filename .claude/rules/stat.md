@@ -274,7 +274,8 @@ the entry beginning "Each facet, coordinate system, geom, stat and position is a
   three of the rule's bandwidths, before `adjust`, without `trim`, **the bandwidth from all the
   group's rows**, where a density's reads those inside the bounds (R draws it so); `x` the
   group's, or its x range's middle, `width` 0.9 of that range, else the stat's, else a mapped
-  width constant within each group of one x and each short group kept, as R carries it, a mapped
+  width constant within each group of one x and each short group kept, missing ones too, as R
+  carries it, a mapped
   width varying within any such group dropping every width, as R drops the column; a row for each
   of `quantiles`, in their order, at the frame's type 7 quantile of the group's y, unweighted as R
   takes it, its other columns read along the curve by R's `approx()` formula, a curve row at its

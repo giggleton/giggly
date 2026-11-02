@@ -945,6 +945,19 @@ defmodule Giggly.GeomTest do
       assert DataFrame.pull(set_up, :width) == [0.45, 0.45, 0.45, 0.45]
       assert DataFrame.pull(set_up, :xmin) == [0.775, 2.775, 9.775, 10.275]
       assert DataFrame.pull(set_up, :xmax) == [1.225, 3.225, 10.225, 10.725]
+
+      # Golden: the same of groups at x 1 and 3 in one panel: 0.9 wide, the spacing from 0 to 1.
+      apart =
+        DataFrame.new(
+          x: [1.0, 3.0],
+          y: [1.0, 1.0],
+          panel: [1, 1],
+          group: [1, 2],
+          flipped_aes: [false, false]
+        )
+
+      set_apart = Geom.setup_data(@violin, apart, @continuous)
+      assert DataFrame.pull(set_apart, :xmin) == [0.55, 2.55]
     end
 
     # Golden: `geom_violin()` of x a and b at y 1, 2, 4, 1, 3 and 4 mapping a width of 0.5 for a
@@ -999,16 +1012,42 @@ defmodule Giggly.GeomTest do
     test "violins are drawn in the order of their groups, a row missing x or y left out" do
       frame =
         violin_rows(
-          y: [1.0, 2.0, nil, 1.0, 2.0],
-          violinwidth: [1.0, 1.0, 1.0, 0.5, 0.5],
-          group: [2, 2, 2, 1, 1],
-          fill: ["#FF0000", "#FF0000", "#FF0000", "#0000FF", "#0000FF"]
+          y: [1.0, 2.0, nil, 1.0, 2.0, :nan],
+          violinwidth: [1.0, 1.0, 1.0, 0.5, 0.5, 0.5],
+          group: [2, 2, 2, 1, 1, 1],
+          fill: ["#FF0000", "#FF0000", "#FF0000", "#0000FF", "#0000FF", "#0000FF"]
         )
 
-      assert [%Polygons{fill: ["#0000FF"]}, %Polygons{fill: ["#FF0000"], outlines: [outline]}] =
-               draw_panel(@violin, frame, @cartesian, @params)
+      assert [
+               %Polygons{fill: ["#0000FF"], outlines: [first]},
+               %Polygons{fill: ["#FF0000"], outlines: [second]}
+             ] = draw_panel(@violin, frame, @cartesian, @params)
 
-      assert Enum.count(outline) == 5
+      assert {Enum.count(first), Enum.count(second)} == {5, 5}
+    end
+
+    test "violins are drawn in the order of their groups however many a panel holds" do
+      groups = Enum.to_list(40..1//-1)
+
+      fills =
+        Enum.map(groups, fn group ->
+          "#0000" <> String.pad_leading(Integer.to_string(group), 2, "0")
+        end)
+
+      frame =
+        violin_rows(
+          y: List.duplicate(1.0, 40),
+          violinwidth: List.duplicate(1.0, 40),
+          group: groups,
+          fill: fills
+        )
+
+      drawn =
+        @violin
+        |> draw_panel(frame, @cartesian, @params)
+        |> Enum.map(fn %Polygons{fill: [fill]} -> fill end)
+
+      assert drawn == Enum.reverse(fills)
     end
 
     test "a missing width splits the outline, a run of two points or more drawn" do
@@ -1034,6 +1073,10 @@ defmodule Giggly.GeomTest do
         assert [%Polygons{color: [:none], fill: ["#FFFFFF"]}] =
                  draw_panel(@violin, frame, @cartesian, @params)
       end
+
+      unwidened = violin_rows(y: [1.0, 2.0], violinwidth: [1.0, 1.0], linewidth: [nil, nil])
+      [%Polygons{stroke_width: width}] = draw_panel(@violin, unwidened, @cartesian, @params)
+      assert width === 0.0
     end
 
     test "a violin's corners are round where the layer gives none, its ends and mitre its own" do

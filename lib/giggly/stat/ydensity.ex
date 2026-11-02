@@ -9,7 +9,10 @@ defmodule Giggly.Stat.Ydensity do
   # `compute_density()`, its bandwidth worked out from all the group's rows, before the bounds
   # leave any out, as `stat_ydensity()` works it out before handing it over). Its `x` is the
   # group's x, or the middle of its x values' range where they are more than one, with a `width`
-  # of 0.9 of that range; else its `width` is the stat's, the layer's `width:`, or none. Then a
+  # of 0.9 of that range; else its `width` is the stat's, the layer's `width:`, or else a mapped
+  # one, carried, missing ones too, to each group of one x and each short group kept where it is
+  # constant within every such group, as ggplot2 carries it, and leaving every row without a
+  # `width` where it varies within one, as ggplot2 drops the column; else none. Then a
   # row for each of `quantiles`, in their order, at the type 7 quantile of the group's y, R's
   # `quantile()`, unweighted as ggplot2 takes it (and warns, which a pure pipeline cannot), its
   # `quantile` that probability, every other column the group's curve read at that y by R's
@@ -236,18 +239,21 @@ defmodule Giggly.Stat.Ydensity do
       firsts = for name <- constant, name not in [:panel, :group], do: {name, {:first, [name]}}
       carried_values = DataFrame.summarise(kept_rows, [:panel, :group], firsts)
 
-      groups
-      |> with_given_widths(given != [], figures, kept_rows, stat)
+      {given_groups, carried_width} =
+        with_given_widths(groups, given != [], figures, kept_rows, stat)
+
+      given_groups
       |> widened(stat.scale)
-      |> output(carried_values, constant, stat.quantiles, flipped)
+      |> output(carried_values, constant, {stat.quantiles, carried_width}, flipped)
     end
 
     # Each group's rows with the layer's mapped width, where it maps one, as ggplot2 carries it to
     # the groups whose own rows gave no width: those of one x where the stat is given none, and a
     # short group kept. Where it varies within any such group given rows, every row loses its
     # width, a group's of several x too, as ggplot2 drops a column that varies from the whole
-    # table.
-    defp with_given_widths(groups, false, _figures, _kept_rows, _stat), do: groups
+    # table. Beside them, whether a group given rows carries the mapped width, so the table holds
+    # a `width` though every one carried is missing, as ggplot2 binds the column it carries.
+    defp with_given_widths(groups, false, _figures, _kept_rows, _stat), do: {groups, false}
 
     defp with_given_widths(groups, true, figures, kept_rows, stat) do
       reading =
@@ -275,9 +281,12 @@ defmodule Giggly.Stat.Ydensity do
 
       constant = Carry.constant_columns(read_rows, [:width]) == [:width]
 
-      Enum.map(groups, fn {key, group_rows} ->
-        {key, given_width(group_rows, constant, Map.fetch!(reading, key), given_widths[key])}
-      end)
+      given_groups =
+        Enum.map(groups, fn {key, group_rows} ->
+          {key, given_width(group_rows, constant, Map.fetch!(reading, key), given_widths[key])}
+        end)
+
+      {given_groups, constant and DataFrame.row_count(read_rows) > 0}
     end
 
     # A group's rows given the mapped width where it reads it, every row's width dropped where the
@@ -499,16 +508,16 @@ defmodule Giggly.Stat.Ydensity do
     defp share(row, :width, _peaks), do: row.scaled
 
     # The stat's table: each group's rows in its group's order, the columns ggplot2's, a `width`
-    # where some group has one and a `quantile` where the stat reads quantiles, then each carried
-    # column's group's value, the violins' widths and the orientation.
-    defp output(groups, carried_values, constant, quantiles, flipped) do
+    # where some group has one or carries a mapped one and a `quantile` where the stat reads
+    # quantiles, then each carried column's group's value, the violins' widths and the orientation.
+    defp output(groups, carried_values, constant, {quantiles, carried_width}, flipped) do
       rows =
         Enum.flat_map(groups, fn {key, group_rows} ->
           Enum.map(group_rows, fn row -> Map.put(row, :key, key) end)
         end)
 
       widths =
-        if Enum.any?(rows, fn row -> row.width not in [nil, :dropped] end),
+        if carried_width or Enum.any?(rows, fn row -> row.width not in [nil, :dropped] end),
           do: [:width],
           else: []
 

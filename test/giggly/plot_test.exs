@@ -3694,6 +3694,21 @@ defmodule Giggly.PlotTest do
       options = [scale: :count, fill: "red", linejoin: :bevel]
 
       assert Plot.stat_ydensity(plot, options) == Plot.geom_violin(plot, options)
+      assert Plot.stat_ydensity(plot) == Plot.geom_violin(plot)
+    end
+
+    test "a mapping that is not a map, or options that are not a keyword list, are refused" do
+      plot = Plot.new(@violin_values, %{x: :g, y: :y})
+
+      for function <- [:geom_violin, :stat_ydensity],
+          {mapping, options} <- [{untyped(:x), []}, {%{}, untyped(:scale)}] do
+        error =
+          assert_raise FunctionClauseError, fn ->
+            apply(Plot, function, [plot, mapping, options])
+          end
+
+        assert {error.module, error.function, error.arity} == {Plot, function, 3}
+      end
     end
 
     test "the densities' options are the stat's, each number kept as a float" do
@@ -3740,6 +3755,14 @@ defmodule Giggly.PlotTest do
 
         assert given.stat.quantiles == recorded
       end
+
+      [along_x] =
+        @violin_values
+        |> Plot.new(%{x: :g, y: :y})
+        |> Plot.geom_violin(orientation: :x)
+        |> Map.fetch!(:reversed_layers)
+
+      assert along_x.stat.orientation == :x
     end
 
     test "a violin's look is set for every violin, and its border's ends and corners chosen" do
