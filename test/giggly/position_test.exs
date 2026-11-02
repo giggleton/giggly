@@ -304,6 +304,106 @@ defmodule Giggly.PositionTest do
     end
   end
 
+  # Golden: ggplot2 4.0.3's `layer_data()` in R 4.6.1, printed to 17 significant digits, for
+  # dodging the rows the mutation pass over step 5 found nothing pinning.
+  describe "compute_layer/3 for dodging, the shares at an x" do
+    # `geom_point(position = position_dodge(width = 0.9, preserve = ...))` of two points of group 1
+    # and one of group 2 at x 1, one of group 1 at 2.
+    test "a group with two marks at an x counts once among its groups, either way" do
+      frame =
+        DataFrame.new(
+          panel: [1, 1, 1, 1],
+          group: [1, 1, 2, 1],
+          x: [1.0, 1.0, 1.0, 2.0],
+          y: [1.0, 2.0, 3.0, 4.0]
+        )
+
+      for {preserve, last} <- [{:total, 2.0}, {:single, 1.77499999999999991}] do
+        position = dodge(width: 0.9, preserve: preserve)
+        dodged = Position.compute_layer(position, frame, @continuous)
+
+        assert DataFrame.pull(dodged, :x) ===
+                 [0.77500000000000002, 0.77500000000000002, 1.22500000000000009, last]
+      end
+    end
+
+    # `geom_col(position = position_dodge(reverse = TRUE))` of three groups at x 1 and two at 2.
+    test "reversed, each x's marks are ranked from its own highest group" do
+      x_positions = [1.0, 1.0, 1.0, 2.0, 2.0]
+
+      frame =
+        DataFrame.new(
+          panel: [1, 1, 1, 1, 1],
+          group: [1, 2, 3, 1, 2],
+          x: x_positions,
+          xmin: Enum.map(x_positions, fn x -> x - 0.45 end),
+          xmax: Enum.map(x_positions, fn x -> x + 0.45 end),
+          ymax: [1.0, 2.0, 3.0, 4.0, 5.0]
+        )
+
+      assert placed(dodge(reverse: true), frame) === [
+               [
+                 1.30000000000000004,
+                 1.0,
+                 0.69999999999999996,
+                 2.22500000000000009,
+                 1.77499999999999991
+               ],
+               [
+                 1.15000000000000013,
+                 0.84999999999999998,
+                 0.54999999999999993,
+                 2.0,
+                 1.54999999999999982
+               ],
+               [
+                 1.44999999999999996,
+                 1.14999999999999991,
+                 0.84999999999999998,
+                 2.45000000000000018,
+                 2.0
+               ]
+             ]
+    end
+
+    # `geom_col(aes(width = w), just = 0, position = "dodge")` of bars 0.4 and 0.8 wide from x 1:
+    # the panel's first width spaces them, the widest sizes each share.
+    test "the widest mark at an xmin sizes every share" do
+      frame =
+        DataFrame.new(
+          panel: [1, 1],
+          group: [1, 2],
+          x: [1.0, 1.0],
+          xmin: [1.0, 1.0],
+          xmax: [1.0 + 0.4, 1.0 + 0.8],
+          ymax: [1.0, 2.0]
+        )
+
+      assert placed(dodge([]), frame) === [
+               [0.90000000000000002, 1.10000000000000009],
+               [0.69999999999999996, 0.90000000000000013],
+               [1.1000000000000001, 1.3]
+             ]
+    end
+
+    # R's `pos_dodge()` gives rows missing their x a missing `xmin`, dodged together to NA.
+    test "marks missing their x share a missing xmin and stay missing, the rest dodged" do
+      frame =
+        DataFrame.new(
+          panel: [1, 1, 1, 1],
+          group: [1, 2, 1, 2],
+          x: [nil, nil, 1.0, 1.0],
+          y: [1.0, 2.0, 3.0, 4.0]
+        )
+
+      within = dodge(width: 0.9)
+      dodged = Position.compute_layer(within, frame, @continuous)
+
+      assert {DataFrame.pull(dodged, :x), DataFrame.pull(dodged, :xmin)} ===
+               {[nil, nil, 0.775, 1.225], [nil, nil, 0.55, 1.0]}
+    end
+  end
+
   # The position columns `position` leaves `frame`'s marks at: their x, xmin and xmax.
   defp placed(position, frame) do
     dodged = Position.compute_layer(position, frame, @continuous)
