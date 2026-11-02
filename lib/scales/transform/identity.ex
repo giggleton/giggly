@@ -9,7 +9,8 @@ defmodule Scales.Transform.Identity do
   #
   # Its axis takes R's default breaks for a transformation, extended Wilkinson
   # (`Scales.Breaks`), and its default minor breaks, midway between them
-  # (`Scales.MinorBreaks`), and writes the breaks as plain decimals (`Scales.Labels.plain/1`).
+  # (`Scales.MinorBreaks`), and writes the breaks as plain decimals (`Scales.Labels.plain/1`). Its
+  # derivatives are 1 at every value, a missing one and NaN too, as R's `rep(1, length(x))`.
 
   @behaviour Scales.Transform
 
@@ -28,6 +29,12 @@ defmodule Scales.Transform.Identity do
 
   @impl Scales.Transform
   def breaks(_transformation, extent, options), do: Breaks.extended(extent, options)
+
+  @impl Scales.Transform
+  def derivative(_transformation, values), do: Enum.map(values, fn _value -> 1.0 end)
+
+  @impl Scales.Transform
+  def inverse_derivative(transformation, positions), do: derivative(transformation, positions)
 
   @impl Scales.Transform
   def minor_breaks(_transformation, breaks, extent), do: MinorBreaks.regular(breaks, extent)

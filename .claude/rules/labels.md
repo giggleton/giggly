@@ -95,15 +95,22 @@ and "`wrap/2` takes"; why `dictionary/2` matches and takes what it does: "`dicti
 - **R's order of floating-point operations is kept**: rounding is `round(x / (accuracy /
   scale)) * (accuracy / scale)` and a step's scale `scale * (1 / threshold)`, since reordering
   moves labels (two and a half billion is `3B` under the short scale); `signif()` and `round()`
-  are R's C (`Labels.Arithmetic`), a power of ten R's `R_pow_di()`, so `0.15` to one digit is
+  are R's C (`Labels.Arithmetic`), a logarithm in a base `Scales.Double`'s, a power of ten R's
+  `R_pow_di()`, so `0.15` to one digit is
   `2e-01` where `format()` from the exact value writes `1e-01`.
 - **A float is printed from its exact value, a half to even, never with `float_to_binary/2`'s
   `decimals:`**, which rounds a tie away from zero where R's `sprintf()` does not; `plain/1`
-  rounds to 15 significant digits first, so `decimals:` only pads its labels.
+  rounds to 15 significant digits first, so `decimals:` only pads its labels, and past the 253
+  decimals and 256 characters `decimals:` writes at most it takes `Labels.Format`'s exact digits,
+  as R's `format(scientific = FALSE)` writes them, so no double raises (design-log §4, the entry
+  beginning "A plain label past").
 - **Its options are NimbleOptions schemas, as every public option in Giggly is**, so a bad one
   raises `NimbleOptions.ValidationError` and each formatter's option docs are generated from its
   schema; its boundary lists NimbleOptions and nothing else. The package's transformations call
-  `plain/1` for their default labels; a user hands the others to a scale's labels.
+  `plain/1` for their default labels, or `plain_round_tripped/1`, 14 significant digits first,
+  where their inverse does not give a break back exactly, but Box-Cox, modulus and Yeo-Johnson
+  `plain/1` of their breaks in data units, and a span of time `timespan/2` (`scales.md`); a user
+  hands the others to a scale's labels.
 - **Only what R offers, and only where R's answer is sound**: no superseded name (`currency`,
   not `dollar`), and a `scale_cut:` list without a zero threshold is refused, the one shape where
   R misaligns its steps; `scientific/2` takes no `trim:`, which `label_scientific()` drops;

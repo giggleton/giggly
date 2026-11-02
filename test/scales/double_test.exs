@@ -107,7 +107,21 @@ defmodule Scales.DoubleTest do
     end
   end
 
-  describe "maximum/2 and mean/2" do
+  describe "minimum/2, maximum/2 and mean/2" do
+    # R's `min(NaN, 1)` and `min(1, NaN)` are NaN, `min(-Inf, 1)` `-Inf` and `min(Inf, 1)` 1.
+    test "the smaller of two, NaN where either is" do
+      assert {Double.minimum(:nan, 1), Double.minimum(1, :nan), Double.minimum(:neg_infinity, 1),
+              Double.minimum(:infinity, 1), Double.minimum(1, 2)} ===
+               {:nan, :nan, :neg_infinity, 1, 1}
+    end
+
+    # R's `1 / min(-0, 0)` and `1 / max(-0, 0)` are `-Inf`, `1 / min(0, -0)` and `1 / max(0, -0)`
+    # `Inf`: of two equals, the first.
+    test "of two equals, the first, so a zero's sign is the first's" do
+      assert {Double.minimum(-0.0, 0.0), Double.maximum(-0.0, 0.0), Double.minimum(0.0, -0.0),
+              Double.maximum(0.0, -0.0)} === {-0.0, -0.0, 0.0, 0.0}
+    end
+
     # R's `max(NaN, 1)` and `max(1, NaN)` are NaN, `max(-Inf, 1)` 1 and `max(Inf, 1)` `Inf`.
     test "the larger of two, NaN where either is" do
       assert {Double.maximum(:nan, 1), Double.maximum(1, :nan), Double.maximum(:neg_infinity, 1),
@@ -141,5 +155,285 @@ defmodule Scales.DoubleTest do
       assert_raise FunctionClauseError, fn -> Double.less?(nan, :infinity) end
       assert_raise FunctionClauseError, fn -> Double.less?(:neg_infinity, nan) end
     end
+  end
+
+  describe "logarithm/2, power/2 and exponential/1" do
+    # R's log(0, 3) is -Inf, log(-2, 3) and log(-Inf, 3) NaN, log(0.5, 3) -0.63092975357145742,
+    # 3^-Inf 0, 3^0.5 1.7320508075688772, 3^800 Inf, exp(-Inf) 0, exp(2) 7.3890560989306504 and
+    # exp(800) Inf (`inc4/step3/probe.R`)
+    test "a logarithm is minus infinity at zero and NaN below it, in base 2 and 10 their own" do
+      assert {Double.logarithm(0.0, 3), Double.logarithm(-0.0, 3), Double.logarithm(-2.0, 3),
+              Double.logarithm(:neg_infinity, 3), Double.logarithm(:infinity, 3),
+              Double.logarithm(:nan, 3), Double.logarithm(0.5, 3)} ===
+               {:neg_infinity, :neg_infinity, :nan, :nan, :infinity, :nan, -0.63092975357145742}
+
+      # log(1000, 10), where log(1000) / log(10) is 2.9999999999999996; log(3, 2), where
+      # log(3) / log(2) is 1.5849625007211563
+      assert {Double.logarithm(1000.0, 10), Double.logarithm(3.0, 2)} ===
+               {3.0, 1.5849625007211561}
+    end
+
+    test "a power and an exponential are zero at minus infinity and infinite past the largest double" do
+      assert {Double.power(3, :neg_infinity), Double.power(3, 0.5), Double.power(3, 800.0),
+              Double.power(3, :infinity), Double.power(3, :nan)} ===
+               {0.0, 1.7320508075688772, :infinity, :infinity, :nan}
+
+      assert {Double.exponential(:neg_infinity), Double.exponential(2.0),
+              Double.exponential(800.0), Double.exponential(:infinity), Double.exponential(:nan)} ===
+               {0.0, 7.3890560989306504, :infinity, :infinity, :nan}
+    end
+
+    # Golden: R 4.6.1's `x^y` for each base and the exponents -Inf, -3, -0.5, 0, 0.5, 2, 3, Inf
+    # and NaN, and five powers past the largest double or below the smallest (`inc4/step5/pow.R`).
+    test "a power of any base is R's: 1 and 0 decide first, a negative base's fraction is NaN" do
+      exponents = [:neg_infinity, -3.0, -0.5, 0.0, 0.5, 2.0, 3.0, :infinity, :nan]
+
+      for {base, expected} <- [
+            {:neg_infinity, [:nan, 0.0, :nan, 1.0, :nan, :infinity, :neg_infinity, :nan, :nan]},
+            {-2.0, [:nan, -0.125, :nan, 1.0, :nan, 4.0, -8.0, :nan, :nan]},
+            {-0.5, [:nan, -8.0, :nan, 1.0, :nan, 0.25, -0.125, :nan, :nan]},
+            {-0.0, [:infinity, :infinity, :infinity, 1.0, 0.0, 0.0, 0.0, 0.0, :nan]},
+            {0.0, [:infinity, :infinity, :infinity, 1.0, 0.0, 0.0, 0.0, 0.0, :nan]},
+            {0.5,
+             [
+               :infinity,
+               8.0,
+               1.4142135623730951,
+               1.0,
+               0.70710678118654757,
+               0.25,
+               0.125,
+               0.0,
+               :nan
+             ]},
+            {1.0, [1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0]},
+            {2.0,
+             [0.0, 0.125, 0.70710678118654757, 1.0, 1.4142135623730951, 4.0, 8.0, :infinity, :nan]},
+            {:infinity, [0.0, 0.0, 0.0, 1.0, :infinity, :infinity, :infinity, :infinity, :nan]},
+            {:nan, [:nan, :nan, :nan, 1.0, :nan, :nan, :nan, :nan, :nan]}
+          ] do
+        assert Enum.map(exponents, fn exponent -> Double.power(base, exponent) end) === expected,
+               inspect(base)
+      end
+
+      assert {Double.power(-2.0, 1075.0), Double.power(-0.5, 1075.0), Double.power(2.0, 1075.0),
+              Double.power(-2.0, 1.0e300), Double.power(:neg_infinity, 1.0e300),
+              Double.power(-1.0, :infinity), Double.power(10, 2)} ===
+               {:neg_infinity, -0.0, :infinity, :infinity, :infinity, :nan, 100.0}
+
+      # R: (-Inf)^3L, 1.5^-Inf, 0.5^-1075.5, 0.5^-1075 and (-0.5)^-1075 are -Inf 0 Inf Inf -Inf
+      # (`inc4/step5/pins.R`): a whole exponent as an integer, a base between 1 and 2 to minus
+      # infinity, and a base below 1 past the largest double, to a fractional and a whole power
+      assert {Double.power(:neg_infinity, 3), Double.power(1.5, :neg_infinity),
+              Double.power(0.5, -1075.5), Double.power(0.5, -1075.0), Double.power(-0.5, -1075.0)} ===
+               {:neg_infinity, 0.0, :infinity, :infinity, :neg_infinity}
+    end
+  end
+
+  describe "logarithm_of_one_plus/1 and exponential_minus_one/1" do
+    # R's log1p(-1) is -Inf, log1p(-2) and log1p(-Inf) NaN, log1p(-0) +0 on a vector,
+    # log1p(-1e-300) -1e-300, log1p(0.5) 0.40546510810816438; expm1(-Inf) -1, expm1(-1000) -1,
+    # expm1(-0) +0, expm1(-1e-300) -1e-300, expm1(-2) -0.8646647167633873, expm1(800) Inf
+    test "R's at each edge, a zero of either sign 0.0, and near zero the value itself" do
+      assert {Double.logarithm_of_one_plus(-1.0), Double.logarithm_of_one_plus(-2.0),
+              Double.logarithm_of_one_plus(:neg_infinity), Double.logarithm_of_one_plus(-0.0),
+              Double.logarithm_of_one_plus(-1.0e-300), Double.logarithm_of_one_plus(0.5),
+              Double.logarithm_of_one_plus(:infinity), Double.logarithm_of_one_plus(:nan)} ===
+               {:neg_infinity, :nan, :nan, 0.0, -1.0e-300, 0.40546510810816438, :infinity, :nan}
+
+      assert {Double.exponential_minus_one(:neg_infinity), Double.exponential_minus_one(-1000.0),
+              Double.exponential_minus_one(-0.0), Double.exponential_minus_one(-1.0e-300),
+              Double.exponential_minus_one(-2.0), Double.exponential_minus_one(800.0),
+              Double.exponential_minus_one(:infinity), Double.exponential_minus_one(:nan)} ===
+               {-1.0, -1.0, 0.0, -1.0e-300, -0.8646647167633873, :infinity, :infinity, :nan}
+    end
+  end
+
+  describe "hyperbolic_sine/1, hyperbolic_cosine/1 and inverse_hyperbolic_sine/1" do
+    # R's sinh(-0) and asinh(-0) are +0 on a vector, sinh(2) 3.626860407847019, sinh(-1000)
+    # -Inf, cosh(2) 3.7621956910836314, cosh(-1000) and cosh(-Inf) Inf, asinh(2)
+    # 1.4436354751788103
+    test "R's at each edge, a zero of either sign 0.0, past the largest double an infinity" do
+      assert {Double.hyperbolic_sine(-0.0), Double.hyperbolic_sine(2.0),
+              Double.hyperbolic_sine(-1000.0), Double.hyperbolic_sine(1000.0),
+              Double.hyperbolic_sine(:neg_infinity), Double.hyperbolic_sine(:nan)} ===
+               {0.0, 3.626860407847019, :neg_infinity, :infinity, :neg_infinity, :nan}
+
+      assert {Double.hyperbolic_cosine(2.0), Double.hyperbolic_cosine(-1000.0),
+              Double.hyperbolic_cosine(:neg_infinity), Double.hyperbolic_cosine(:nan)} ===
+               {3.7621956910836314, :infinity, :infinity, :nan}
+
+      assert {Double.inverse_hyperbolic_sine(-0.0), Double.inverse_hyperbolic_sine(2.0),
+              Double.inverse_hyperbolic_sine(:neg_infinity), Double.inverse_hyperbolic_sine(:nan)} ===
+               {0.0, 1.4436354751788103, :neg_infinity, :nan}
+    end
+  end
+
+  describe "the tangents and sines" do
+    # R's tanh(-Inf) -1, tanh(-0) +0, tanh(-1000) -1, tanh(2) 0.9640275800758169; atanh(-0) +0,
+    # atanh(1) Inf, atanh(-1) -Inf, atanh(-2), atanh(-1.5), atanh(Inf) and atanh(-Inf) NaN,
+    # atanh(0.25)
+    # 0.25541281188299536; sin(-0) and asin(-0) +0, sin(Inf) NaN, sin(2) 0.90929742682568171,
+    # asin(-1) -1.5707963267948966, asin(2) and asin(-Inf) NaN (`inc4/step4/edge.R`,
+    # `gaps.R`)
+    test "R's at each edge, a zero of either sign 0.0" do
+      assert {Double.hyperbolic_tangent(:neg_infinity), Double.hyperbolic_tangent(-0.0),
+              Double.hyperbolic_tangent(-1000.0), Double.hyperbolic_tangent(2.0),
+              Double.hyperbolic_tangent(:infinity), Double.hyperbolic_tangent(:nan)} ===
+               {-1.0, 0.0, -1.0, 0.9640275800758169, 1.0, :nan}
+
+      assert {Double.inverse_hyperbolic_tangent(-0.0), Double.inverse_hyperbolic_tangent(1.0),
+              Double.inverse_hyperbolic_tangent(-1), Double.inverse_hyperbolic_tangent(-2.0),
+              Double.inverse_hyperbolic_tangent(-1.5), Double.inverse_hyperbolic_tangent(1.5),
+              Double.inverse_hyperbolic_tangent(:infinity),
+              Double.inverse_hyperbolic_tangent(:neg_infinity),
+              Double.inverse_hyperbolic_tangent(:nan), Double.inverse_hyperbolic_tangent(0.25)} ===
+               {0.0, :infinity, :neg_infinity, :nan, :nan, :nan, :nan, :nan, :nan,
+                0.25541281188299536}
+
+      assert {Double.sine(-0.0), Double.sine(:infinity), Double.sine(:neg_infinity),
+              Double.sine(:nan), Double.sine(2.0)} ===
+               {0.0, :nan, :nan, :nan, 0.90929742682568171}
+
+      assert {Double.arc_sine(-0.0), Double.arc_sine(-1.0), Double.arc_sine(2.0),
+              Double.arc_sine(-1.5), Double.arc_sine(:neg_infinity), Double.arc_sine(:nan)} ===
+               {0.0, -1.5707963267948966, :nan, :nan, :nan, :nan}
+    end
+  end
+
+  describe "normal_distribution/1, normal_quantile/1 and normal_density/1" do
+    # R's pnorm(-Inf) +0, pnorm(-0) 0.5, pnorm(1e-300) 0.5, pnorm(40.5) and pnorm(Inf) 1,
+    # pnorm(-1000) +0, pnorm(0.25) 0.5987063256829237; qnorm(-0) -Inf, qnorm(0.5) +0, qnorm(1)
+    # Inf, qnorm(-1), qnorm(-0.25), qnorm(1.5), qnorm(2) and qnorm(-Inf) NaN, qnorm(1e-300)
+    # -37.047096299361201; dnorm(-Inf) and dnorm(40.5) +0, dnorm(-0) 0.3989422804014327,
+    # dnorm(-38.4) 2.5345567631655948e-321, dnorm(1) 0.24197072451914337 (`inc4/step4/edge.R`,
+    # `gaps.R`); pnorm(1e300) 1, pnorm(-1e300) 0, dnorm(1e200) and dnorm(-1e300) 0, where the
+    # arithmetic would pass the largest double (`inc4/step4/pins.R`)
+    test "R's at each edge, 0 and 1 beyond 40 either side" do
+      assert {Double.normal_distribution(:neg_infinity), Double.normal_distribution(-0.0),
+              Double.normal_distribution(1.0e-300), Double.normal_distribution(40.5),
+              Double.normal_distribution(:infinity), Double.normal_distribution(-1000.0),
+              Double.normal_distribution(-40.5), Double.normal_distribution(0.25),
+              Double.normal_distribution(:nan)} ===
+               {0.0, 0.5, 0.5, 1.0, 1.0, 0.0, 0.0, 0.5987063256829237, :nan}
+
+      assert {Double.normal_distribution(1.0e300), Double.normal_distribution(-1.0e300),
+              Double.normal_density(1.0e200), Double.normal_density(-1.0e300)} ===
+               {1.0, 0.0, 0.0, 0.0}
+
+      assert {Double.normal_quantile(-0.0), Double.normal_quantile(0.5),
+              Double.normal_quantile(1), Double.normal_quantile(-1.0),
+              Double.normal_quantile(-0.25), Double.normal_quantile(1.5),
+              Double.normal_quantile(2.0), Double.normal_quantile(:neg_infinity),
+              Double.normal_quantile(:infinity), Double.normal_quantile(:nan),
+              Double.normal_quantile(1.0e-300)} ===
+               {:neg_infinity, 0.0, :infinity, :nan, :nan, :nan, :nan, :nan, :nan, :nan,
+                -37.047096299361201}
+
+      assert {Double.normal_density(:neg_infinity), Double.normal_density(40.5),
+              Double.normal_density(-40.5), Double.normal_density(-0.0),
+              Double.normal_density(-38.4), Double.normal_density(1), Double.normal_density(:nan)} ===
+               {0.0, 0.0, 0.0, 0.3989422804014327, 2.5345567631655948e-321, 0.24197072451914337,
+                :nan}
+    end
+  end
+
+  describe "normal_quantile/1's rounding" do
+    # Golden: R's qnorm() of 0.7212275324855, 0.19690938852727413, 0.5335679799318314, 0.25 and
+    # 0.75 (`inc4/step4/pins.R`, `edge.R`), each the double nearest the truth; the erf step's
+    # sign, the bisection's direction at a tie and its choice of the nearer end each move one of
+    # the first three a double off, and the erf middle the quartiles (`inc4/step4/replay/`).
+    test "R's quantile where it is correctly rounded, the quartiles among them" do
+      assert Enum.map(
+               [0.7212275324855, 0.19690938852727413, 0.5335679799318314, 0.25, 0.75],
+               &Double.normal_quantile/1
+             ) ===
+               [
+                 0.58649200145257852,
+                 -0.85271246432942183,
+                 0.084241981814811337,
+                 -0.67448975019608171,
+                 0.67448975019608171
+               ]
+    end
+  end
+
+  describe "negate/1" do
+    test "an infinity's is the other, a zero's the zero of the other sign" do
+      assert {Double.negate(:infinity), Double.negate(:neg_infinity), Double.negate(:nan),
+              Double.negate(0.0), Double.negate(-2.5)} ===
+               {:neg_infinity, :infinity, :nan, -0.0, 2.5}
+    end
+
+    # Golden: `fixtures/r_elementary_4.6.1.csv` is R 4.6.1's asinh(), log1p() and expm1() at
+    # random doubles, from -1 up, tiny and huge (`inc4/step3/fixture.R`), and its sin(), tanh(),
+    # atanh(), pnorm(), qnorm() and dnorm(), at proportions near 0, 0.5 and 1 and values to 40
+    # either side (`inc4/step4/fixture.R`). R's asinh and atanh are correctly rounded, the
+    # platform's within 1 ulp of them (369 and 368 of 3,000 off under glibc 2.39); Goldberg's
+    # log1p is within 2 ulps of R's, Kahan's expm1 within 1; the normal's distribution, quantile
+    # and density within 3, 5 and 7, as near a 60-digit truth as R's or nearer: R's density is up
+    # to 6 off it between 4 and 5 either side, this one 2.
+    test "the elementary functions are within their measured ulps of R's" do
+      bounds = %{
+        "asinh" => 1,
+        "log1p" => 2,
+        "expm1" => 1,
+        "sin" => 1,
+        "tanh" => 1,
+        "atanh" => 1,
+        "pnorm" => 3,
+        "qnorm" => 5,
+        "dnorm" => 7
+      }
+
+      functions = %{
+        "asinh" => &Double.inverse_hyperbolic_sine/1,
+        "log1p" => &Double.logarithm_of_one_plus/1,
+        "expm1" => &Double.exponential_minus_one/1,
+        "sin" => &Double.sine/1,
+        "tanh" => &Double.hyperbolic_tangent/1,
+        "atanh" => &Double.inverse_hyperbolic_tangent/1,
+        "pnorm" => &Double.normal_distribution/1,
+        "qnorm" => &Double.normal_quantile/1,
+        "dnorm" => &Double.normal_density/1
+      }
+
+      rows =
+        __DIR__
+        |> Path.join("fixtures/r_elementary_4.6.1.csv")
+        |> File.stream!()
+        |> Stream.drop(1)
+        |> Enum.map(fn line ->
+          [quoted, value, expected] =
+            line
+            |> String.trim()
+            |> String.split(",")
+
+          {String.trim(quoted, ~s(")), double(value), double(expected)}
+        end)
+
+      assert Enum.count(rows) == 4381
+
+      far =
+        Enum.reject(rows, fn {function, value, expected} ->
+          ulps(functions[function].(value), expected) <= bounds[function]
+        end)
+
+      assert far == []
+    end
+  end
+
+  # A number as R wrote it, `-1` among them.
+  defp double(text) do
+    {value, ""} = Float.parse(text)
+    value
+  end
+
+  # How many doubles apart two finite doubles are, each read from its bits in their order.
+  defp ulps(left, right), do: abs(ordinal(left) - ordinal(right))
+
+  defp ordinal(value) do
+    <<sign::1, magnitude::63>> = <<value::float>>
+    if sign == 1, do: -magnitude, else: magnitude
   end
 end

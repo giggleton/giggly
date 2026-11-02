@@ -291,8 +291,12 @@ defmodule Scales.Labels.Format do
   defp widens?(_numerator, _denominator, _exponent, _digits), do: false
 
   # A float in plain notation with `decimals` decimals, rounded half to even from its exact
-  # value, as C's `sprintf("%.*f")` writes it.
-  defp fixed(value, decimals) do
+  # value, as C's `sprintf("%.*f")` writes it, however many characters that takes:
+  # `Scales.Labels.plain/1` writes with it where Erlang's `float_to_binary/2` refuses, past 253
+  # decimals or 256 characters.
+  @doc false
+  @spec fixed(float(), non_neg_integer()) :: String.t()
+  def fixed(value, decimals) do
     {numerator, denominator} = exact(abs(value))
 
     digits =

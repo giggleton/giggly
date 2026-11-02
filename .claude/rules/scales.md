@@ -112,8 +112,15 @@ R's regular ones: the entry beginning "The panel's grid lines are placed by the 
   infinities** (`t:Scales.double/0`; design-log §4, the entry beginning "A NaN is `:nan`"), and
   **`Scales.Double` is the one home of R's IEEE arithmetic on them**, an infinity past the largest
   double, NaN for 0/0, Inf − Inf and Inf × 0, a zero's sign read from its bit; its operators take
-  no `nil`, which their callers set aside first. Its tests pin R's answers. A transformation
-  still gives `nil` where R gives NaN.
+  no `nil`, which their callers set aside first. **It is the one home too of the elementary
+  functions transformations are built from**, a logarithm in a base, a power (R's `^` for any
+  base and exponent, its grid of infinities, zeros and negative bases R's), log1p, expm1, the
+  hyperbolic sine, cosine and tangent, asinh, atanh, the sine and arcsine, and the standard
+  normal's distribution, quantile and density, each R's at the infinities, NaN and zero; `Breaks`
+  and `Labels` take their logarithms from it. What Erlang lacks, log1p, expm1 and the normal's
+  three, is measured methods, never ported (design-log §4, the entries beginning "The scales
+  package carries every transformation" and "A distribution's spread"). Its tests pin R's answers
+  and, in `test/scales/fixtures/r_elementary_4.6.1.csv`, each function's measured ulps from R's.
 - **The rescaling functions are R's `rescale()`, `rescale_mid()` and `rescale_max()` to the last
   digit** (`Scales.Bounds`), on lists as R's are on vectors, a `nil` in giving `nil` out, as R's
   `NA`, and NaN `:nan`, given or worked out; a value, an end or a midpoint may be an infinity,
@@ -147,25 +154,111 @@ R's regular ones: the entry beginning "The panel's grid lines are placed by the 
   frame as the scale is handed them. The rule exists once, and grouping does not depend on scales
   to use it.
 - **A transformation is a module implementing `Scales.Transform`**, resolved from its name
-  there and handed to each of its callbacks, so the date-time one reads its zone; it carries what
-  R's object carries and a scale reads: the transformation, its inverse,
+  there (a user's own from the `%Scales.Transform{}` that `Transform.new/2` makes, a composition
+  from `{:compose, parts}`) and handed to each of its callbacks, so the date-time one reads its
+  zone; it carries what R's object carries and a scale reads: the transformation, its inverse,
   its domain, and its axis's default breaks, minor breaks and labels (`breaks`, `minor_breaks`,
   `format`). **A label is made from the break and the extent** (`format/2`), since a date's
   format is the step chosen for the whole axis; a number's ignores the extent and is written once
   the breaks outside it are dropped. Breaks the transformation did not choose, given or laid by a
   width, are handed `:given` instead of the extent, and a date writes them in full, `2026-09-21`,
   as R's `format()` writes a date its pretty breaks did not name. **Breaks follow ggplot2's `get_breaks()`**: the extent
-  squished into the transformed domain (log10 from -100, sqrt from 0), turned back into data
+  squished into the domain transformed, its ends sorted, at both
+  ends (log10 from -100, sqrt from 0, exp from 0, yj(-1) at 1, the bound its values never pass),
+  a transformed domain of no width or one end squishing nothing, a date's, date-time's or time's
+  never squished, turned back into data
   units, broken there, and transformed back, **in the order that leaves them**, so reverse's and
   reciprocal's descend, as R draws them; labels are written, and a labels function handed, the
-  breaks turned back, as R turns them (`10^x`, `x * x`). **A value outside the domain is R's**:
-  log10 places 0 at minus infinity, at the panel's edge, and a negative value, as sqrt does, at
-  `nil`, R's NaN; reverse swaps the infinities, reciprocal places 0 at plus infinity.
-- **log10's breaks are `Breaks.log/2`'s, five wanted unless `n:` says, in base 10**
-  (`Transform.Log10`), on the extent turned back into data units, put back into log space; its
-  test pins R's own axis, labels and minor breaks, for each of `breaks_log()`'s branches, and
-  compares its breaks with `Breaks.log/2`'s, whose test pins R's figures. sqrt, reverse and
-  reciprocal take extended breaks on the data range, as R's `extended_breaks()` does.
+  breaks turned back, as R turns them (`10^x`, `x * x`). **A domain is held in data units, as
+  R's `domain`** (log10's from 1e-100). **A value outside the domain is R's**: log10 places 0 at
+  minus infinity, at the panel's edge, and a negative value, as sqrt does, at `:nan`; reverse
+  swaps the infinities, reciprocal places 0 and `-0.0` at the infinities of their signs, each
+  through `Scales.Double` where R's IEEE arithmetic decides. **A transformation of numbers has
+  R's derivatives both ways and `trim_to_domain/2`** (R's `d_transform`, `d_inverse` and
+  `trim_to_domain()`), every double R's, its tests R's golden over the infinities, both zeros,
+  `nil` and NaN; a date's, date-time's or time's has neither and raises, as R's has no
+  derivatives and takes numbers. `trim_to_domain/2` gives `:none` with nothing to range over,
+  where R warns at an empty `range()` (design-log §4, the entry beginning "A transformation gives R's doubles").
+- **A logarithm in a base's breaks are `Breaks.log/2`'s, five wanted unless `n:` says, in its
+  base** (`Transform.Log`: `:log` in base e, `:log2`, `:log10`, `{:log, base}`), on the extent
+  turned back into data units, put back into log space, so `:log`'s are powers of e; its test
+  pins R's own axis, labels and minor breaks, for each of `breaks_log()`'s branches, and compares
+  its breaks with `Breaks.log/2`'s, whose test pins R's figures. log1p, exp, asinh, the
+  pseudo-logarithm, sqrt, reverse, reciprocal, asn, atanh, the probabilities, Box-Cox, modulus
+  and Yeo-Johnson take extended breaks on the data range, as R's `extended_breaks()` does; an
+  exponential's extent reaching zero or below is broken on its high end alone, as R's breaks drop
+  its NaN, and **a Box-Cox's, modulus's or Yeo-Johnson's end that turns back to an infinity** past
+  the bound its values never reach is set aside, R's five copies of the other end found, none
+  where both do (design-log §4, the entry beginning "An axis past a bound"). **A break at an end
+  of a domain the transformation takes to an infinity is that infinity**, logit's 0 and 1, as
+  R's, outside every extent; a caller keeps numbers alone.
+- **Every transformation of scales 1.4.0 is a name** (design-log §4, the entries beginning "The
+  scales package carries every transformation", "A logarithm's or exponential's base" and "A
+  distribution's spread"): a base
+  is a number above 1, a pseudo-logarithm's sigma and a distribution's `sd:` or `scale:` above 0,
+  its `mean:` or `location:` a number, each checked by guard where the name is resolved, so
+  `FunctionClauseError` wherever it is handed, where R also takes a falling base below 1 and a
+  spread of 0; `{:pseudo_log, ...}` takes `sigma:`, `base:` or both, once each, and
+  `{:probability, :normal, ...}` and `{:probability, :logistic, ...}` their own two likewise,
+  `:probit` and `:logit` their standard forms; an exponent is any number, a Box-Cox offset one
+  from 0 up and a modulus offset one from 1 up, below which R's modulus no longer rises, a span
+  of time's unit `:second` to `:week` (design-log §4, the entry beginning "Box-Cox, modulus,
+  Yeo-Johnson and a span of time"). `{:log, 10}` and
+  `{:log, 2}` place every value where `:log10` and `:log2` do, as R's `log(x, base)` takes those
+  bases by their own functions; R's `exp(1)^x`, not `exp(x)`, is `:log`'s inverse and `:exp`.
+  Every value, derivative, domain and break is R's but where the platform's asinh, atanh and sine
+  are not correctly rounded (asinh and atanh within 1 ulp of R's, the pseudo-logarithm and asn's
+  inverse 2), log1p's and expm1's measured methods (within 2 and 1), and the normal's (its
+  quantile within 5, distribution 3, density 7, nearer the truth than R's where they part; a mean
+  or the forward derivative carries the quantile's last bit, the derivative's at the far tail
+  multiplied by about its square, 5.2e-13 relatively); R's `+0` for a negative zero from log1p,
+  expm1, asinh, sinh, the pseudo-logarithm, asin, sin, tanh and atanh on a vector. The
+  derivatives are in the order that gave R's doubles, the pseudo-logarithm's `1 / (sqrt(1 + x *
+  x / (4 * sigma * sigma)) * 2 * sigma * log(base))` alone of twelve; a probability's forward
+  derivative is 1 over its inverse's at the value transformed, as R's. Their tests pin R's
+  figures over the nine doubles, ggplot2's axes and `test/scales/fixtures/r_elementary_4.6.1.csv`'s
+  bounds.
+- **The Box-Cox, modulus and Yeo-Johnson transformations are scales' documented formulas**
+  (`Transform.BoxCox`, `Transform.Modulus`, `Transform.YeoJohnson`, on `Transform.Power`'s
+  `(base^exponent - 1) / exponent`; design-log §4, the entry beginning "The Box-Cox, modulus and
+  Yeo-Johnson transformations"): an exponent within 1e-7 of 0, and yj's `2 - exponent`, counts
+  as 0, as R's; every double R's but the platform's last bit, R's `^` being x86's `powl` (Box-Cox
+  in 3 parts from it on 65 of 3,000, the subtraction then amplifying a bit near 1) and log1p's and
+  expm1's methods a double off (`fixtures/r_power_4.6.1.csv`, six rows); the cancellation near 0
+  is R's too. A missing value's derivative is 1 where its power is 0, R's `NA^0`; yj's NaN is
+  missing and either zero `0.0`, as R's; yj's inverse derivative below 0 at an exponent of 2 is
+  `exp(-x)`, where R's fails. **A Box-Cox value below minus its offset is NaN**, where R refuses
+  the whole vector, and **its domain is R's, from 0 whatever the offset**, so an axis finds no
+  break below 0 (design-log §4, the entry beginning "Box-Cox's domain"). **Their labels are each
+  default break's value in data units**, found again from the extent, a given break turned back
+  at 14 digits, where the round trip keeps as few as three (design-log §4, the entry beginning
+  "Box-Cox, modulus and Yeo-Johnson labels"). Their tests pin the fixture, ggplot2's axes, both
+  kinds past a bound, and the refusals.
+- **A span of time is its seconds** (`Transform.Timespan`, R's `transform_timespan()`): a value
+  times its unit's seconds, turned back times one over them, as R converts a `difftime`'s units,
+  numbers where R gives one; `Breaks.timespan/2` on the extent turned back into its unit, its
+  labels `Labels.timespan/2`'s in the unit, minor breaks regular, no `n:` and no derivatives, as
+  R's take none, `trim_to_domain/2` R's.
+- **A composition is `{:compose, [part, ...]}`** (`Transform.Composition`, R's
+  `transform_compose()`; design-log §4, the entries beginning "A composition is", "A
+  composition's breaks", "A composition's labels", "A composition's domain" and "A date,
+  date-time or time transformation comes first"): values through each part and back through each
+  inverse, a `nil` passed back uncalled, since built-in inverses take positions; derivatives R's
+  running chain-rule product, only where every part has one; breaks and labels the first part's,
+  on the extent turned back into its space, `n:` handed on; minor breaks R's regular ones
+  unreversed; its domain R's rule but the range's ends ordered as a pair, none left `ArgumentError`; a date, date-time
+  or time part first only, the composition then never squished, its steps laid through
+  `width/3`. Its tests pin R's doubles at the nine doubles and the edges, the domains and trims,
+  ggplot2's axes, and its reversed date, date-time and time axes.
+- **A transformation of your own is a `%Scales.Transform{}` made by `Transform.new/2`**
+  (`Transform.Custom`, R's `new_transform()`; the entries beginning "`Transform.new/2` takes"
+  and "A transformation of your own"): its functions, of one value, are handed every value in
+  its domain, its ends and their infinities among them, an integer as a float, `nil` and `:nan`
+  kept and a value outside the domain `:nan` uncalled, an answer but a double, an infinity,
+  `:nan` or `nil` refused with `ArgumentError`; its breaks its function's on the extent turned
+  back, an end turning back to anything but a number set aside as Box-Cox's are; its labels its
+  function's of the breaks turned back. Its tests pin ggplot2's axes of user transformations, alone
+  and as a composition's part.
 - **A date scale works in days since 1970-01-01, as R stores a date** (`Transform.Date`, R's
   `transform_date()`): a date is a float of its days, a missing one `nil`, and a position turned
   back the day it falls on, rounded down, as R's `format()` writes it; it trains, expands and
@@ -236,7 +329,8 @@ R's regular ones: the entry beginning "The panel's grid lines are placed by the 
 - **Every transformation's minor breaks are R's `scales::regular_minor_breaks()`**
   (`Scales.MinorBreaks`), in transformed space, with two intervals per gap, on the breaks in the
   transformation's order, the first gap's step added before and after them as R adds it, with
-  `reverse = TRUE` for reverse alone: one more step past an outermost break the extent reaches beyond,
+  `reverse = TRUE` for reverse alone, a composition's unreversed whichever way it runs, as R's:
+  one more step past an outermost break the extent reaches beyond,
   then each gap's middle as R's `seq()` finds it, its start plus half its width, which differs
   from the two ends' mean in the last bit (an example pins it), and none for fewer than two breaks.
 - **A number or a width of minor breaks to each gap is exactly R's `minor_breaks_n()` and
@@ -251,13 +345,18 @@ R's regular ones: the entry beginning "The panel's grid lines are placed by the 
   fails; the `detail` attribute left out. Their tests pin R's figures; all of 4,000 numeric, 2,000
   date, 1,712 date-time and 4,014 log cases matched R, and 1,495 times but where R's `hms` runs
   past midnight.
-- **A number of breaks wanted, `n:`, reaches every transformation's own breaks but time's**
+- **A number of breaks wanted, `n:`, reaches every transformation's own breaks but time's and a
+  span of time's**
   (`Transform.breaks/3`, `format/4`; design-log §4, the entry beginning "`n:` reaches"), as R's
   `transformation$breaks(limits, n)`: extended breaks' under the identity, sqrt, reverse and
-  reciprocal, a whole number from 2, as R's search finds nothing for one and never ends for none;
-  `Breaks.log/2`'s under log10, from 1; R's `pretty()` under the date and date-time
+  reciprocal, log1p, exp, asinh and the pseudo-logarithm, a whole number from 2, as R's search
+  finds nothing for one and never ends for none; `Breaks.log/2`'s under a logarithm in a base,
+  from 1; R's `pretty()` under the date and date-time
   transformations, from 0, as R takes it, and their labels found with the same `n:`, as R's
-  breaks carry theirs as names. Time refuses it, as R's `transform_hms()` takes no number.
+  breaks carry theirs as names. Time and a span of time refuse it, as R's `transform_hms()` and
+  `transform_timespan()` take no number. A composition hands it to its first part, where ggplot2
+  ignores it with a warning; a user's breaks function of two arguments is handed it, and one of
+  one refuses it.
 - **A width's breaks are exactly R's `fullseq()` and `breaks_width()`, on numbers, dates,
   date-times and times** (`Breaks.fullseq/3`, `Breaks.width/3`; design-log §4, the entry
   beginning "Breaks a width apart"): numbers from the low limit rounded down to a multiple of the
@@ -320,4 +419,9 @@ R's regular ones: the entry beginning "The panel's grid lines are placed by the 
 - **Labels are written the Elixir way, not R's** (`Scales.Labels.plain/1`): `inspect`'s plain
   decimals, rounded to 15 significant digits, as many decimals on every label as the most precise
   needs, none when all are whole, negative zero as `0`, never scientific, no thousands separators,
-  so a log axis's `1e+05` is written `100000`.
+  so a log axis's `1e+05` is written `100000` and a natural one's powers of e to 15 digits. **A
+  break turned back through an inverse that does not give it back exactly is rounded to 14
+  significant digits first** (`Labels.plain_round_tripped/1`: log1p's, exp's, asinh's, the
+  pseudo-logarithm's, a probability's), so `10000` under sigma 2, base 10 is not
+  `9999.99999999999`, nor `0.0009` under logit `0.000900000000000001`; asn's and atanh's showed
+  none and stay plain; its test and the axes' pin it.

@@ -185,6 +185,202 @@ deleted from the entry it was in, never marked superseded; git history keeps eve
   — they collide with the layer's own (`width:`). *Follows, its own decision:* `guide_legend/1`
   as `guide: {:legend, ...}`.
 
+- **A composition is the name `{:compose, [part, ...]}` (2026-11-01, Steve: "A", increment 4's
+  step 6's C1; checked against scales 1.4.0).** R's `transform_compose("log10", "reverse")`, or
+  `transform = c("log10", "reverse")`, is `{:compose, [:log10, :reverse]}`, resolved as every
+  name is, each part a name, a user's own transformation or another composition, so a
+  composition of built-ins stays a value that compares and prints. One part is allowed, as R's;
+  none is refused. *Rejected: a bare list, R's `c()`*: the one compound name without a tag, and
+  `[]` and one part would need rules of their own. *Rejected: `Transform.compose/1` returning a
+  value of functions*, as R's returns a `new_transform()`: built-ins would stop being names.
+
+- **A composition's breaks are its first part's, `n:` reaching them, and its minor breaks R's
+  regular ones unreversed (2026-11-01, Steve: "A", "A", increment 4's step 6's C6 and C8;
+  checked against ggplot2 4.0.3).** As R's, the extent is turned back through the later parts
+  into the first part's space and broken there by that part, so its rules hold: an exponential's
+  or Yeo-Johnson's end past its bound is set aside (exp then reverse on 0 to 5 draws R's five
+  stacked breaks). R calls the first part's breaks without `n`, and ggplot2 warns "Ignoring
+  `n.breaks`"; here `n:` is handed on, so log10 then reverse with `n: 2` draws log10's one
+  break, and a first part refusing it (time, a span of time) refuses it here; a user's breaks
+  function of two arguments is handed it, one of one refuses it, as `:time`. Minor breaks are
+  R's `regular_minor_breaks()` with `reverse` off, whichever way the composition runs, so log10
+  then reverse on 0.01 to 5 draws 1.5 and 0.5 but not -0.5, R's drawing. *Rejected: refusing
+  `n:`*: a plot R draws fails. *Rejected: minor breaks reversed when the composition falls*: a
+  gridline ggplot2 does not draw.
+
+- **A composition's labels are its first part's (2026-11-01, Steve: "A", increment 4's step 6's
+  C5; checked against ggplot2 4.0.3).** R writes every composition's labels with `format()`;
+  Giggly replaced `format()` long ago with each transformation's own rule, so here the breaks
+  and the extent are turned back through the later parts to the first part's `format/4`: Box-Cox
+  in 2 then reverse writes `0.000 0.002 0.004 0.006` from data units as R does, a date first
+  writes its dates, and a span of minutes then reverse `20m`, as R's timespan alone writes it,
+  where R's composition writes `20 mins`. A later part with an inexact inverse leaves its round
+  trip, as R's does under `format()`'s seven digits: log10 then sqrt labels 1000 as
+  `999.999999999999`; re-finding the first part's breaks to hand it exactly, as Box-Cox's labels
+  do, is left until a composition needs it. *Rejected: plain labels from the round trip*:
+  `0.002000000000001` under Box-Cox, and a date first unlabelled.
+
+- **A composition's domain is R's, but the range's two ends are ordered as a pair (2026-11-01,
+  Steve: "A", increment 4's step 6's C4; checked against scales 1.4.0).** As R's: the first
+  part's domain transformed, cut to each later part's domain and transformed again, turned back
+  through every inverse and sorted, `ArgumentError` when nothing is left (sqrt, reverse, log10),
+  as R aborts; so sqrt then log10 takes 1e-200 up and exp then log -230.26 up. R takes `min()`
+  and `max()` of the range alone, each keeping the first of an equal pair, so the reciprocal's -0
+  and +0 both come out -0 and the reciprocal then reverse has the domain `-Inf, -Inf`, its
+  `trim_to_domain()` of -5 to 1000 `0, 0`; no drawing shows it, ggplot2 squishing nothing into a
+  domain of no width. Here the pair's first is low and second high, so the domain is the
+  reciprocal's own line and the trim `-0.001, 0.2`; every other tie is R's, matched over 2,740
+  rows of composed pairs and triples. *Rejected: R's exactly*: a package function's wrong
+  answer copied for no drawing. *Rejected: -0 below +0 everywhere*, as first built: R's
+  `0 <= -0` holds, so sqrt, reverse, sqrt, R's domain 0 to 0, came out empty.
+
+- **A date, date-time or time transformation comes first in a composition, or nowhere
+  (2026-11-01, Steve: "A", increment 4's step 6's C7; checked against ggplot2 4.0.3).**
+  `scale_y_date()` takes no `transform`, so R's reversed date axis is
+  `scale_y_continuous(transform = c("date", "reverse"))`, and ggplot2 draws date, date-time and
+  `hms` then reverse with the first part's labels; the composition here takes and gives the
+  first part's values, its breaks and labels, and `width/3` lays steps through it (two weeks: R's
+  full dates from 2024-01-08), with no derivatives and no `trim_to_domain/2`, never squished. A
+  temporal part elsewhere raises `ArgumentError`, as R's reverse then date-time fails to build
+  (its `hms` is a number, ours a `Time`). *Rejected: compositions of numbers only*: a reversed
+  date axis in Giggly would reopen scales for a release.
+
+- **`Transform.new/2` takes a name and keyword functions, checked at the call (2026-11-01,
+  Steve: "A", increment 4's step 6's C2; checked against scales 1.4.0).**
+  `Transform.new("cube", transform: f, inverse: g, ...)`: the name a string, as R's
+  `new_transform()` requires one, read by messages and `inspect`; `derivative:`,
+  `inverse_derivative:`, `domain:` (the line unless given), `breaks:` (limits in data units),
+  `minor_breaks:` (breaks and extent in transformed space) and `labels:` (breaks in data units)
+  optional, R's defaults; a `%Scales.Transform{}` comes back. NimbleOptions refuses a missing
+  function, an unknown option, another arity and a domain not low to high, where R checks
+  nothing and fails when an axis first calls it, or keeps `c(Inf, 0)` backwards. *Rejected: no
+  name, `new(&cube/1, inverse: ...)`*: messages would say "a user's transformation", and the
+  required inverse would be an option.
+
+- **A transformation of your own is handed every value in its domain, its ends among them
+  (2026-11-01, Steve: "A", increment 4's step 6's C3; checked against scales 1.4.0).** R's help
+  says the function "is expected to be able to transform the `domain` argument", and ggplot2
+  transforms the domain's ends on every axis, so on the default line a user's function is
+  handed `:neg_infinity` and `:infinity`, and an annotation at `Inf` one too: Erlang's arithmetic
+  raises on them where R's IEEE arithmetic gives the cube of `Inf` as `Inf`, so a function on an
+  unbounded domain writes a clause for each, the moduledoc showing how. An integer is handed as
+  a float; `nil` and `:nan` are kept uncalled; a value outside the domain is `:nan` uncalled, a
+  departure (R's cube with a domain from 0 gives -8 for -2), so `&:math.sqrt/1` on a domain from
+  0 never meets a negative. It returns a number, an infinity, `:nan` or `nil`; anything else
+  raises `ArgumentError` naming it. *Rejected: finite floats only*: a falling function's `Inf`
+  drawn on the wrong edge, a bounded one never squished, its inverse handed 1.05.
+
+- **Box-Cox, modulus, Yeo-Johnson and a span of time are `{:boxcox, exponent}`, `{:modulus,
+  exponent}`, `{:yj, exponent}` and `{:timespan, unit}`, a modulus offset from 1 (2026-11-01,
+  Steve: "A", "A", increment 4's step 5; checked against scales 1.4.0).** The exponent, R's
+  required `p`, goes first as `{:log, base}`'s base does, an optional offset as a keyword,
+  `{:boxcox, 0.5, offset: 3}`, as `{:probability, :normal, mean: 1}` holds its options; `:yj`
+  keeps R's name, as `:asn` did; `:timespan` is seconds, its unit `:second` to `:week`,
+  `Breaks.timespan/2`'s names. The exponent is any number, a Box-Cox offset one from 0 up, R's
+  documented range, and a modulus offset one from 1 up: below 1 R's modulus no longer rises,
+  offset 0 sending 0.5 to -0.586 and -0.5 to +0.586. Anything else raises by guard.
+  *Rejected: `{:yeo_johnson, ...}`*: the house rule over R's name, where `:asn` kept R's.
+  *Rejected: keywords throughout*: an exponent no keyword can leave out. *Rejected: R's
+  documented offset from 0 for the modulus*: points near zero drawn out of order. *Rejected: R's
+  acceptance*: a negative offset, falling or folding through the squish and the breaks.
+
+- **The Box-Cox, modulus and Yeo-Johnson transformations are their documented formulas, R's
+  doubles but the platform's last bit (2026-11-01, Steve: "A", increment 4's step 5; checked
+  against R 4.6.1).** Each is `(base^exponent - 1) / exponent` as scales' help pages write it,
+  evaluated with R's `^` (`Double.power/2`: a square `x * x`, 1 and 0 deciding first), an
+  exponent within 1e-7 of 0 its logarithm, as R's. On 3,000 random doubles every value and
+  derivative was R's but where Erlang's power parts from R's x86 `powl` (Box-Cox in 3 on 65, up
+  to 42 ulps near 1 where the subtraction amplifies it; ours the right one 57 times, R's 19) and
+  log1p's and expm1's methods (a double). Near 0 both lose every digit, yj(0.5) of 1e-16 being 0.
+  yj's inverse derivative below 0 at an exponent of 2 is the slope `exp(-x)`, where R's fails (Q4).
+  *Rejected: an expm1/log1p form*, within 1e-13 of the truth everywhere: half of R's doubles moved
+  by a few ulps for precision no plot shows.
+
+- **Box-Cox's domain is R's, from 0 whatever the offset, and a value below minus its offset NaN
+  (2026-11-01, Steve: "A", "A", increment 4's step 5; checked against scales 1.4.0).** R refuses
+  the whole vector when any value is below minus the offset; here that value alone is NaN, as a
+  logarithm's negative is, so a plot draws the rest. R's domain is `c(0, Inf)` whatever the
+  offset, so with offset 3 on data from -2.9 to 1 ggplot2 finds breaks 0, 0.5 and 1 only, the
+  values from -3 to 0 still transformed; Giggly draws that axis, as the rule of copying R's odd
+  but unbroken drawings says. *Rejected: R's raise*: one stray value fails the plot, the only
+  transformation raising on data. *Rejected: the domain from minus the offset*: breaks -2 to 1
+  there, a departure for a few breaks on an uncommon axis.
+
+- **An axis past a bound a transformation never reaches is broken on its other end, as R's
+  (2026-11-01, Steve: "A", increment 4's step 5; checked against ggplot2 4.0.3).** Box-Cox and
+  modulus with a negative exponent and yj below 0 or above 2 bound their values, and the 5%
+  widening passes the bound: `Transform.squish/2` now squishes every transformation of numbers
+  into its sorted transformed domain, as `get_breaks()` does, so the end sits on the bound, turns
+  back to an infinity, and is set aside, as an exponential's NaN end is, R's five copies of the
+  other end found: boxcox(-1) on 1 to 100 draws no breaks, yj(-1) on -10 to 10 five stacked at
+  its bottom, as ggplot2 does; both ends, none. A third of random axes with a negative exponent.
+  *Rejected: no breaks whenever an end turns back*: a second rule, departing under yj(-1).
+  *Rejected: raising*: it fails a plot R draws.
+
+- **Box-Cox, modulus and Yeo-Johnson labels are written from their breaks in data units
+  (2026-11-01, Steve: "A", increment 4's step 5; checked against scales 1.4.0).** Turned back,
+  their breaks lose digits a fixed rounding cannot restore: under boxcox(2) 0.0064 comes back
+  0.0063999999999983, under boxcox(3) as few as three digits survive, since the transformed space
+  holds no more, and offset 3's 0 comes back -4.4e-16, which R writes `-4.440892e-16`; 14 digits
+  left noise on 10-35% of random axes. So `format/4`, handed the extent squished as `breaks/3`
+  is, finds the same breaks in data units again and writes each from its own value, the first
+  where two share a position; a given break is turned back at 14 digits, and a labels function
+  handed the round trip, as R hands it. *Rejected: the rule for every inexact inverse*: steps 3's
+  and 4's built code reopened. *Rejected: 14 digits, as theirs*: the noise.
+
+- **A plain label past what Erlang writes is written whole, as R writes it (2026-11-01, Steve:
+  "A", increment 4's step 5's C8; checked against R 4.6.1).** `Labels.plain/1` raised
+  `ArgumentError` on a break above about 1e255 or below about 1e-253, where
+  `float_to_binary/2` refuses more than 256 characters or 253 decimals, so a log10 axis reaching
+  1e256 failed its plot. There it now writes the double's exact digits, `Labels.Format`'s
+  `sprintf()` rule, as R's `format(scientific = FALSE)` does: 2e257 in R's 258 characters,
+  10^308 in 309; every smaller label is unchanged, 1e23 still R's `99999999999999991611392`.
+  *Rejected: scientific notation past some size*, as R's default `format()` writes `1e+23`:
+  plain's rule is never scientific, and 1e23's label would change too. *Rejected: the fix inside
+  step 5's commit*: an unrelated fix mixed into the transformations.
+
+- **A distribution's spread is above 0 and its location a number, and the normal quantile's
+  middle is bisected on `erf` (2026-11-01, Steve: "A", "A", increment 4's step 4, "Ok" for the
+  quartiles; checked against scales 1.4.0).** `{:probability, :normal, mean:, sd:}` and `{:probability, :logistic,
+  location:, scale:}` take either keyword or both, R's defaults 0 and 1, `:probit` and `:logit`
+  their standard forms; any other value is refused by guard, as a base is. The quantile bisected
+  on the distribution was 25% off at p = 0.5 + 1 ulp, many quantiles sharing one distribution
+  double there: between 0.25 and 0.75 it is bisected on `erf(q / sqrt(2)) / 2` against `p - 0.5`,
+  exact there, the quartiles themselves on the distribution, which gives them correctly
+  rounded, as R's, where `erf` is a double off; within 5 ulps of R's, correctly rounded on 86% of 3,000 where R's is on 31%; the
+  density splits `x * x` exactly first (Dekker), within 7 ulps of R's, nearer the truth where
+  they part. *Rejected: R's positional parameters*: sd alone would spell out the mean.
+  *Rejected: R's spread of 0*: every value at the mean. *Rejected: Wichura's AS241*: 50 typed
+  coefficients, R's tails since changed, and R's quantile is the less accurate.
+
+- **A break turned back through an inexact inverse is written to 14 significant digits
+  (2026-11-01, Steve: "A", "A", increment 4's step 3; checked against scales 1.4.0).** Every
+  transformation keeps plain labels (the 2026-10-12 rule, so a natural log's powers of e take 15
+  digits where R's `format()` gives 7), but log1p's, exp's, asinh's, the pseudo-logarithm's and,
+  from step 4, logit's, probit's and both probability tuples' labels are written from each break
+  turned back rounded to 14 significant digits first (`Labels.plain_round_tripped/1`): the round
+  trip leaves `10000` as `9999.999999999989` under a pseudo-logarithm in sigma 2, base 10, and
+  `0.0009` written `0.000900000000000001` under logit. Against the breaks' own labels in data
+  units, at 15 digits up to 40% of random axes showed that error, at 14 none of 28,000, and under
+  a probability only axes ending within 5e-12 of 1, whose breaks need 15 digits; asn and atanh
+  showed none and stay plain. *Rejected: 14 digits
+  in `plain/1` itself*: an identity axis needing 15 (1e14 to 1e14 + 4) would collide.
+  *Rejected: R's `format()`*, for these alone or for all: `:log10` and `{:log, 10}` written two
+  ways, or the agreed plain labels reopened. *Rejected: plain as it was*: the noise. *Rejected:
+  asn and atanh round-tripped too*: their 15-digit axes near 1 lost for nothing.
+
+- **A logarithm's or exponential's base is above 1, a pseudo-logarithm's sigma above 0, and asinh
+  and atanh are the platform's (2026-11-01, Steve: "A", "A", "A", increment 4's step 3, and "A",
+  step 4; checked against scales 1.4.0).** Names: `:log`, `:log2`, `:log10`, `{:log, base}`, `:log1p`, `:exp`,
+  `{:exp, base}`, `:asinh`, `:pseudo_log` and `{:pseudo_log, sigma:, base:}`, either keyword
+  optional, R's defaults. Any other base or sigma is refused by guard; a falling axis is the base
+  above 1 reversed. asinh is `:math.asinh`, within 1 ulp of R's correctly rounded one (369 of
+  3,000 off under glibc 2.39), and atanh `:math.atanh` likewise (368). *Rejected: positional `{:pseudo_log, sigma, base}`*: sigma alone,
+  the usual call, would spell out e. *Rejected: R's bases below 1*: `squish/2` and
+  `Breaks.log/2` would take a falling domain, for an axis nobody draws. *Rejected: an own
+  correctly rounded asinh or atanh*: new numerics for one ulp; *one through log1p*: further off
+  (asinh's 540).
+
 - **A bootstrap example states its departure once, in its notebook's About (2026-11-01, Steve:
   "Your recommendation").** stat_summary's About says that ggplot2's examples set no seed, so R
   draws its `mean_cl_boot` intervals differently on every run, that Giggly draws them from
@@ -229,6 +425,19 @@ deleted from the entry it was in, never marked superseded; git history keeps eve
   package holds two rules. *Rejected: R's `discard()` with an `NA` end*: every value the other end
   keeps comes back `NA`, from R's logical indexing, no rule a caller can use.
 
+- **A transformation gives R's doubles: NaN `:nan`, its derivatives R's at `nil` too, and
+  `trim_to_domain/2` of nothing `:none` (2026-11-01, Steve: "A", "A", "A", increment 4's step 2;
+  checked against scales 1.4.0).** A value outside the domain transforms to `:nan`, R's NaN, and a
+  missing one stays `nil`, as `Scales.Bounds` holds them; Giggly's scales already send either to
+  `na_value`. The identity's and reverse's derivatives are R's `rep(1, length(x))` and `-1`
+  everywhere, `nil` and `:nan` included. `trim_to_domain/2` follows R (range, squish, ends
+  transformed) but gives `:none` with no value to range over. *Rejected: NaN `nil`*: R's two
+  answers made one, the package's rule split between Bounds and Transform. *Rejected: `nil` at
+  `nil` for the identity's derivatives*: a departure for a value nothing reads differently.
+  *Rejected: refusing no values*: every caller would check for empty data first. *Rejected: R's
+  transformed `Inf` and `-Inf`*: R's own warning says they mean nothing, and silently they would
+  read as a range.
+
 - **`transform:` reaches the continuous non-position scales; binned ones wait (2026-11-01, Steve:
   "B", "We don't want to be releasing scales every time we release giggly"; checked against
   ggplot2 4.0.3).** As R's, every continuous colour, fill, alpha, size, radius and line-width
@@ -255,7 +464,8 @@ deleted from the entry it was in, never marked superseded; git history keeps eve
   `Scales.Transform.new/2`, R's `new_transform()`: functions of one value (`&Mod.fun/1` keeps it
   readable), a domain, breaks handed limits in data units; built-ins stay names. log1p (Goldberg's
   `log(u) * x / (u - 1)`), expm1 (Kahan's), the normal CDF (`erfc` with its argument's rounding
-  corrected) and quantile (bisection on it) match R to a few ulps, 2.4e-15 relatively at worst.
+  corrected) and quantile (bisection on it, its middle on `erf`: the entry beginning "A
+  distribution's spread") match R to a few ulps.
   `:logit`, `:probit`, and the normal and logistic with R's parameters; other distributions
   through `new/2`. Every numeric transformation has R's derivatives, a composition's by the chain
   rule. *Rejected: a module a user writes*: internal callbacks made API. *Rejected: Nx*: its
@@ -2378,8 +2588,9 @@ deleted from the entry it was in, never marked superseded; git history keeps eve
   given in data units and transformed, limits then sorted, as ggplot2 sorts them, so a scale
   function takes either order, and `xlim/3`, `ylim/3` and `lims/2` reverse an axis given high to
   low, as ggplot2's `limits()` does. A value outside the domain is R's: `log10(0)` is minus
-  infinity, at the panel's edge, a NaN missing. *Rejected: refusing high-to-low limits on a
-  scale function*: the order means nothing once transformed (`scale_x_reverse` takes both).
+  infinity, at the panel's edge, a NaN, which the scale maps missing. *Rejected: refusing
+  high-to-low limits on a scale function*: the order means nothing once transformed
+  (`scale_x_reverse` takes both).
 
 - **`Scales.Labels`'s `comma/2`, `percent/2` and `currency/2` take every option of scales
   1.4.0's `label_comma()`, `label_percent()` and `label_currency()` (2026-10-18, Steve).**
@@ -3967,18 +4178,28 @@ tells the story (`git show <hash>`). Until 2026-10-15 each milestone also had a 
 §1's roadmap.
 
 - 2026-11-01 — Draw coord_flip()'s examples with the swap ggplot2 prefers, and every example of a
-  superseded function with its replacement (positions, step 7); §4: "An example calling a function
-  ggplot2 has superseded"
+  superseded function with its replacement (positions, step 7) (`00f2415`); §4: "An example calling
+  a function ggplot2 has superseded"
 - 2026-11-01 — Give the layers jittering beside dodging, {:jitterdodge, options}, as R's
   position_jitterdodge() but its reverse, and refuse a jittered range missing its cross position
   (positions, step 6) (`aff93fa`); §4: "Jittering beside dodging takes R's options"
+- 2026-11-01 — Compose transformations and take a user's own (transforms, step 6) (`3409ceb`); §4:
+  "A composition is", "A composition's breaks", "A composition's labels", "A composition's domain",
+  "A date, date-time or time transformation comes first", "`Transform.new/2` takes", "A
+  transformation of your own"
 - 2026-11-01 — Give dodging R's preserve:, orientation: and reverse:, and dodging by clusters its
   width:, each position reading the orientation as R does (positions, step 5) (`5392a92`); §4:
   "Dodging takes R's options", "Dodging by clusters takes `preserve:`", "Dodging by clusters'
   `:single`", "A notebook leaves out an argument"
+- 2026-11-01 — Carry Box-Cox, modulus, Yeo-Johnson and a span of time (transforms, step 5)
+  (`dd131e6`); §4: "Box-Cox, modulus, Yeo-Johnson and a span of time", "The Box-Cox, modulus and
+  Yeo-Johnson transformations", "Box-Cox's domain", "An axis past a bound", "Box-Cox, modulus and
+  Yeo-Johnson labels"
 - 2026-11-01 — Make nudge_x and nudge_y aesthetics, set or mapped on every layer that nudges
   (positions, step 4) (`6b8cab7`); §4: "A nudge is an aesthetic only", "A position declares the
   aesthetics it reads"
+- 2026-11-01 — Write a plain label past what Erlang writes whole, as R writes it (`4bdb310`); §4: "A
+  plain label past"
 - 2026-11-01 — Give stacking its vjust: and reverse:, and fill each pile to 1 with :fill (positions,
   step 3) (`86f1b9a`); §4: "Filling is stacking with `fill: true`"
 - 2026-11-01 — Give every layer function the positions that move its marks in ggplot2, refusing the
@@ -3992,6 +4213,14 @@ tells the story (`git show <hash>`). Until 2026-10-15 each milestone also had a 
 - 2026-11-01 — Add Hmisc's summaries to stat_summary(): mean_cl_normal, mean_sdl, median_hilow
   and a seeded mean_cl_boot (summaries, step 5); §4: "`mean_cl_boot` draws its resamples", "The
   Hmisc summaries take Hmisc's arguments"
+- 2026-11-01 — Carry asn, atanh, logit, probit and the normal and logistic probabilities
+  (transforms, step 4) (`6e2fa4f`); §4: "A distribution's spread", "A break turned back through an
+  inexact inverse", "A logarithm's or exponential's base"
+- 2026-11-01 — Carry the logarithms, log1p, the exponentials, asinh and the pseudo-logarithm
+  (transforms, step 3) (`f99fb82`); §4: "A break turned back through an inexact inverse", "A
+  logarithm's or exponential's base"
+- 2026-11-01 — Give R's doubles from each transformation, with trim_to_domain() and the
+  derivatives (transforms, step 2) (`e1ce0bb`); §4: "A transformation gives R's doubles"
 - 2026-11-01 — Complete R's out-of-range family, with infinities and NaN as R gives them
   (transforms, step 1) (`189efe5`); §4: "A NaN is `:nan` throughout `Scales.Bounds`", "The
   scales package carries every transformation", "`oob:` takes a name or a function",

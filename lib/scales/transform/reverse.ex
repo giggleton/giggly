@@ -4,7 +4,8 @@ defmodule Scales.Transform.Reverse do
   # The reversal, R's `transform_reverse()`: each value negated, so the axis runs from high to low.
   # Use it through `Scales.Transform`.
   #
-  # Plus and minus infinity swap. Its breaks are extended Wilkinson's on the range in data units,
+  # Plus and minus infinity swap, and NaN stays itself. Its derivatives are -1 at every value, a
+  # missing one and NaN too, as R's. Its breaks are extended Wilkinson's on the range in data units,
   # negated, so they descend; its minor breaks are R's regular ones with `reverse = TRUE`, which
   # adds the step above the first break and below the last; and its labels are the breaks in data
   # units, plain decimals.
@@ -21,6 +22,12 @@ defmodule Scales.Transform.Reverse do
 
   @impl Scales.Transform
   def domain(_transformation), do: {:neg_infinity, :infinity}
+
+  @impl Scales.Transform
+  def derivative(_transformation, values), do: Enum.map(values, fn _value -> -1.0 end)
+
+  @impl Scales.Transform
+  def inverse_derivative(transformation, positions), do: derivative(transformation, positions)
 
   @impl Scales.Transform
   def breaks(_transformation, {low, high}, options) do
@@ -45,5 +52,5 @@ defmodule Scales.Transform.Reverse do
   defp negated(value) when is_number(value), do: -value
   defp negated(:infinity), do: :neg_infinity
   defp negated(:neg_infinity), do: :infinity
-  defp negated(_missing), do: nil
+  defp negated(missing_or_nan), do: missing_or_nan
 end

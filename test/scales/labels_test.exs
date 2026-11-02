@@ -1584,6 +1584,21 @@ defmodule Scales.LabelsTest do
 
   # `plain/1` writes numbers the Elixir way, not R's, so these labels are worked out from what it
   # promises, not R's output.
+  describe "plain_round_tripped/1" do
+    # 10000 under transform_pseudo_log(2, 10), turned back, is 9999.999999999989, which plain/1
+    # writes "9999.99999999999"; ten 9s after the point are past 14 significant digits
+    test "writes each value rounded to 14 significant digits first" do
+      assert {Labels.plain_round_tripped([9_999.999999999989, 5000.000000000001]),
+              Labels.plain([9_999.999999999989, 5000.000000000001])} ===
+               {["10000", "5000"], ["9999.99999999999", "5000.00000000000"]}
+
+      assert Labels.plain_round_tripped([0.12345678901234, 2.0]) === [
+               "0.12345678901234",
+               "2.00000000000000"
+             ]
+    end
+  end
+
   describe "plain/1" do
     test "every label gets the decimals the most precise needs, rounding error and -0.0 dropped" do
       assert Labels.plain([2.5, 2.75, 0.30000000000000004, -0.0]) ==
@@ -1615,6 +1630,28 @@ defmodule Scales.LabelsTest do
 
     test "no breaks have no labels" do
       assert Labels.plain([]) == []
+    end
+
+    # The exact value of 0.3 to 17 decimals is 0.29999999999999999, as C's sprintf() and R's
+    # format() write it; plain/1's decimals only pad the 15 significant digits it rounds to.
+    test "a break given more decimals than its own digits is padded with zeros" do
+      assert Labels.plain([0.3, 1.0e-17]) == ["0.30000000000000000", "0.00000000000000001"]
+    end
+
+    # R: trimws(format(2e257, scientific = FALSE)), its exact digits, 258 characters, past the
+    # 256 that Erlang's float_to_binary/2 writes; and format(c(1e-300, 0.25), scientific = FALSE),
+    # past its 253 decimals.
+    test "a break past the characters or decimals Erlang writes is written whole, as R writes it" do
+      assert Labels.plain([2.0e257]) == [
+               "2000000000000000060255319800281085005780973079549390257664215959806548266755292465642224" <>
+                 "7125382915271364876860343455656359338682733727546893769990039911439972557329123488427600" <>
+                 "5207941131245911204484318605390207565762827048057062398328588249283527946922885120"
+             ]
+
+      assert Labels.plain([1.0e-300, 0.25]) == [
+               "0." <> String.duplicate("0", 299) <> "1",
+               "0.25" <> String.duplicate("0", 298)
+             ]
     end
   end
 end

@@ -24,8 +24,7 @@ defmodule Scales do
 
     * A range is `{low, high}`.
     * A double is held as R holds one (`t:double/0`): `nil` is R's `NA`, a missing value,
-      `:nan` R's `NaN`, and `:infinity` and `:neg_infinity` R's infinities. A transformation
-      gives `nil` where R gives `NaN`, as R's position scales take it to be missing.
+      `:nan` R's `NaN`, and `:infinity` and `:neg_infinity` R's infinities.
     * A colour is uppercase `#RRGGBB`, or `#RRGGBBAA` with an alpha of its own; `:none` is no
       colour, R's `NA`.
     * A function takes a list where R takes a vector, and its options as a keyword list of R's
