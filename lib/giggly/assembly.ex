@@ -341,7 +341,7 @@ defmodule Giggly.Assembly do
           frame,
           {final_x_scales, x_routes},
           {final_y_scales, y_routes},
-          &Scale.censor/2
+          &Scale.map_positions/2
         )
       end)
 

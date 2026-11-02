@@ -21,6 +21,10 @@ defmodule Giggly.Plot.Options do
   # takes.
   @dodges [Position.Dodge, Position.Dodge2]
 
+  # The values of a continuous or binned scale's `oob:` given by name, R's `oob_*` functions but
+  # `oob_discard()`.
+  @oob_names [:censor, :censor_any, :squish, :squish_any, :squish_infinite, :keep]
+
   # A facet's strip labels, ggplot2's labellers: each kind's options, and whether a labeller given
   # alone puts each column's label in a strip of its own. In a keyword list of labellers,
   # `multi_line:` is the list's, as ggplot2's `labeller()` hands its `.multi_line` to each.
@@ -2270,6 +2274,47 @@ defmodule Giggly.Plot.Options do
   # Every scale function's `expand:`, its default the scale's.
   @scale_expand_type {:custom, __MODULE__, :validate_expand, []}
 
+  # A continuous or binned scale's `oob:`, R's `oob`: what happens to a value outside its limits,
+  # run in transformed space, a position scale's at both of its maps. Its default is the scale's,
+  # `:censor`, a binned one's `:squish`. The names' meanings are `Scales.Bounds`'s.
+  @oob_type {:custom, __MODULE__, :validate_oob, []}
+  @oob_names_doc "`:censor`, a finite number outside made missing; `:censor_any`, an infinity " <>
+                   "too; `:squish`, a finite number moved onto the nearer limit; " <>
+                   "`:squish_any`, an infinity too; `:squish_infinite`, an infinity alone moved " <>
+                   "onto its limit; `:keep`, every value kept; or a function handed the values " <>
+                   "and the limits, `{low, high}`, both transformed, that returns a value for " <>
+                   "each, a number, an infinity, `nil` or `:nan`"
+
+  @position_oob_spec [
+    type: @oob_type,
+    doc:
+      "What happens to a value outside the limits: " <>
+        @oob_names_doc <>
+        ". Run on the " <>
+        "positions as given and again once the stat and position have moved them, so a bar " <>
+        "whose base the limits leave out is missing; a value kept outside is drawn past the " <>
+        "panel's edge and cut off there. `:censor` when not given."
+  ]
+
+  @legend_oob_spec [
+    type: @oob_type,
+    doc:
+      "What happens to a value outside the limits: " <>
+        @oob_names_doc <>
+        ". A value left " <>
+        "outside, or left missing, takes `na_value:`, but an opacity or a size kept outside " <>
+        "runs on past its range. `:censor` when not given."
+  ]
+
+  @binned_oob_spec [
+    type: @oob_type,
+    doc:
+      "What happens to a value outside the limits before it is binned: " <>
+        @oob_names_doc <>
+        ". A value left outside, or left missing, takes `na_value:`. `:squish` when not given, " <>
+        "so a value outside takes the colour of the bin at the nearer end."
+  ]
+
   # The continuous scale functions' options, validated at the call; an option not given keeps the
   # scale's default, `Giggly.Scale.Continuous`'s. A transformed scale's function takes them all but
   # `transform:`, which it sets.
@@ -2281,8 +2326,9 @@ defmodule Giggly.Plot.Options do
         "`{low, high}`: the values the axis spans whatever the " <>
           "data, in data units, `nil` for an end the data decides; " <>
           "either order names the same axis. A value outside them is " <>
-          "missing, so its mark is not drawn."
+          "missing, so its mark is not drawn, unless `oob:` says otherwise."
     ],
+    oob: @position_oob_spec,
     breaks: [
       type: {:custom, __MODULE__, :validate_breaks, []},
       doc:
@@ -2414,8 +2460,10 @@ defmodule Giggly.Plot.Options do
                           doc:
                             "`{low, high}`: the dates the axis spans whatever the data, `nil` " <>
                               "for an end the data decides; either order names the same axis. " <>
-                              "A value outside them is missing, so its mark is not drawn."
+                              "A value outside them is missing, so its mark is not drawn, " <>
+                              "unless `oob:` says otherwise."
                         ],
+                        oob: @position_oob_spec,
                         breaks: [
                           type: {:custom, __MODULE__, :validate_dates, []},
                           doc:
@@ -2495,8 +2543,9 @@ defmodule Giggly.Plot.Options do
                                   "data, `DateTime`s or `NaiveDateTime`s as its column holds, " <>
                                   "`nil` for an end the data decides; either order names the " <>
                                   "same axis. A value outside them is missing, so its mark is " <>
-                                  "not drawn."
+                                  "not drawn, unless `oob:` says otherwise."
                             ],
+                            oob: @position_oob_spec,
                             breaks: [
                               type: {:custom, __MODULE__, :validate_datetimes, []},
                               doc:
@@ -2595,8 +2644,10 @@ defmodule Giggly.Plot.Options do
                           doc:
                             "`{low, high}`: the times of day the axis spans whatever the data, " <>
                               "`nil` for an end the data decides; either order names the same " <>
-                              "axis. A value outside them is missing, so its mark is not drawn."
+                              "axis. A value outside them is missing, so its mark is not " <>
+                              "drawn, unless `oob:` says otherwise."
                         ],
+                        oob: @position_oob_spec,
                         breaks: [
                           type: {:custom, __MODULE__, :validate_times, []},
                           doc:
@@ -2713,7 +2764,7 @@ defmodule Giggly.Plot.Options do
       doc:
         "`{low, high}`: the values the scale spans whatever the data, `nil` for an end the " <>
           "data decides; either order names the same scale. A value outside them takes " <>
-          "`na_value:`."
+          "`na_value:`, unless `oob:` says otherwise where the scale takes it."
     ],
     breaks: [
       type: {:custom, __MODULE__, :validate_breaks, []},
@@ -2773,6 +2824,7 @@ defmodule Giggly.Plot.Options do
                                       )
   @continuous_color_legend_option_specs Enum.concat(
                                           @continuous_legend_option_specs,
+                                          oob: @legend_oob_spec,
                                           guide: @continuous_color_guide_spec
                                         )
 
@@ -3099,9 +3151,10 @@ defmodule Giggly.Plot.Options do
       doc:
         "`{low, high}`: the values the bins span whatever the data, `nil` for an end the data " <>
           "decides; either order names the same scale. A value outside them takes the colour of " <>
-          "the bin at the nearer end. The data's range, widened so the end bins are as wide as " <>
-          "their neighbours, when neither this nor `breaks:` is given."
+          "the bin at the nearer end, unless `oob:` says otherwise. The data's range, widened so " <>
+          "the end bins are as wide as their neighbours, when neither this nor `breaks:` is given."
     ],
+    oob: @binned_oob_spec,
     breaks: [
       type: {:custom, __MODULE__, :validate_breaks, []},
       doc:
@@ -3219,6 +3272,7 @@ defmodule Giggly.Plot.Options do
                                     [range: @alpha_range_spec, na_value: @alpha_na_value_spec] ++
                                       Enum.concat(
                                         @continuous_legend_option_specs,
+                                        oob: @legend_oob_spec,
                                         guide: @alpha_guide_spec
                                       )
                                   )
@@ -3303,6 +3357,7 @@ defmodule Giggly.Plot.Options do
                              ] ++
                                Enum.concat(
                                  @continuous_legend_option_specs,
+                                 oob: @legend_oob_spec,
                                  guide: @size_guide_spec
                                )
                            )
@@ -4916,6 +4971,28 @@ defmodule Giggly.Plot.Options do
 
   def validate_coefficient(coefficient),
     do: {:error, "expected a number, or a list of them, got: #{inspect(coefficient)}"}
+
+  # NimbleOptions' check of a scale's `oob:`: one of R's `oob_*` functions by name, or a function
+  # of the values and the limits. `:discard` is refused: R's `oob_discard()` returns fewer values
+  # than it is handed, which ggplot2 recycles over the rows, so its marks are drawn at values other
+  # rows hold, a meaning no plot wants.
+  @doc false
+  @spec validate_oob(term()) :: {:ok, atom() | function()} | {:error, String.t()}
+  def validate_oob(name) when name in @oob_names, do: {:ok, name}
+  def validate_oob(oob) when is_function(oob, 2), do: {:ok, oob}
+
+  def validate_oob(:discard) do
+    {:error,
+     "oob: :discard is not taken: it would leave fewer values than rows, which ggplot2 " <>
+       "recycles, drawing marks at values other rows hold; use :censor, which makes a value " <>
+       "outside the limits missing"}
+  end
+
+  def validate_oob(oob) do
+    {:error,
+     "expected one of #{Enum.map_join(@oob_names, ", ", &inspect/1)}, or a function of two " <>
+       "arguments, the values and the limits, got: #{inspect(oob)}"}
+  end
 
   # NimbleOptions' check of a scale's limits: `{low, high}`, each a number, kept as a float, or
   # `nil` for an end the data decides, in either order, which the scale sorts once transformed.

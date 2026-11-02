@@ -31,7 +31,8 @@ defmodule Giggly.Render do
   # and the plot's background is drawn first, under everything, over the whole table, margin
   # included, as ggplot2 adds it (`table_add_background()`), cut off at the table's edges as it is.
   # Each panel's cell is cut off at its edges when the coordinate system clips panels, and each
-  # strip's always, as `theme_gray()`'s `strip.clip` says.
+  # strip's always, as `theme_gray()`'s `strip.clip` says. A layer whose line widths hold an
+  # infinity, which a scale's palette gives for an infinite value, raises, as R cannot draw it.
   #
   # A plot with legends, one for each aesthetic other than position that a layer maps, or for
   # several merged, places them where the theme puts them (`legend_position`), as ggplot2's
@@ -198,10 +199,31 @@ defmodule Giggly.Render do
   # A layer's rows in one panel drawn by its geom; a panel where the layer has none, as one whose
   # own table holds no row there, draws nothing of it, as ggplot2's `draw_layer()` gives such a
   # panel an empty grob.
-  defp draw_layer(geom, {:ok, frame}, coord, params, installed_fonts),
-    do: Geom.draw_panel(geom, frame, coord, params, installed_fonts)
+  defp draw_layer(geom, {:ok, frame}, coord, params, installed_fonts) do
+    check_line_widths(geom, frame)
+    Geom.draw_panel(geom, frame, coord, params, installed_fonts)
+  end
 
   defp draw_layer(_geom, :error, _coord, _params, _installed_fonts), do: []
+
+  # An infinite line width cannot be drawn, so it raises, as R fails to draw it ("'lwd' must be
+  # non-negative and finite"); a geom draws with a `linewidth` column only where it strokes one,
+  # and a scale's palette leaves an infinity there for an infinite value.
+  defp check_line_widths(geom, frame) do
+    widths =
+      if :linewidth in DataFrame.names(frame), do: DataFrame.pull(frame, :linewidth), else: []
+
+    case Enum.find(widths, fn width -> width in [:infinity, :neg_infinity] end) do
+      nil ->
+        :ok
+
+      infinite ->
+        raise ArgumentError,
+              "a layer drawn by #{inspect(geom.__struct__)} has a linewidth of " <>
+                "#{inspect(infinite)}, which cannot be drawn, as R cannot draw it either; leave " <>
+                "infinite values out of the column mapped to linewidth"
+    end
+  end
 
   # The plot's legends stacked in their box (`Giggly.Guide.Box`), `:none` for none or where the
   # theme puts them nowhere (`legend_position: :none`), or where the box goes, its width and height

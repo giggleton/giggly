@@ -91,7 +91,7 @@ defmodule Giggly.Plot do
   axis's time zone; `xlim/3`, `ylim/3` and `lims/2` set its limits alone, two ends for a
   continuous, a date or a date-time axis and, with `xlim/2` and `ylim/2`, a list of values for a
   discrete one; a time axis's are its scale's `limits:`. A value outside the limits is missing, so
-  its mark is not drawn. A continuous scale given a column of dates places each at its days since
+  its mark is not drawn, unless the scale's `oob:` says otherwise. A continuous scale given a column of dates places each at its days since
   1970-01-01, one of date-times each at its seconds since 1970-01-01 00:00 UTC, and one of times
   each at its seconds since midnight.
 
@@ -117,7 +117,8 @@ defmodule Giggly.Plot do
   discrete column's values six shapes, solid or open, and `scale_shape_manual/2` names each value's
   shape; shapes have no order, so a continuous column cannot be mapped to `:shape`. `lims/2` sets
   their limits alone. A value outside a colour scale's limits takes its `na_value:`, as a missing
-  one does.
+  one does, unless its `oob:` says otherwise; a binned scale's takes the colour of the nearer end
+  bin.
 
   ## Labels
 
@@ -2863,7 +2864,8 @@ defmodule Giggly.Plot do
 
   A value outside the limits is missing, so its mark is not drawn: a point, or a bar counted from
   it, and a bar whose ends the limits cut once it is placed. An end at `:infinity` or
-  `:neg_infinity` is kept. The scale's name titles the axis whatever `labs/2` says. Raises
+  `:neg_infinity` is kept. `oob:` says otherwise: `:squish` moves a value onto the nearer limit,
+  `:keep` draws it past the panel's edge, cut off there. The scale's name titles the axis whatever `labs/2` says. Raises
   `ArgumentError` for a list of labels without a list of breaks as long; a column on the axis
   that is not numbers is refused when the plot is run.
 
@@ -3098,7 +3100,7 @@ defmodule Giggly.Plot do
   A date axis places each date at its days since 1970-01-01 and marks it on calendar boundaries:
   every day, week, month or year, as suits its span, or every step of `date_breaks:`. Its labels
   are written as suits the breaks, or in the format `date_labels:` gives. A value outside the
-  limits is missing, so its mark is not drawn. The scale's name titles the axis whatever `labs/2`
+  limits is missing, so its mark is not drawn, unless `oob:` says otherwise. The scale's name titles the axis whatever `labs/2`
   says. Raises `ArgumentError` for an option given beside its `date_` twin, or a list of labels
   without a list of breaks as long; a column on the axis that is not dates is refused when the
   plot is run.
@@ -3155,7 +3157,8 @@ defmodule Giggly.Plot do
   though it were UTC's. Where the zone's offset changes, as daylight saving begins or ends, steps
   under a day keep their spacing and days, months and years keep their midnight. A zone other
   than UTC needs `time_zone_database:` to name a database that knows it, such as the tz
-  package's. A value outside the limits is missing, so its mark is not drawn. The scale's name
+  package's. A value outside the limits is missing, so its mark is not drawn, unless `oob:` says
+  otherwise. The scale's name
   titles the axis whatever `labs/2` says. Raises `ArgumentError` for an option given beside its
   `date_` twin, a list of labels without a list of breaks as long, or a time zone the database
   does not know; a column on the axis that is not date-times, or is in a zone the database does
@@ -3222,7 +3225,8 @@ defmodule Giggly.Plot do
   minutes or hours, as suits its span, or every step of `date_breaks:`. Its labels give hours,
   minutes and seconds (`10:30:00`), the hours counting on past midnight where the axis reaches
   beyond it (`24:00:00`), or are written in the format `date_labels:` gives, wrapped round
-  midnight. A value outside the limits is missing, so its mark is not drawn. The scale's name
+  midnight. A value outside the limits is missing, so its mark is not drawn, unless `oob:` says
+  otherwise. The scale's name
   titles the axis whatever `labs/2` says. Raises `ArgumentError` for an option given beside its
   `date_` twin, or a list of labels without a list of breaks as long; a column on the axis that is
   not times is refused when the plot is run.
@@ -4025,7 +4029,8 @@ defmodule Giggly.Plot do
   bin's middle of a gradient from `#132B43` to `#56B1F7`, or a colour each of `palette:`, a
   palette's name or a list, given to the bins in order.
 
-  Values outside the limits take the colour of the nearer end bin; with neither limits nor
+  Values outside the limits take the colour of the nearer end bin, unless `oob:` says otherwise;
+  with neither limits nor
   breaks given, the limits are the data's range widened so the end bins are as wide as their
   neighbours. Its guide is colour steps, a bar of one block of colour for each bin, unless
   `guide:` names another.
@@ -4509,7 +4514,8 @@ defmodule Giggly.Plot do
   Each value is drawn at a size, in millimetres, whose square is as far toward the square of
   `max_size:` as the value is toward the high end of the limits from 0, so a point's area is in
   proportion to the value, and the high end is drawn at `max_size:`. A value below 0 is drawn as
-  large as its distance from 0. Its guide is a legend unless `guide:` says otherwise. Raises
+  large as its distance from 0, and an infinite value at an infinite size, so it is not drawn.
+  Its guide is a legend unless `guide:` says otherwise. Raises
   `NimbleOptions.ValidationError` for an option it does not take or a value it cannot use, a size
   below 0 or a `guide:` of `:colorbar` or `:colorsteps`, and `ArgumentError` for a list of labels
   without a list of breaks as long; a column that is not numbers, and a value below limits whose
@@ -4759,7 +4765,7 @@ defmodule Giggly.Plot do
   millimetres, as far between them as the value is through the limits. A line whose width changes
   along it is drawn a segment from each row to the next, each as wide as the row it starts from.
   Its guide is a legend unless `guide:` says otherwise. A value outside the limits, or missing,
-  draws no line. Raises `NimbleOptions.ValidationError` for an option it does not take or a value
+  draws no line, and an infinite one is an infinite width, which raises when the plot is drawn. Raises `NimbleOptions.ValidationError` for an option it does not take or a value
   it cannot use, a width below 0 or a `guide:` of `:colorbar` or `:colorsteps`, and `ArgumentError`
   for a list of labels without a list of breaks as long; a column that is not numbers is refused
   when the plot is run.

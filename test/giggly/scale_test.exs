@@ -511,7 +511,8 @@ defmodule Giggly.ScaleTest do
       upper = weights(limits: {nil, 4.0})
       values = [1.513, 2.0, 3.5, 5.0, 5.424, nil, :infinity, :neg_infinity]
 
-      assert {Scale.map(both, values), Scale.censor(both, values), Scale.censor(upper, values)} ===
+      assert {Scale.map(both, values), Scale.map_positions(both, values),
+              Scale.map_positions(upper, values)} ===
                {[nil, 2.0, 3.5, 5.0, nil, nil, :infinity, :neg_infinity],
                 [nil, 2.0, 3.5, 5.0, nil, nil, :infinity, :neg_infinity],
                 [1.513, 2.0, 3.5, nil, nil, nil, :infinity, :neg_infinity]}
@@ -520,7 +521,7 @@ defmodule Giggly.ScaleTest do
     test "a discrete scale's positions are not censored" do
       scale = trained(:discrete, ["a", "b"])
 
-      assert Scale.censor(scale, [0.55, 2.45, 9.0]) === [0.55, 2.45, 9.0]
+      assert Scale.map_positions(scale, [0.55, 2.45, 9.0]) === [0.55, 2.45, 9.0]
     end
 
     test "a scale's kind is discrete, date, date-time, time or continuous" do
@@ -1543,6 +1544,7 @@ defmodule Giggly.ScaleTest do
                guide: :colorsteps,
                name: :default,
                limits: {nil, nil},
+               oob: :squish,
                breaks: :default,
                labels: :default,
                n_breaks: 5,
@@ -2576,6 +2578,85 @@ defmodule Giggly.ScaleTest do
 
       assert_received {:handed, {+0.0, 97.0}, [n: 3]}
       assert_received {:handed, {+0.0, 97.0}, [n: 5]}
+    end
+  end
+
+  describe "a scale's oob" do
+    # A continuous scale of `options`, trained on `values` put through its transformation, as the
+    # assembly trains one.
+    defp bounded(options, values) do
+      scale = struct!(Scale.Continuous, options)
+      Scale.train(scale, Scale.transform(scale, values), :none)
+    end
+
+    defp handing(values, limits) do
+      send(self(), {:handed, values, limits})
+      values
+    end
+
+    # Golden: ggplot2 4.0.3's oob, R 4.6.1, on `scale_y_reverse(limits = c(10, 30))` and
+    # `scale_y_log10(limits = c(1, 1000))` (`inc4/step7/fn.R`): handed range = (-30, -10) and
+    # (0, 3), and each position column alone.
+    test "a function is handed one column's values and the limits, both transformed, the limits sorted" do
+      reversed =
+        bounded([transform: :reverse, limits: {10.0, 30.0}, oob: &handing/2], [5.0, 40.0])
+
+      logged = bounded([transform: :log10, limits: {1.0, 1000.0}, oob: &handing/2], [0.5, 5000])
+
+      Scale.map(reversed, Scale.transform(reversed, [5.0, 40.0]))
+      Scale.map_positions(logged, Scale.transform(logged, [10]))
+
+      assert_received {:handed, [-5.0, -40.0], {-30.0, -10.0}}
+      assert_received {:handed, [1.0], {+0.0, 3.0}}
+    end
+
+    test "a function's numbers are read as floats, and its NaN as missing" do
+      scale = bounded([oob: fn _values, _limits -> [5, :nan, :infinity, nil] end], [1, 9])
+
+      assert Scale.map(scale, [1, 2, 3, 4]) === [5.0, nil, :infinity, nil]
+    end
+
+    test "a function returning another count of values, or no list, raises when run" do
+      short = bounded([oob: fn values, _limits -> Enum.take(values, 1) end], [1, 9])
+      no_list = bounded([oob: fn _values, _limits -> 5 end], [1, 9])
+
+      error = assert_raise ArgumentError, fn -> Scale.map(short, [1, 9]) end
+      assert String.starts_with?(error.message, "a scale's oob: function returned a list of 1 ")
+      assert error.message =~ "for the 2 values"
+
+      error = assert_raise ArgumentError, fn -> Scale.map_positions(no_list, [1, 9]) end
+      assert String.starts_with?(error.message, "a scale's oob: function must return a list")
+      assert error.message =~ "got: 5"
+    end
+
+    test "a function returning what is not a number, an infinity, nil or NaN raises naming it" do
+      scale = bounded([oob: fn _values, _limits -> [1.0, "5"] end], [1, 9])
+
+      error = assert_raise ArgumentError, fn -> Scale.map(scale, [1, 9]) end
+      assert String.starts_with?(error.message, "a scale's oob: function returned \"5\", ")
+    end
+
+    # Golden: ggplot2 4.0.3, R 4.6.1, on y = -Inf, Inf, NA with no limits (`inc4/step7/empty.R`):
+    # its oob handed range = (Inf, -Inf), so `oob_squish_any` puts both infinities at -Inf.
+    test "a position scale with no finite value and no limits hands its oob the range of nothing" do
+      values = [:neg_infinity, :infinity, nil]
+      squished = bounded([oob: :squish_any], values)
+      handed = bounded([oob: &handing/2], values)
+
+      assert Scale.map(squished, values) === [:neg_infinity, :neg_infinity, nil]
+
+      Scale.map_positions(handed, values)
+      assert_received {:handed, ^values, {:infinity, :neg_infinity}}
+    end
+
+    # Golden: ggplot2 4.0.3's `scale_size_area()`, R 4.6.1 (`inc4/step7/aes.txt`): -Inf and Inf
+    # are both size Inf, which a point is not drawn at, whatever the limits' high end.
+    test "a size by area places an infinite value at an infinity, as its high end of 0 does too" do
+      scale = area_scale([1, 10])
+      zeros = area_scale([0, 0])
+
+      assert {Scale.map(scale, [:neg_infinity, :infinity]), Scale.map(zeros, [:infinity])} ===
+               {[:infinity, :infinity], [:infinity]}
     end
   end
 end

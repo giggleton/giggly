@@ -97,16 +97,20 @@ defmodule Giggly.Scale do
   # mapped. A continuous value's place runs over the scale's limits, or about its
   # midpoint (R's
   # `rescale_mid()`), or at its share of their high end (R's `rescale_max()`), as the scale's
-  # `rescaler` says, and one outside them is censored, as ggplot2's `oob = censor`; a missing or
-  # censored value maps to the scale's `na_value`, grey50 for a colour, `nil`, R's `NA`, for alpha,
-  # line type, line width, shape and size. Each names the guide that draws it, as ggplot2's scales
-  # do: a colour bar for a continuous colour or fill, colour steps for a binned one, a legend for the
-  # rest, whose breaks and labels are the scale's on its limits.
+  # `rescaler` says, once its `oob` has run on it (`Giggly.Scale.OutOfBounds`), `:censor` unless a
+  # plot's scale says otherwise, as ggplot2's `oob = censor`; a value the palette gives nothing for,
+  # a missing or censored one, or for a colour one left outside or infinite, maps to the scale's
+  # `na_value`, grey50 for a colour, `nil`, R's `NA`, for alpha, line type, line width, shape and
+  # size, while an alpha, size or line width runs on past its range for a value left outside and
+  # is infinite for an infinite one, as R's palettes give them. Each names the guide that draws
+  # it, as ggplot2's scales do: a colour bar for a continuous colour or fill, colour steps for a
+  # binned one, a legend for the rest, whose breaks and labels are the scale's on its limits.
   #
   # A plot's colour or fill scale may be binned (`Giggly.Scale.Binned`), ggplot2's third kind,
-  # which no column's type chooses: it trains as a continuous scale does, squishes each value into
-  # its limits, widened from the data's range where none are given, and cuts it into bins at its
-  # breaks, each bin one colour.
+  # which no column's type chooses: it trains as a continuous scale does, runs its `oob` on each
+  # value, `:squish` into its limits unless a plot's scale says otherwise, its limits widened from
+  # the data's range where none are given, and cuts it into bins at its breaks, each bin one colour,
+  # a value left outside in none.
 
   # Values in, values out: a scale depends on nothing but R's scales half, `Scales`, as ggplot2
   # depends on R's `scales`, and R's `as.character()`, which writes a discrete level. It exports
@@ -117,7 +121,7 @@ defmodule Giggly.Scale do
     exports: [Binned, Continuous, Discrete]
 
   alias Giggly.AsCharacter
-  alias Giggly.Scale.{Binned, BreaksFunction, Continuous, Discrete}
+  alias Giggly.Scale.{Binned, BreaksFunction, Continuous, Discrete, OutOfBounds}
   alias Scales.{Bounds, DataRange, Palette, Transform}
 
   @typedoc "A scale: a continuous, a discrete or a binned one."
@@ -392,40 +396,48 @@ defmodule Giggly.Scale do
   def reset(%Continuous{} = scale), do: %{scale | range: :none}
   def reset(%Discrete{} = scale), do: %{scale | continuous_range: :none}
 
-  # Each value's position on the scale's axis: a continuous value unchanged, or `nil` outside the
-  # scale's limits, a discrete one at its level's position counting from 1. For an aesthetic other
-  # than position, each value through the scale's palette: a continuous one's place in the scale's
-  # limits (`limits/1`), from 0 to 1, by its `rescaler` (`rescaled/3`), put through the palette,
-  # and the scale's `na_value` for a missing value, one that is not a finite number, one outside the
-  # limits, which ggplot2 censors and maps to its `na.value`, or one whose place R makes NaN; a
-  # discrete one as `Giggly.Scale.Discrete` maps it; a binned one to its bin's colour, as
-  # `Giggly.Scale.Binned` maps it.
+  # Each value's position on the scale's axis: a continuous value as the scale's `oob` leaves it
+  # on its limits (`positioned/2`), a discrete one at its level's position counting from 1. For an
+  # aesthetic other than position, each value through the scale's palette: a continuous one as
+  # its `oob` leaves it, placed in the scale's limits (`limits/1`) by its `rescaler`
+  # (`rescaled/3`), 0 to 1 inside them and beyond them outside, an infinity at an infinity, put
+  # through the palette, and the scale's `na_value` where the palette gives no value or R's NaN,
+  # as a colour's gives none off its ends or for a missing value; a discrete one as
+  # `Giggly.Scale.Discrete` maps it; a binned one to its bin's colour, as `Giggly.Scale.Binned`
+  # maps it.
   @doc false
   @spec map(t(), list()) :: list()
-  def map(%Continuous{palette: :identity} = scale, values), do: Continuous.censor(scale, values)
+  def map(%Continuous{palette: :identity} = scale, values), do: positioned(scale, values)
 
-  # A scale with no limits, every value it was trained on missing, is handed none but missing
-  # values, which are not numbers, so `placed_inside?/2` never asks about its bounds.
+  # A scale with no limits, every value it was trained on missing or infinite, maps every value to
+  # its `na_value`, as R's rescaling over the range of nothing gives NaN.
   def map(%Continuous{palette: palette, na_value: na_value} = scale, values) do
-    bounds = limits(scale)
+    case limits(scale) do
+      :none ->
+        Enum.map(values, fn _unplaced -> na_value end)
 
-    values
-    |> Enum.map(fn value -> if placed_inside?(value, bounds), do: value end)
-    |> rescaled(bounds, scale.rescaler)
-    |> then(fn places -> Palette.continuous(palette, places) end)
-    |> Enum.map(fn mapped -> if is_nil(mapped), do: na_value, else: mapped end)
+      bounds ->
+        scale.oob
+        |> OutOfBounds.run(values, bounds)
+        |> rescaled(bounds, scale.rescaler)
+        |> then(fn places -> Palette.continuous(palette, places) end)
+        |> Enum.map(fn mapped -> given_or(mapped, na_value) end)
+    end
   end
 
   def map(%Discrete{} = scale, values), do: Discrete.map(scale, values)
   def map(%Binned{} = scale, values), do: Binned.map(scale, values)
 
+  # A palette's value, or the scale's `na_value` where it gave none or R's NaN.
+  defp given_or(mapped, na_value) when mapped in [nil, :nan], do: na_value
+  defp given_or(mapped, _na_value), do: mapped
+
   # Each value's place in `bounds` by the scale's rescaler (`Scales.Bounds`), a `nil` left `nil`:
   # R's `rescale()`, from 0 to 1; about a midpoint, R's `rescale_mid()`, so the further end is at 0
   # or 1 and the midpoint at the middle; or R's `rescale_max()`, the value over the high end, so 0
   # is at 0 and one value at 1, whatever the low end. Over a high end of 0, a value of 0 is R's
-  # NaN, made `nil`, which maps to the missing value, and any other an infinity, which R cannot
-  # draw, so it raises. Without bounds every value is `nil`, and stays so.
-  defp rescaled(values, :none, _rescaler), do: values
+  # NaN, made `nil`, which maps to the missing value, and any other finite value an infinity,
+  # which R cannot draw, so it raises; an infinite value's place is an infinity whatever the end.
   defp rescaled(values, bounds, :rescale), do: Bounds.rescale(values, bounds, {0, 1})
 
   defp rescaled(values, bounds, {:mid, midpoint}),
@@ -439,6 +451,7 @@ defmodule Giggly.Scale do
 
   defp finite_place(place, _value) when is_number(place) or is_nil(place), do: place
   defp finite_place(:nan, _value), do: nil
+  defp finite_place(infinite, value) when not is_number(value), do: infinite
 
   defp finite_place(_infinite, value) do
     raise ArgumentError,
@@ -447,13 +460,27 @@ defmodule Giggly.Scale do
             "draw either; give the scale limits whose high end is above 0"
   end
 
-  # Each position, `nil` where a continuous scale's limits leave it out, `:infinity` and
-  # `:neg_infinity` kept: ggplot2's second mapping of the positions, once they are final, which
-  # removes a bar the limits cut. A discrete scale's positions are returned as given.
+  # Each position as a continuous scale's `oob` leaves it on its limits, ggplot2's second mapping
+  # of the positions once the stat and position have moved them, which by default removes a bar
+  # the limits cut. A discrete scale's positions are returned as given.
   @doc false
-  @spec censor(t(), list()) :: list()
-  def censor(%Continuous{} = scale, values), do: Continuous.censor(scale, values)
-  def censor(%Discrete{}, values), do: values
+  @spec map_positions(t(), list()) :: list()
+  def map_positions(%Continuous{} = scale, values), do: positioned(scale, values)
+  def map_positions(%Discrete{}, values), do: values
+
+  # Each position as the scale's `oob` leaves it on its limits, R's NaN `nil`, as ggplot2's position
+  # map gives `NA` for it. A scale with no limits, every value it was trained on missing or
+  # infinite, hands its `oob` the range of nothing, `{:infinity, :neg_infinity}`, as R's range of no
+  # finite values is `c(Inf, -Inf)`.
+  defp positioned(%Continuous{oob: oob} = scale, values) do
+    bounds =
+      case limits(scale) do
+        :none -> {:infinity, :neg_infinity}
+        bounds -> bounds
+      end
+
+    OutOfBounds.run(oob, values, bounds)
+  end
 
   # The extent of the axis in positions, widened as ggplot2 widens it before drawing: a continuous
   # scale's limits, each end its `limits`' or else its range's, by its `expand`, 5% of their width

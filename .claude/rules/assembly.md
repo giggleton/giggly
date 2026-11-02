@@ -32,7 +32,7 @@ numbered: the entry beginning "Group ids follow ggplot2's".
   table has none, as `compute_data_size()` reads a row's size before its parameter (a stat writing a width
   takes the set one as its own, as `stat_count()` and `stat_boxplot()` do) → geom reparameterize
   (a bar or a tile to `xmin`/`xmax`/`ymin`/`ymax`) → the position's aesthetics into every row → position →
-  reset and retrain position scales → map positions again, censoring what limits cut → freeze
+  reset and retrain position scales → map positions again through each scale's `oob` → freeze
   view scales → complete the theme → train non-position scales → build guides → map
   non-position scales → each geom's defaults under the theme → `after_scale` → fixed values last.
   A stage arrives with its increment and goes where this order puts it.
@@ -71,9 +71,10 @@ numbered: the entry beginning "Group ids follow ggplot2's".
 - **The position scales are reset and trained again after the position**, on every layer's
   x-family and y-family columns where the marks now stand, as ggplot2's `reset_scales()` and second
   `train_position()`: a bar's `ymin` of 0 reaches the y axis, and a discrete scale keeps its levels
-  and widens its continuous range. **The positions are then mapped again** (`Scale.censor/2`), as
-  ggplot2 maps them, which leaves out what a scale's limits cut: a bar reaching past the y axis's
-  limit is missing its end, so it is not drawn; the non-position scales train on what remains.
+  and widens its continuous range. **The positions are then mapped again** (`Scale.map_positions/2`),
+  through each scale's `oob`, as ggplot2 maps them, which by default leaves out what a scale's
+  limits cut: a bar reaching past the y axis's limit is missing its end, so it is not drawn; the
+  non-position scales train on what remains.
 - **The assembly's output is `%Giggly.Assembly{}`, and gains a field with the stage that fills it:**
   the layer frames, the rows each layer's geom draws (`drawn_data`: its frame without the
   aesthetics other than position it carries unused, its geom's defaults in their place), each
@@ -132,7 +133,7 @@ numbered: the entry beginning "Group ids follow ggplot2's".
   before the stat it is the plot's scale whatever its kind; the axis's kind, which each geom and
   the after-stat check are told, is its scale's (`Scale.kind_of/1`); every layer's columns in the
   axis's family are then put through the scale's transformation, trained on, and mapped to
-  positions, a continuous scale censoring those outside its limits, a discrete one leaving a
+  positions, a continuous scale's `oob` taking those outside its limits, a discrete one leaving a
   column of numbers as it is, as ggplot2's maps a value that is not discrete. Which columns
   belong to an axis is `Aesthetics.family/1`'s answer, never a name compared with `:x`. **A
   date-time scale given no zone then takes the axis's first date-time column's**

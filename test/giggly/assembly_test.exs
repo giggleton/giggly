@@ -152,6 +152,29 @@ defmodule Giggly.AssemblyTest do
       assert {hd(legend.decor), List.last(legend.decor)} === {{0.0, "#132B43"}, {1.0, "#56B1F7"}}
     end
 
+    # Golden: ggplot2 4.0.3's `get_guide_data()` for mpg's `colour = cty` under
+    # `scale_colour_continuous(oob = function(x, range) pmin(x, 20))`, R 4.6.1
+    # (`inc4/step7/guide/guide.txt`): the keys at and above 20 all take 20's colour, as do the
+    # bar's colours there.
+    test "a colour bar's keys and colours go through the scale's oob" do
+      [legend] =
+        Giggly.Datasets.mpg()
+        |> Plot.new(%{x: :displ, y: :hwy, colour: :cty})
+        |> Plot.geom_point()
+        |> Plot.scale_color_continuous(
+          oob: fn values, _limits ->
+            Enum.map(values, fn value -> if is_number(value), do: min(value, 20), else: value end)
+          end
+        )
+        |> Assembly.run()
+        |> Map.fetch!(:legends)
+
+      assert Enum.map(legend.keys, fn key -> key.values.color end) ===
+               ["#153049", "#214769", "#2E608A", "#2E608A", "#2E608A", "#2E608A"]
+
+      assert List.last(legend.decor) === {1.0, "#2E608A"}
+    end
+
     # ggplot2 hashes a guide's kind with its title and labels, so a colour bar and a legend of one
     # column, with one title and the same labels, stay two guides.
     test "a colour bar and a legend with the same title and labels stay apart" do

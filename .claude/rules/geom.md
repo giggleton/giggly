@@ -104,8 +104,12 @@ beginning "Each layer's defaults are filled in from the theme".
   `fill_alpha()` to the fill, `GeomRect` `fill_alpha()` to the fill and `GeomPath` `alpha()` to the
   line; a row whose alpha is missing, the default, keeps the colour's own, opaque for a colour
   with none, as ggplot2's default alpha, `NA`, leaves a colour. **A bar's border is never
-  given the row's alpha**, only its own. `Giggly.Geom.Mark` is the one home of the rule, and a
-  colour reaches the scene as its `#RRGGBB` and an opacity.
+  given the row's alpha**, only its own. **An alpha is held between 0 and 1, and an infinite one
+  draws nothing, but where a geom reads it as opaque** (`Mark.opaque_alpha/1`): a band's fill
+  (ribbon, area, density, smooth), a box plot's box and outliers, and the reference lines, which
+  ggplot2 4.0.3 draws opaque at either infinity whatever the colour's own alpha (design-log §4,
+  the entry beginning "A non-position scale keeps"). `Giggly.Geom.Mark` is the one home of the
+  rule, and a colour reaches the scene as its `#RRGGBB` and an opacity.
 - **A colour of `:none`, R's `NA`, draws nothing**: no point and no line, as ggplot2's `GeomPoint`
   and `GeomPath` drop the rows whose colour is missing (`handle_na()`, a path's at a group's ends),
   and a bar left unfilled or unbordered, whatever the alpha, as `alpha(NA, a)` is `NA`; so a point's

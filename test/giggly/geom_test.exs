@@ -3558,6 +3558,89 @@ defmodule Giggly.GeomTest do
     end
   end
 
+  # Golden throughout: svglite's drawing of ggplot2 4.0.3's geoms with an alpha of -Inf, -0.5, 1.5
+  # and Inf through an identity scale, R 4.6.1 (`inc4/step7/geoms.txt`, `geoms2.R`, `own.txt`): an
+  # alpha below 0 draws nothing and one above 1 is opaque everywhere; an infinite one draws
+  # nothing in most geoms, but is opaque, whatever the colour's own alpha, in a band's fill, a box
+  # plot's box and outliers and the reference lines.
+  describe "draw_panel/5 for an alpha off 0 to 1, or infinite" do
+    @off_range [-0.5, 1.5, :infinity, :neg_infinity]
+
+    test "a point's alpha is held between 0 and 1, and an infinite one draws nothing" do
+      frame = DataFrame.new(x: [0.5, 1.0, 1.5, 2.0], y: [1.0, 1.0, 1.0, 1.0], alpha: @off_range)
+
+      assert [
+               %Circles{
+                 color_opacity: [+0.0, 1.0, +0.0, +0.0],
+                 fill_opacity: [+0.0, 1.0, +0.0, +0.0]
+               }
+             ] =
+               draw_panel(%Geom.Point{}, frame, @cartesian, @params)
+    end
+
+    test "a rectangle's fill draws nothing at an infinite alpha" do
+      frame =
+        DataFrame.new(
+          xmin: [0.0, 0.5, 1.0, 1.5],
+          xmax: [0.5, 1.0, 1.5, 2.0],
+          ymin: [0.0, 0.0, 0.0, 0.0],
+          ymax: [1.0, 1.0, 1.0, 1.0],
+          alpha: @off_range
+        )
+
+      assert [%Rectangles{fill_opacity: [+0.0, 1.0, +0.0, +0.0]}] =
+               draw_panel(%Geom.Rect{}, frame, @cartesian, @params)
+    end
+
+    test "a band's fill is opaque at an infinite alpha, held between 0 and 1 otherwise" do
+      fills =
+        Enum.map(@off_range, fn alpha ->
+          rows = DataFrame.put(band([0.0, 1.0], [0.0, 0.0], [1.0, 1.0]), :alpha, [alpha, alpha])
+
+          [%Polygons{fill_opacity: [opacity]} | _lines] =
+            draw_panel(@ribbon, rows, @cartesian, @params)
+
+          opacity
+        end)
+
+      assert fills === [+0.0, 1.0, 1.0, 1.0]
+    end
+
+    test "a reference line is opaque at an infinite alpha, colour's own alpha or not" do
+      look = [
+        group: [-1, -1, -1, -1],
+        color: ["#FF000080", "#FF000080", "#FF000080", "#FF000080"],
+        alpha: @off_range
+      ]
+
+      horizontal = DataFrame.new([yintercept: [1.0, 2.0, 3.0, 3.5]] ++ look)
+      vertical = DataFrame.new([xintercept: [0.5, 1.0, 1.5, 1.75]] ++ look)
+
+      diagonal =
+        DataFrame.new([intercept: [0.0, 0.5, 1.0, 1.5], slope: [1.0, 1.0, 1.0, 1.0]] ++ look)
+
+      opacities =
+        Enum.map([{@hline, horizontal}, {@vline, vertical}, {@abline, diagonal}], fn {geom, frame} ->
+          [%Segments{opacity: opacity}] = draw_panel(geom, frame, @cartesian, @params)
+          opacity
+        end)
+
+      assert opacities === List.duplicate([+0.0, 1.0, 1.0, 1.0], 3)
+    end
+
+    test "a box plot's box and outliers are opaque at an infinite alpha" do
+      {coord, params} = box_params()
+      frame = box_rows(alpha: [:neg_infinity], fill: ["#FF000080"])
+
+      assert [
+               %Circles{color_opacity: [1.0], fill_opacity: [1.0]},
+               %Segments{},
+               %Polygons{fill_opacity: [1.0]},
+               %Segments{}
+             ] = draw_panel(@box, frame, coord, params)
+    end
+  end
+
   defp rounded_size({width, height}), do: {Float.round(width, 2), Float.round(height, 2)}
 
   # `value` with its type hidden from the compiler, so a test can hand a function a value its

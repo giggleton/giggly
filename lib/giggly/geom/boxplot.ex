@@ -308,7 +308,7 @@ defmodule Giggly.Geom.Boxplot do
           shape: List.duplicate(Map.get(look, :shape, box.shape), count),
           size: List.duplicate(Map.get(look, :size, box.size), count),
           stroke: List.duplicate(Map.fetch!(look, :stroke), count),
-          alpha: List.duplicate(Map.get(look, :alpha, box.alpha), count)
+          alpha: List.duplicate(Mark.opaque_alpha(Map.get(look, :alpha, box.alpha)), count)
         )
 
       Geom.draw_panel(%Point{}, points, coord, panel_params, installed_fonts)
@@ -361,7 +361,9 @@ defmodule Giggly.Geom.Boxplot do
         line_join: :mitre
       }
 
-      {drawn_box, median} = Crossbar.parts(box, style, placing)
+      {drawn_box, median} =
+        Crossbar.parts(%{box | alpha: Mark.opaque_alpha(box.alpha)}, style, placing)
+
       Enum.concat(drawn_box, median)
     end
 
