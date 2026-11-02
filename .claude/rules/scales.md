@@ -156,7 +156,8 @@ R's regular ones: the entry beginning "The panel's grid lines are placed by the 
 - **A transformation is a module implementing `Scales.Transform`**, resolved from its name
   there (a user's own from the `%Scales.Transform{}` that `Transform.new/2` makes, a composition
   from `{:compose, parts}`) and handed to each of its callbacks, so the date-time one reads its
-  zone; it carries what R's object carries and a scale reads: the transformation, its inverse,
+  zone; `resolved/1` (`@doc false`) says whether a name resolves, `:unknown` or a composition's
+  refusal, for a caller checking one where it is given, as Giggly's `transform:` does; it carries what R's object carries and a scale reads: the transformation, its inverse,
   its domain, and its axis's default breaks, minor breaks and labels (`breaks`, `minor_breaks`,
   `format`). **A label is made from the break and the extent** (`format/2`), since a date's
   format is the step chosen for the whole axis; a number's ignores the extent and is written once
@@ -257,7 +258,8 @@ R's regular ones: the entry beginning "The panel's grid lines are placed by the 
   kept and a value outside the domain `:nan` uncalled, an answer but a double, an infinity,
   `:nan` or `nil` refused with `ArgumentError`; its breaks its function's on the extent turned
   back, an end turning back to anything but a number set aside as Box-Cox's are; its labels its
-  function's of the breaks turned back. Its tests pin ggplot2's axes of user transformations, alone
+  function's of the breaks turned back, by default `Labels.plain_round_tripped/1`'s, 14
+  significant digits first, as R's `format()` hides a cube root's `9999.99999999999`. Its tests pin ggplot2's axes of user transformations, alone
   and as a composition's part.
 - **A date scale works in days since 1970-01-01, as R stores a date** (`Transform.Date`, R's
   `transform_date()`): a date is a float of its days, a missing one `nil`, and a position turned

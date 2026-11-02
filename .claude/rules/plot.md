@@ -243,14 +243,14 @@ stat and position" and "Each facet, coordinate system, geom, stat and position i
   **`n_breaks:` is taken where R takes `n.breaks`**, the continuous position and legend scale
   functions and the binned ones, not dates, date-times or times; given beside `breaks:` a list,
   `:none` or a function of one argument it raises at the call, where R ignores it, and `n_breaks:
-  1` beside default breaks but under log10, where R's extended search fails.
+  1` beside default breaks but under a logarithm, where R's extended search fails.
   **`palette:` on the discrete and continuous colour scales is a
   name, `Scales.Palette.named/1`'s palette, or a list** (`validate_discrete_palette/1`,
   `validate_continuous_palette/1`), a manual palette or a gradient. **A size scale function
   takes the options R's
   does**: `na_value:` only on `scale_size_area/2` and `scale_size_discrete/2`, as R's
-  `scale_size_continuous()` and `scale_radius()` refuse `na.value`, and no `transform:` (design-log
-  §4, the entry beginning "A scale's `rescaler`"); a size, a range's ends and `max_size:` 0 or
+  `scale_size_continuous()` and `scale_radius()` refuse `na.value` (design-log §4, the entry
+  beginning "A scale's `rescaler`"); a size, a range's ends and `max_size:` 0 or
   more (`validate_size/1`, `validate_size_range/1`). **A shape scale function takes the options
   R's does** but those its family waits for (`aesthetics:`, `na.translate`, `drop`): `solid:`,
   recorded `true` unless given, `na_value:`, a shape (`validate_shape/1`), none, drawing no point,
@@ -261,8 +261,17 @@ stat and position" and "Each facet, coordinate system, geom, stat and position i
   `scale_linetype()` takes though its docs leave it out, and `scale_linetype_manual/2`'s `values:`,
   line types or a map from value to line type. **A line width scale function takes R's**:
   `range:`, widths 0 or more (`validate_linewidth_range/1`), and `na_value:` only on
-  `scale_linewidth_discrete/2`, as R's `scale_linewidth_continuous()` refuses `na.value`, and no
-  `transform:`. **Each records its `guide:`** (`validate_guide/2`): `:legend`, `:none`, or the
+  `scale_linewidth_discrete/2`, as R's `scale_linewidth_continuous()` refuses `na.value`.
+  **`transform:` is taken by every continuous scale function ggplot2 gives a `transform`, the
+  binned ones aside** (`validate_transform/1`; design-log §4, the entries beginning "`transform:`
+  takes every" and "`transform:` reaches"): x and y, the continuous colour and fill scales,
+  alpha's, size's, size by area's, radius's and line width's; any transformation of numbers
+  `Scales.Transform` resolves, a date, date-time or time one, alone or first in a composition,
+  an unknown name and a composition the package refuses refused at the call; limits given outside
+  its domain refused at the call (`check_limits_domain/3`), `n_breaks: 1` refused but under a
+  logarithm, a composition's first part deciding, a user's own breaking as its function does, and
+  `n_breaks:` refused under a span of time; gradient2's `midpoint:` transformed, one outside the
+  domain, its default 0 under log10 among them, refused at the call. **Each records its `guide:`** (`validate_guide/2`): `:legend`, `:none`, or the
   `%Guide.Legend{}` `guide_legend/1` builds, and on a continuous colour or fill scale `:colorbar`,
   its default, or `:colorsteps`, on a binned one `:colorsteps`, its default, its colour bar
   refused, the others' `:legend`; a colour bar or colour steps for a
@@ -274,10 +283,9 @@ stat and position" and "Each facet, coordinate system, geom, stat and position i
   canonicalized first), `fill:`, `alpha:`, `shape:`, `size:`, `linetype:` and `linewidth:`**: a
   list records what the aesthetic's `_discrete` function records with those limits, two numbers
   its `_continuous` one's, but a shape's or a line type's, refused at the call
-  (`validate_unordered_limits/2`), as R's `lims(shape = c(1, 5))` aborts; numbers high to low are
-  refused at the call, where R reverses the
-  values through a transformation these scales lack (design-log §4, the entry beginning "Colour,
-  fill and alpha scales"), and dates are refused. **Limits, breaks and minor breaks are recorded in
+  (`validate_unordered_limits/2`), as R's `lims(shape = c(1, 5))` aborts; numbers high to low
+  record `transform: :reverse`, as an axis's do and R's `limits()` does (`limits_options/1`), and
+  dates are refused. **Limits, breaks and minor breaks are recorded in
   data units, as given**, for the scale to transform, or a function, of one argument or two on
   continuous, date, date-time, time and binned scales and for a discrete axis's minor breaks, of
   one for a discrete scale's breaks, as ggplot2 counts its arguments (design-log §4, the entry

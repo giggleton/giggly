@@ -6562,7 +6562,8 @@ defmodule Giggly.PlotTest do
             {:expand, [mult: {0, "a"}], ~s([mult: {0, "a"}])},
             {:expand, [0, 0.05], "[0, 0.05]"},
             {:expand, 0.05, "got: 0.05"},
-            {:transform, :log2, ":log2"},
+            {:transform, :date, "expected a transformation of numbers"},
+            {:transform, {:log, 1}, "got: {:log, 1}"},
             {:transform, "log10", ~s("log10")}
           ] do
         error =
@@ -7739,13 +7740,40 @@ defmodule Giggly.PlotTest do
 
     # ggplot2 4.0.3's `lims(colour = c(10, 1))` reverses the colours through a reverse
     # transformation, which Giggly's colour, fill and alpha scales do not have yet.
-    test "lims/2 refuses a colour, fill or alpha scale's limits high to low, or dates" do
+    # ggplot2 4.0.3's `lims(colour = c(1000, 10))` reverses the colours through a reverse
+    # transformation: on 1 to 10,000, 10 is drawn #56B1F7 and 1000 #132B43, 1, 3 and beyond 1000
+    # grey50 (`inc4/step8/edges.R`).
+    test "lims/2 runs a colour, fill or alpha scale's limits given high to low from high to low" do
+      plot =
+        %{"x" => [1, 2, 3, 4, 5, 6, 7], "y" => [1, 1, 1, 1, 1, 1, 1]}
+        |> Map.put("z", [1, 3, 10, 30, 100, 300, 1000])
+        |> Plot.new(%{x: "x", y: "y", color: "z", fill: "z"})
+        |> Plot.geom_point()
+        |> Plot.lims(color: {1000, 10}, fill: {1000, 10})
+
+      assert plot.scales.fill === %{plot.scales.color | guide: :colorbar}
+      assert plot.scales.color.transform == :reverse
+
+      colors =
+        plot
+        |> Giggly.layer_data()
+        |> DataFrame.pull(:color)
+
+      assert colors == [
+               "#7F7F7F",
+               "#7F7F7F",
+               "#56B1F7",
+               "#55AEF3",
+               "#4FA4E5",
+               "#4187BE",
+               "#132B43"
+             ]
+    end
+
+    test "lims/2 refuses a colour, fill or alpha scale's dates" do
       plot = Plot.new(@rows)
 
       for {options, shown} <- [
-            {[color: {10, 1}],
-             "low first, since a colour, fill, alpha, size or line width scale cannot run " <>
-               "from high to low, got: {10, 1}"},
             {[fill: {~D[2026-01-01], nil}], "two numbers, each nil"},
             {[alpha: "a"], ~s(got: "a")}
           ] do
@@ -8151,16 +8179,15 @@ defmodule Giggly.PlotTest do
             {&Plot.scale_size_continuous/2, [na_value: 1], "unknown options [:na_value]"},
             {&Plot.scale_radius/2, [na_value: 1], "unknown options [:na_value]"},
             {&Plot.scale_size_area/2, [range: {1, 6}], "unknown options [:range]"},
-            {&Plot.scale_size_continuous/2, [transform: :log10], "unknown options [:transform]"}
+            {&Plot.scale_size_continuous/2, [transform: :ln], "got: :ln"}
           ] do
         error = assert_raise NimbleOptions.ValidationError, fn -> function.(plot, options) end
         assert error.message =~ shown
       end
     end
 
-    # ggplot2 4.0.3's `lims(size = c(20, 0))` reverses the sizes through a reverse transformation,
-    # which Giggly's size scales do not have.
-    test "lims/2 gives a size scale its limits, low first, as its scale functions do" do
+    # ggplot2 4.0.3's `lims(size = c(20, 0))` reverses the sizes through a reverse transformation.
+    test "lims/2 gives a size scale its limits, as its scale functions do, high to low reversed" do
       plot = Plot.new(@rows)
 
       assert {Plot.lims(plot, size: {0, 400}).scales.size,
@@ -8168,8 +8195,8 @@ defmodule Giggly.PlotTest do
                {Plot.scale_size_continuous(plot, limits: {0, 400}).scales.size,
                 Plot.scale_size_discrete(plot, limits: ["8", "4"]).scales.size}
 
-      error = assert_raise NimbleOptions.ValidationError, fn -> Plot.lims(plot, size: {20, 0}) end
-      assert error.message =~ "since a colour, fill, alpha, size or line width scale cannot run"
+      assert Plot.lims(plot, size: {20, 0}).scales.size ===
+               Plot.scale_size_continuous(plot, limits: {20, 0}, transform: :reverse).scales.size
     end
 
     test "labs/2 titles the size legend" do
@@ -8375,8 +8402,7 @@ defmodule Giggly.PlotTest do
             {&Plot.scale_linewidth_discrete/2, [range: 6], "got: 6"},
             {&Plot.scale_linewidth_discrete/2, [na_value: -1], "got: -1"},
             {&Plot.scale_linewidth_continuous/2, [na_value: 1], "unknown options [:na_value]"},
-            {&Plot.scale_linewidth_continuous/2, [transform: :log10],
-             "unknown options [:transform]"}
+            {&Plot.scale_linewidth_continuous/2, [transform: :bogus], "got: :bogus"}
           ] do
         error = assert_raise NimbleOptions.ValidationError, fn -> function.(plot, options) end
         assert error.message =~ shown
@@ -8415,8 +8441,8 @@ defmodule Giggly.PlotTest do
 
     # ggplot2 4.0.3's `lims(linetype = c(1, 5))` aborts: "A continuous variable cannot be mapped
     # to the linetype aesthetic", and its `lims(linewidth = c(10, 0))` reverses the widths through
-    # a reverse transformation, which Giggly's line width scales do not have.
-    test "lims/2 gives a line type scale a list of limits, and a line width scale either, low first" do
+    # a reverse transformation.
+    test "lims/2 gives a line type scale a list of limits, and a line width scale either" do
       plot = Plot.new(@rows)
 
       assert {Plot.lims(plot, linetype: ["8", "4"]).scales.linetype,
@@ -8426,16 +8452,15 @@ defmodule Giggly.PlotTest do
                 Plot.scale_linewidth_continuous(plot, limits: {0, 10}).scales.linewidth,
                 Plot.scale_linewidth_discrete(plot, limits: ["8", "4"]).scales.linewidth}
 
-      for {options, shown} <- [
-            {[linetype: {1, 5}],
-             "expected a list of the values the scale shows, since a line type scale is " <>
-               "discrete, got: {1, 5}"},
-            {[linewidth: {10, 0}],
-             "since a colour, fill, alpha, size or line width scale cannot run"}
-          ] do
-        error = assert_raise NimbleOptions.ValidationError, fn -> Plot.lims(plot, options) end
-        assert error.message =~ shown
-      end
+      assert Plot.lims(plot, linewidth: {10, 0}).scales.linewidth ===
+               Plot.scale_linewidth_continuous(plot, limits: {10, 0}, transform: :reverse).scales.linewidth
+
+      error =
+        assert_raise NimbleOptions.ValidationError, fn -> Plot.lims(plot, linetype: {1, 5}) end
+
+      assert error.message =~
+               "expected a list of the values the scale shows, since a line type scale is " <>
+                 "discrete, got: {1, 5}"
     end
 
     test "labs/2 titles the line type and line width legends" do
@@ -9179,6 +9204,158 @@ defmodule Giggly.PlotTest do
                  ":censor, :censor_any, :squish, :squish_any, :squish_infinite, :keep"
 
         assert error.message =~ "got: #{inspect(oob)}"
+      end
+    end
+  end
+
+  describe "a scale's transform:" do
+    # Every scale function ggplot2 4.0.3 gives a `transform` but the binned ones
+    # (`inc4/step8/formals.R`): the position scales, the continuous colour and fill scales, alpha's,
+    # size's, size by area's, radius's and line width's, each with what else it needs.
+    @transform_scale_functions [
+      {&Plot.scale_x_continuous/2, []},
+      {&Plot.scale_y_continuous/2, []},
+      {&Plot.scale_color_continuous/2, []},
+      {&Plot.scale_fill_continuous/2, []},
+      {&Plot.scale_color_gradient/2, []},
+      {&Plot.scale_fill_gradient/2, []},
+      {&Plot.scale_color_gradient2/2, [midpoint: 1]},
+      {&Plot.scale_fill_gradient2/2, [midpoint: 1]},
+      {&Plot.scale_color_gradientn/2, [colors: ["red", "blue"]]},
+      {&Plot.scale_fill_gradientn/2, [colors: ["red", "blue"]]},
+      {&Plot.scale_color_viridis_c/2, []},
+      {&Plot.scale_fill_viridis_c/2, []},
+      {&Plot.scale_color_distiller/2, []},
+      {&Plot.scale_fill_distiller/2, []},
+      {&Plot.scale_alpha_continuous/2, []},
+      {&Plot.scale_size_continuous/2, []},
+      {&Plot.scale_size_area/2, []},
+      {&Plot.scale_radius/2, []},
+      {&Plot.scale_linewidth_continuous/2, []}
+    ]
+
+    test "every continuous scale function records any transformation of numbers" do
+      plot = Plot.new(@rows)
+
+      for {function, options} <- @transform_scale_functions,
+          transform <- [:log, {:boxcox, 2}, {:compose, [:log10, :reverse]}] do
+        [scale] = Map.values(function.(plot, [{:transform, transform} | options]).scales)
+        assert {function, scale.transform} == {function, transform}
+      end
+    end
+
+    test "a date, date-time or time transformation, alone or first, or an unknown one is refused" do
+      plot = Plot.new(@rows)
+
+      for {function, options} <- @transform_scale_functions,
+          {transform, shown} <- [
+            {:date, "expected a transformation of numbers, since Plot.scale_x_date/2"},
+            {{:compose, [:time, :reverse]}, "expected a transformation of numbers"},
+            {{:compose, [:log10, :date]},
+             "got: {:compose, [:log10, :date]}, which Scales.Transform refuses: a date, " <>
+               "date-time or time transformation comes first"},
+            {:ln, "expected a transformation: `:identity`, `:log`, `:log2`, `:log10`"},
+            {{:log, 1}, "got: {:log, 1}"}
+          ] do
+        error =
+          assert_raise NimbleOptions.ValidationError, fn ->
+            function.(plot, [{:transform, transform} | options])
+          end
+
+        assert {function, error.key, error.message =~ shown} == {function, :transform, true}
+      end
+    end
+
+    # ggplot2 4.0.3 warns at a limit its transformation makes NaN and takes the data's end, and
+    # fails at one it makes an infinity (`inc4/step8/xy.R`); Giggly refuses both at the call.
+    test "a limit outside the transformation's domain is refused at the call" do
+      plot = Plot.new(@rows)
+
+      for {function, options, limits, outside} <- [
+            {&Plot.scale_x_log10/2, [], {-5, 1000}, "-5.0 falls outside the :log10"},
+            {&Plot.scale_y_continuous/2, [transform: :log10], {0, 1000},
+             "0.0 falls outside the :log10 transformation's domain, {1.0e-100, :infinity}"},
+            {&Plot.scale_color_continuous/2, [transform: :sqrt], {nil, -5},
+             "-5.0 falls outside the :sqrt transformation's domain, {0.0, :infinity}"},
+            {&Plot.scale_size_area/2, [transform: {:log, 2}], {0, 8},
+             "0.0 falls outside the {:log, 2} transformation's domain"}
+          ] do
+        error =
+          assert_raise ArgumentError, fn -> function.(plot, [{:limits, limits} | options]) end
+
+        assert String.starts_with?(error.message, "Plot.")
+        assert error.message =~ "is given limits: "
+        assert error.message =~ outside
+      end
+
+      assert Plot.scale_x_log10(plot, limits: {nil, 1000}).scales.x.limits == {nil, 1000.0}
+    end
+
+    test "a transformation of one's own is named by its name where its limits are refused" do
+      cube =
+        Scales.Transform.new("cube",
+          transform: fn value -> value * value * value end,
+          inverse: fn position -> position end,
+          domain: {0, :infinity}
+        )
+
+      error =
+        assert_raise ArgumentError, fn ->
+          @rows
+          |> Plot.new()
+          |> Plot.scale_alpha_continuous(transform: cube, limits: {-1, 1})
+        end
+
+      assert error.message =~
+               ~s(-1.0 falls outside the "cube" transformation's domain, {0, :infinity})
+    end
+
+    # ggplot2 4.0.3's gradient2 transforms its midpoint (`mid_rescaler()`), and under log10 at the
+    # default midpoint 0 warns and colours every value grey50 (`inc4/step8/edges.R`).
+    test "gradient2's midpoint is transformed, and one outside the domain refused at the call" do
+      plot = Plot.new(@rows)
+
+      assert {Plot.scale_color_gradient2(plot, transform: :log10, midpoint: 100).scales.color.rescaler,
+              Plot.scale_fill_gradient2(plot, transform: :reverse, midpoint: 100).scales.fill.rescaler} ==
+               {{:mid, 2.0}, {:mid, -100.0}}
+
+      for {function, name, options, shown} <- [
+            {&Plot.scale_color_gradient2/2, "Plot.scale_color_gradient2/2", [], "0.0"},
+            {&Plot.scale_fill_gradient2/2, "Plot.scale_fill_gradient2/2", [midpoint: -1], "-1.0"}
+          ] do
+        error =
+          assert_raise ArgumentError, fn -> function.(plot, [{:transform, :log10} | options]) end
+
+        assert String.starts_with?(error.message, "#{name}'s midpoint, #{shown}")
+        assert error.message =~ "outside the :log10 transformation's domain"
+      end
+    end
+
+    # ggplot2 4.0.3 draws one break, 1, under log2 at `n.breaks = 1`, and ignores `n.breaks` with a
+    # warning under a span of time.
+    test "n_breaks: 1 is a logarithm's alone, and a span of time takes no n_breaks:" do
+      plot = Plot.new(@rows)
+
+      for transform <- [:log, :log2, {:log, 3}, {:compose, [:log10, :reverse]}] do
+        assert Plot.scale_color_continuous(plot, transform: transform, n_breaks: 1).scales.color.n_breaks ==
+                 1
+      end
+
+      error =
+        assert_raise ArgumentError, fn ->
+          Plot.scale_linewidth_continuous(plot, transform: :sqrt, n_breaks: 1)
+        end
+
+      assert error.message =~ "Plot.scale_linewidth_continuous/2 is given n_breaks: 1"
+
+      for transform <- [:timespan, {:timespan, :hour}, {:compose, [:timespan, :reverse]}] do
+        error =
+          assert_raise ArgumentError, fn ->
+            Plot.scale_x_continuous(plot, transform: transform, n_breaks: 3)
+          end
+
+        assert error.message =~ "is given n_breaks: beside transform: "
+        assert error.message =~ "whose breaks count no number"
       end
     end
   end

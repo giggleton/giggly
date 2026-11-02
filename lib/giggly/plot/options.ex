@@ -14,7 +14,7 @@ defmodule Giggly.Plot.Options do
   # plot, which `GigglyCredo.Check.PlotRunsNothing` holds here as in `Giggly.Plot`.
 
   alias Giggly.{Aesthetics, ElementTree, Geom, Guide, Theme}
-  alias Scales.{ColorOperations, DataRange, Palette}
+  alias Scales.{ColorOperations, DataRange, Palette, Transform}
 
   # The values of a continuous or binned scale's `oob:` given by name, R's `oob_*` functions but
   # `oob_discard()`.
@@ -2587,6 +2587,30 @@ defmodule Giggly.Plot.Options do
   # A continuous scale's limits, as `limits:`, `xlim/3`, `ylim/3` and `lims/2` take them.
   @limits_type {:custom, __MODULE__, :validate_limits, []}
 
+  # The transformations `transform:` takes, as its documentation and its refusal name them.
+  @transform_names_doc "`:identity`, `:log`, `:log2`, `:log10`, `{:log, base}`, `:log1p`, " <>
+                         "`:exp`, `{:exp, base}`, `:asinh`, `:pseudo_log`, " <>
+                         "`{:pseudo_log, sigma: sigma, base: base}`, `:sqrt`, `:reverse`, " <>
+                         "`:reciprocal`, `:asn`, `:atanh`, `:logit`, `:probit`, " <>
+                         "`{:probability, :normal, mean: mean, sd: sd}`, " <>
+                         "`{:probability, :logistic, location: location, scale: scale}`, " <>
+                         "`{:boxcox, exponent}`, `{:boxcox, exponent, offset: offset}`, " <>
+                         "`{:modulus, exponent}`, `{:modulus, exponent, offset: offset}`, " <>
+                         "`{:yj, exponent}`, `:timespan`, `{:timespan, unit}`, a composition " <>
+                         "`{:compose, [part, ...]}` or one `Scales.Transform.new/2` makes"
+
+  # A continuous scale's `transform:`, ggplot2's `transform`, on an axis and on a scale of another
+  # aesthetic alike, its default the scale's, the identity.
+  @transform_spec [
+    type: {:custom, __MODULE__, :validate_transform, []},
+    doc:
+      "What each value is put through before the scale sees it, a transformation of " <>
+        "`Scales.Transform`'s: " <>
+        @transform_names_doc <>
+        "; `:identity` when not given. The scale trains, breaks and places in transformed " <>
+        "space, its limits and breaks given in data units, and labels its breaks in data units."
+  ]
+
   # Every scale function's `name:`.
   @scale_name_spec [
     type: {:custom, __MODULE__, :validate_label, []},
@@ -2701,18 +2725,7 @@ defmodule Giggly.Plot.Options do
   ]
 
   @continuous_scale_options @scale_option_specs
-                            |> Enum.concat(
-                              transform: [
-                                type: {:in, [:identity, :log10, :sqrt, :reverse, :reciprocal]},
-                                doc:
-                                  "What each value is put through before it is placed: " <>
-                                    "`:identity`, the value itself; `:log10`, its base-10 " <>
-                                    "logarithm; `:sqrt`, its square root; `:reverse`, so the " <>
-                                    "axis runs from high to low; or `:reciprocal`, one over " <>
-                                    "it. `:identity` when not given. The axis is marked and " <>
-                                    "labelled in data units, and widened in transformed space."
-                              ]
-                            )
+                            |> Enum.concat(transform: @transform_spec)
                             |> NimbleOptions.new!()
 
   @transformed_scale_options NimbleOptions.new!(@scale_option_specs)
@@ -3110,7 +3123,8 @@ defmodule Giggly.Plot.Options do
           "of the breaks its function returns; a function handed every break, a list of numbers, " <>
           "that returns a label for each, a string, a power or `nil`, as `Scales.Labels`'s do; or " <>
           "`:none` for no labels. A pair's label when a `breaks:` function returns pairs."
-    ]
+    ],
+    transform: @transform_spec
   ]
 
   # A scale's `guide:`, the guide that reads it back, checked by `validate_guide/2` for the kind of
@@ -3935,9 +3949,11 @@ defmodule Giggly.Plot.Options do
                   color: [
                     type: @legend_limits_type,
                     doc:
-                      "The colour scale's limits (`colour:` too): `{low, high}`, low first, " <>
-                        "for a continuous scale, as `scale_color_continuous/2` takes them, or " <>
-                        "a list of values for a discrete one, as `scale_color_discrete/2` does."
+                      "The colour scale's limits (`colour:` too): `{low, high}` for a " <>
+                        "continuous scale, as `scale_color_continuous/2` takes them, two " <>
+                        "numbers high to low running it from high to low, as `transform: " <>
+                        ":reverse` runs it, or a list of values for a discrete one, as " <>
+                        "`scale_color_discrete/2` does."
                   ],
                   fill: [
                     type: @legend_limits_type,
@@ -5289,6 +5305,35 @@ defmodule Giggly.Plot.Options do
        "arguments, the values and the limits, got: #{inspect(oob)}"}
   end
 
+  # NimbleOptions' check of a continuous scale's transformation: one `Scales.Transform` resolves,
+  # a name, a composition or one a user made, as ggplot2's `transform` takes any. A date, date-time
+  # or time one, alone or first in a composition, is refused, since `scale_x_date/2` and its kin
+  # place those columns and no other scale takes them; an unknown name, or a composition
+  # `Scales.Transform` refuses, is refused naming why. A user's function failing on the domain's
+  # ends raises its own error.
+  @doc false
+  @spec validate_transform(term()) :: {:ok, Transform.name()} | {:error, String.t()}
+  def validate_transform(name) do
+    case {Transform.temporal?(name), Transform.resolved(name)} do
+      {true, _resolved} ->
+        {:error,
+         "expected a transformation of numbers, since Plot.scale_x_date/2, " <>
+           "Plot.scale_x_datetime/2 and Plot.scale_x_time/2 and their y twins place dates, " <>
+           "date-times and times, got: #{inspect(name)}"}
+
+      {false, {:ok, name}} ->
+        {:ok, name}
+
+      {false, {:error, :unknown}} ->
+        {:error, "expected a transformation: #{@transform_names_doc}, got: #{inspect(name)}"}
+
+      {false, {:error, reason}} ->
+        {:error,
+         "expected a transformation, got: #{inspect(name)}, which Scales.Transform refuses: " <>
+           reason}
+    end
+  end
+
   # NimbleOptions' check of a scale's limits: `{low, high}`, each a number, kept as a float, or
   # `nil` for an end the data decides, in either order, which the scale sorts once transformed.
   @doc false
@@ -5755,21 +5800,13 @@ defmodule Giggly.Plot.Options do
        "scale is discrete, got: #{inspect(limits)}"}
   end
 
-  # NimbleOptions' check of `lims/2`'s limits for a colour, fill or alpha scale: a list of a
-  # discrete scale's values, or `{low, high}`, two numbers, each kept as a float, or `nil` for an
-  # end the data decides, low first, since such a scale has no transformation to run from high to
-  # low.
+  # NimbleOptions' check of `lims/2`'s limits for a colour, fill, alpha, size or line width scale:
+  # a list of a discrete scale's values, or `{low, high}`, two numbers, each kept as a float, or
+  # `nil` for an end the data decides, high to low reversing the scale, as an axis's do.
   @doc false
   @spec validate_legend_limits(term()) ::
           {:ok, list() | {float() | nil, float() | nil}} | {:error, String.t()}
   def validate_legend_limits(values) when is_list(values), do: validate_discrete_limits(values)
-
-  def validate_legend_limits({low, high} = limits)
-      when is_number(low) and is_number(high) and low > high do
-    {:error,
-     "expected {low, high}, low first, since a colour, fill, alpha, size or line width scale " <>
-       "cannot run from high to low, got: #{inspect(limits)}"}
-  end
 
   def validate_legend_limits(limits) do
     case validate_limits(limits) do

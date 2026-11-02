@@ -213,8 +213,11 @@ defmodule Scales.Transform do
                  ],
                  labels: [
                    type: {:fun, 1},
-                   default: &Labels.plain/1,
-                   doc: "An axis's labels, from its breaks turned back into data units."
+                   doc:
+                     "An axis's labels, from its breaks turned back into data units; each " <>
+                       "rounded to 14 significant digits and written as " <>
+                       "`Scales.Labels.plain/1` writes it when not given, since an inverse " <>
+                       "rarely gives a break back exactly."
                  ]
                )
 
@@ -391,8 +394,8 @@ defmodule Scales.Transform do
   one value: given wherever a transformation's name is, and as a composition's part. Its domain
   is the whole line unless `domain:` says, its breaks `Scales.Breaks.extended/2`'s on an axis's
   limits in data units, its minor breaks `Scales.MinorBreaks.regular/3`'s and its labels
-  `Scales.Labels.plain/1`'s of the breaks turned back, unless `breaks:`, `minor_breaks:` or
-  `labels:` say. A missing function, an unknown option, a function of another arity or a domain
+  `Scales.Labels.plain/1`'s of the breaks turned back, each rounded to 14 significant digits
+  first, unless `breaks:`, `minor_breaks:` or `labels:` say. A missing function, an unknown option, a function of another arity or a domain
   not `{low, high}` raises `NimbleOptions.ValidationError`.
 
   It is handed every value in its domain, the domain's ends among them, as the module
@@ -417,7 +420,8 @@ defmodule Scales.Transform do
   @spec new(String.t(), keyword()) :: t()
   def new(name, options) when is_binary(name) do
     validated = NimbleOptions.validate!(options, @new_options)
-    struct!(__MODULE__, [name: name] ++ validated)
+    labels = Keyword.get(validated, :labels, &Labels.plain_round_tripped/1)
+    struct!(__MODULE__, [name: name, labels: labels] ++ Keyword.delete(validated, :labels))
   end
 
   # A domain `new/2` takes: two numbers or infinities, the first below the second.
@@ -721,6 +725,25 @@ defmodule Scales.Transform do
   @doc false
   @spec domain(name()) :: Bounds.range()
   def domain(name), do: module(name).domain(name)
+
+  # Whether `name` is a transformation this module resolves, `{:error, reason}` saying why not:
+  # `:unknown` for no name of its, a composition's refusal its message. For a caller checking a
+  # transformation where it is given, before any value meets it; a user's function failing on a
+  # composition's domain raises its own error.
+  @doc false
+  @spec resolved(term()) :: {:ok, name()} | {:error, :unknown | String.t()}
+  def resolved(name) do
+    module(name)
+    {:ok, name}
+  rescue
+    error in FunctionClauseError ->
+      if error.module == __MODULE__ and error.function == :module,
+        do: {:error, :unknown},
+        else: reraise(error, __STACKTRACE__)
+
+    error in ArgumentError ->
+      {:error, Exception.message(error)}
+  end
 
   # Whether the transformation `name` takes dates, date-times or times: one of theirs, or a
   # composition whose first part is.

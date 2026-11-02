@@ -79,6 +79,59 @@ stops the question being reopened from scratch. A new entry is about 150 words: 
 sentence or two of why, and one line per rejected alternative. What a later decision replaces is
 deleted from the entry it was in, never marked superseded; git history keeps every version.
 
+- **A transformation of your own labels its breaks turned back rounded to 14 significant digits
+  unless it says (2026-11-02, Steve: "A", increment 4's step 8; checked against ggplot2 4.0.3).**
+  `Transform.new/2` without `labels:` records `&Labels.plain_round_tripped/1`, as logit's and
+  exp's labels are written: a cube of one's own on 1 to 10,000 turns its breaks back as
+  2499.999999999999 to 9999.999999999995, in R as here, which R's `format()` writes `2500` to
+  `10000` at 7 digits and `plain/1` at 15 `2500.00000000000` to `9999.99999999999`. An inverse a
+  user writes, a power or a root, rarely gives a break back exactly, and 14 digits lose a label
+  only on axes ending within 5e-12 of 1 (the entry beginning "A break turned back"). *Rejected:
+  plain labels, as step 6 had them*: noise on 46 of the 552 rows of step 8's table, R's labels
+  on none.
+
+- **A given limit outside its transformation's domain is refused at the call (2026-11-01,
+  Steve: "A", increment 4's step 8's C4; checked against ggplot2 4.0.3).** On x and y and every
+  other continuous scale, a limit's end the transformation turns into no number is refused by
+  the scale function, naming the end, the transformation and its domain: `scale_x_log10(limits:
+  {-5, 1000})`, `{0, 1000}` too. R warns "NaNs produced" and takes the data's end for one turned
+  into NaN, log10 or sqrt of -5, and fails, "'from' must be a finite number", for one turned into
+  an infinity, log10 of 0. Before, x and y raised when run, a rule saying R fails, true of the
+  second alone. *Rejected: R's*, a negative limit on a log axis being a mistake R hides behind a
+  warning. *Rejected: the raise when run*, a mistake raised away from the line that wrote it.
+
+- **gradient2's midpoint is given in data units and transformed, and one outside the domain is
+  refused at the call (2026-11-01, Steve: "A", increment 4's step 8's C3; checked against
+  ggplot2 4.0.3).** As R's `mid_rescaler()`, the scale functions transform `midpoint:` and record
+  the transformed one in `{:mid, midpoint}`: under log10, a midpoint of 100 is white at 100. A
+  midpoint the transformation turns into no number is refused, the default 0 under log10 among
+  them, where R warns "introduced infinite values in `midpoint`" and colours every value and
+  every bar grey50. *Rejected: R's all-grey scale.* *Rejected: the midpoint in transformed
+  units*, unlike R wherever a transformation is given.
+
+- **A column of an aesthetic other than position is put through its scale's transformation
+  before the stat, and a column the stat computes after it (2026-11-01, Steve: "A", increment 4's
+  step 8's C2; checked against ggplot2 4.0.3).** As ggplot2's `transform_df()` and
+  `map_statistic()`: a plot's scale with a transformation transforms its aesthetic's columns of
+  numbers beside the positions, `Scale.transform/2` in the assembly, and each after_stat or stat
+  default column once computed; a default scale's is the identity, and a column not of numbers
+  is left for its scale to refuse. So `geom_count()` under log10 colour counts -1 and -2, both
+  NaN, as one: R's two circles, n = 2 grey and n = 1. *Rejected: transforming once where the
+  scale trains*, after the stat: three circles of n = 1.
+
+- **`transform:` takes every transformation of numbers, and refuses a date, date-time or time
+  one (2026-11-01, Steve: "A", increment 4's step 8's C1; checked against ggplot2 4.0.3).** On x
+  and y and on the continuous colour, fill, alpha, size, size by area, radius and line width
+  scales, every one ggplot2 gives a `transform` but the binned, it takes any name
+  `Scales.Transform` resolves, a composition and one of a user's own, checked at the call, an
+  unknown name refused listing the names. A date, date-time or time one, alone or first in a
+  composition, is refused, pointing at `scale_x_date/2` and its kin; `lims/2` given two numbers
+  high to low reverses these scales, as it does an axis. *Rejected: x and y taking a composition
+  with a date, date-time or time part first*, R's reversed date axis: a dozen places read a
+  scale's kind from its transformation's name, and scales already has it, so it needs no scales
+  release later. *Rejected: R's whole, `:date` on a continuous scale and on colour*, which has no
+  date scale yet.
+
 - **A non-position scale keeps the infinities its palette gives, and the geoms draw them as
   ggplot2 4.0.3 does (2026-11-01, Steve: "A", "A", "A", "A", increment 4's step 7's C3, C3a-c;
   checked against ggplot2 4.0.3).** An alpha, size or line width is R's palette's: past its range
@@ -273,7 +326,8 @@ deleted from the entry it was in, never marked superseded; git history keeps eve
   `new_transform()` requires one, read by messages and `inspect`; `derivative:`,
   `inverse_derivative:`, `domain:` (the line unless given), `breaks:` (limits in data units),
   `minor_breaks:` (breaks and extent in transformed space) and `labels:` (breaks in data units)
-  optional, R's defaults; a `%Scales.Transform{}` comes back. NimbleOptions refuses a missing
+  optional, R's defaults but the labels' (the entry beginning "A transformation of your own
+  labels"); a `%Scales.Transform{}` comes back. NimbleOptions refuses a missing
   function, an unknown option, another arity and a domain not low to high, where R checks
   nothing and fails when an axis first calls it, or keeps `c(Inf, 0)` backwards. *Rejected: no
   name, `new(&cube/1, inverse: ...)`*: messages would say "a user's transformation", and the
@@ -379,7 +433,8 @@ deleted from the entry it was in, never marked superseded; git history keeps eve
   (2026-11-01, Steve: "A", "A", increment 4's step 3; checked against scales 1.4.0).** Every
   transformation keeps plain labels (the 2026-10-12 rule, so a natural log's powers of e take 15
   digits where R's `format()` gives 7), but log1p's, exp's, asinh's, the pseudo-logarithm's and,
-  from step 4, logit's, probit's and both probability tuples' labels are written from each break
+  from step 4, logit's, probit's and both probability tuples', and from step 8 a user's own by
+  default, labels are written from each break
   turned back rounded to 14 significant digits first (`Labels.plain_round_tripped/1`): the round
   trip leaves `10000` as `9999.999999999989` under a pseudo-logarithm in sigma 2, base 10, and
   `0.0009` written `0.000900000000000001` under logit. Against the breaks' own labels in data
@@ -2184,9 +2239,8 @@ deleted from the entry it was in, never marked superseded; git history keeps eve
   too (Steve), measured as `draw_key_text()` measures them. A size scale takes R's options,
   `na_value:` on `_area` and `_discrete` alone. *Rejected: `rescaler` beside `midpoint`*, two
   fields a scale uses one of. *Rejected: drawing each key at its final size*, rendering asking the
-  guide for its layout between measuring and drawing. *Deferred:* `transform:` on size scales (so
-  `lims(size: {20, 0})` is refused, where R reverses), `aesthetics:`, and `scale_size_ordinal()`,
-  with ordered factors.
+  guide for its layout between measuring and drawing. *Deferred:* `aesthetics:`, and
+  `scale_size_ordinal()`, with ordered factors.
 
 - **A count layer counts over ggplot2's list of aesthetics, and `stat_sum/3` comes with
   `geom_count/3` (2026-10-20, Steve, the size step's fourth; checked against ggplot2 4.0.3 in R).**
@@ -2531,8 +2585,7 @@ deleted from the entry it was in, never marked superseded; git history keeps eve
   over its limits, censoring outside them. *Rejected: `guide:` in this step* (Steve: step 6,
   beside `guides/2`, so which guide fits which scale is decided once). *Rejected:
   `scale_alpha/2`*, R's alias. *Deferred:* `h.start`, gradientn's `values` and `rescaler`,
-  `aesthetics`, a transformation on these scales (so `lims/2` refuses numbers high to low for
-  them, which R reverses), `scale_alpha_manual()`, a gradient through colours with an alpha.
+  `aesthetics`, `scale_alpha_manual()`, a gradient through colours with an alpha.
 
 - **`palette:` takes a list of colours (2026-10-19, Steve).** On `scale_color_continuous/2` it
   is a gradient through them, the palette `scale_color_gradientn/2` records, as R's vector of
@@ -2616,11 +2669,10 @@ deleted from the entry it was in, never marked superseded; git history keeps eve
   `na.translate`, `drop`, a discrete `palette`, `continuous.limits`, discrete minor breaks, `oob`,
   `position` and `sec.axis`.
 
-- **Transformations are log10, sqrt, reverse and reciprocal, R's transformation objects ported
-  whole (2026-10-19, Steve).** `scale_x_continuous/2`'s `transform:` takes `:identity`, `:log10`,
-  `:sqrt`, `:reverse` or `:reciprocal`, and `scale_x_log10/2`, `scale_x_sqrt/2`,
-  `scale_x_reverse/2` and their y twins set it: the scale_continuous page draws each, reciprocal
-  its own example. Breaks are found in data units on the extent turned back, labels written from
+- **Transformations are R's transformation objects ported whole (2026-10-19, Steve).**
+  `scale_x_log10/2`, `scale_x_sqrt/2`, `scale_x_reverse/2` and their y twins set
+  `scale_x_continuous/2`'s `transform:`, which takes every transformation of numbers (the entry
+  beginning "`transform:` takes every"): the scale_continuous page draws each. Breaks are found in data units on the extent turned back, labels written from
   breaks turned back, a labels function handed those; limits, given breaks and minor breaks are
   given in data units and transformed, limits then sorted, as ggplot2 sorts them, so a scale
   function takes either order, and `xlim/3`, `ylim/3` and `lims/2` reverse an axis given high to
@@ -4604,7 +4656,7 @@ tells the story (`git show <hash>`). Until 2026-10-15 each milestone also had a 
   "Discrete and date position scales are the scale functions' step 4", "A discrete axis names its
   values as the column holds them", "`date_breaks:` and `date_minor_breaks:` are a step"
 - 2026-10-19 — Give a plot transformed scales: log10, sqrt, reverse and reciprocal (scale
-  functions, step 3); §4: "Transformations are log10, sqrt, reverse and reciprocal"
+  functions, step 3); §4: "Transformations are"
 - 2026-10-18 — Write a scale's labels as R's formatters do (scale functions, step 2) (`7486f22`); §4:
   "`Giggly.Format`'s `comma/2`, `percent/2` and `currency/2` take every option", "`labels:`
   takes a list"
