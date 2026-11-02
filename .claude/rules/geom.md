@@ -418,3 +418,19 @@ beginning "Each layer's defaults are filled in from the theme".
   `size` and `linewidth` added, in millimetres. A box in radial coordinates is drawn between its
   placed corners, not curved. Every part and key is checked against vdiffr's drawing
   (`test/golden/boxplot*.svg`).
+- **A violin (`Geom.Violin`) is set up and drawn as ggplot2's `GeomViolin` does it**: its setup
+  works along its stat's `flipped_aes`, flipped and flipped back, keeps the `width` its rows hold,
+  the stat's or the layer's set one, which the assembly fills in where the stat wrote none, else
+  0.9 of the closest spacing of the x positions in any panel, counting from zero, as
+  `compute_data_size()` reads it, and puts its sides at x ∓ width/2, keeping `width` in the table,
+  as R does. **Each panel's violins are drawn in the order of their groups**, rows missing `x` or
+  `y` left out first: an outline up the left side in order of `y` and down the right, ties kept in
+  their order both ways, as R's `order()` keeps them, back to its first point, each row's side its
+  `violinwidth` of the way from x to `xmin` or `xmax`, placed and munched as one path, as
+  `GeomPolygon` munches a closed outline, a point missing a coordinate splitting it, each run of
+  two points or more drawn. It takes its look from its first row: its fill at its alpha, its border
+  in its colour, width and line type, left off where no line would draw; its corners round where
+  the layer gives none and its key's mitred, as `draw_key_polygon()` falls back. Its defaults are
+  ggplot2's under the theme: a weight of 1, ink mixed 20% toward paper (`#333333`), a fill of
+  paper, the borders' width and line type; its key is `Rect.polygon_key/3`'s. Every drawing is
+  checked against vdiffr's (`test/golden/violin*.svg`), radial coordinates included.

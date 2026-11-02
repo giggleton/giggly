@@ -3633,6 +3633,181 @@ defmodule Giggly.PlotTest do
     end
   end
 
+  describe "geom_violin/3 and stat_ydensity/3" do
+    @violin_values %{
+      "g" => ["a", "a", "a", "b", "b", "b"],
+      "y" => [1.0, 2.0, 4.0, 1.0, 3.0, 4.0],
+      "w" => [1, 2, 1, 2, 1, 2],
+      "s" => ~w(p q r s t u)
+    }
+
+    test "a violin layer records its geom, its densities and dodging with ggplot2's defaults" do
+      plot =
+        @violin_values
+        |> Plot.new(%{x: :g, y: :y})
+        |> Plot.geom_violin()
+
+      assert plot.reversed_layers == [
+               %Plot.Layer{
+                 geom: %Geom.Violin{line_end: :butt, line_join: :none, mitre_limit: 10.0},
+                 stat: %Stat.Ydensity{
+                   bandwidth: :nrd0,
+                   adjust: 1.0,
+                   kernel: :gaussian,
+                   trim: true,
+                   bounds: {:neg_infinity, :infinity},
+                   scale: :area,
+                   quantiles: [0.25, 0.5, 0.75],
+                   drop: true,
+                   width: :none,
+                   orientation: :none
+                 },
+                 position: %Position.Dodge{
+                   width: :none,
+                   preserve: :total,
+                   orientation: :x,
+                   reverse: false
+                 },
+                 data: :none,
+                 mapping: %{},
+                 fixed: %{},
+                 accepted: [
+                   :group,
+                   :weight,
+                   :width,
+                   :x,
+                   :y,
+                   :alpha,
+                   :color,
+                   :fill,
+                   :linetype,
+                   :linewidth
+                 ],
+                 annotation: false,
+                 inherit: true
+               }
+             ]
+    end
+
+    test "stat_ydensity/3 adds the layer geom_violin/3 adds" do
+      plot = Plot.new(@violin_values, %{x: :g, y: :y})
+      options = [scale: :count, fill: "red", linejoin: :bevel]
+
+      assert Plot.stat_ydensity(plot, options) == Plot.geom_violin(plot, options)
+    end
+
+    test "the densities' options are the stat's, each number kept as a float" do
+      options = [
+        bw: 2,
+        adjust: 3,
+        kernel: :epanechnikov,
+        trim: false,
+        bounds: {1, :infinity},
+        scale: :width,
+        quantiles: [0, 1],
+        drop: false,
+        width: 1,
+        orientation: :y
+      ]
+
+      [layer] =
+        @violin_values
+        |> Plot.new(%{x: :g, y: :y})
+        |> Plot.geom_violin(options)
+        |> Map.fetch!(:reversed_layers)
+
+      assert layer.stat === %Stat.Ydensity{
+               bandwidth: 2.0,
+               adjust: 3.0,
+               kernel: :epanechnikov,
+               trim: false,
+               bounds: {1.0, :infinity},
+               scale: :width,
+               quantiles: [0.0, 1.0],
+               drop: false,
+               width: 1.0,
+               orientation: :y
+             }
+
+      assert layer.fixed === %{width: 1.0}
+
+      for {quantiles, recorded} <- [{:none, :none}, {[], []}] do
+        [given] =
+          @violin_values
+          |> Plot.new(%{x: :g, y: :y})
+          |> Plot.geom_violin(quantiles: quantiles)
+          |> Map.fetch!(:reversed_layers)
+
+        assert given.stat.quantiles == recorded
+      end
+    end
+
+    test "a violin's look is set for every violin, and its border's ends and corners chosen" do
+      [layer] =
+        @violin_values
+        |> Plot.new(%{x: :g, y: :y})
+        |> Plot.geom_violin(
+          colour: "red",
+          fill: "steelblue",
+          alpha: 1,
+          linewidth: 2,
+          linetype: 2,
+          lineend: :round,
+          linejoin: :mitre,
+          linemitre: 3
+        )
+        |> Map.fetch!(:reversed_layers)
+
+      assert %Plot.Layer{
+               geom: %Geom.Violin{line_end: :round, line_join: :mitre, mitre_limit: 3.0},
+               fixed: %{
+                 color: "#FF0000",
+                 fill: "#4682B4",
+                 alpha: 1.0,
+                 linewidth: 2.0,
+                 linetype: {4, 4}
+               }
+             } = layer
+    end
+
+    test "quantiles outside 0 to 1, or a scale not offered, are refused" do
+      plot = Plot.new(@violin_values, %{x: :g, y: :y})
+
+      for quantiles <- [[-0.1], [1.5], [0.5, "1"], 0.5, :all] do
+        error =
+          assert_raise NimbleOptions.ValidationError, ~r/expected quantiles/, fn ->
+            Plot.geom_violin(plot, quantiles: quantiles)
+          end
+
+        assert error.message =~ "got: #{inspect(quantiles)}"
+      end
+
+      assert_raise NimbleOptions.ValidationError, ~r/scale/, fn ->
+        Plot.geom_violin(plot, scale: :height)
+      end
+    end
+
+    test "a violin needs x and y, and a weight or width that is not a number is refused" do
+      assert_raise ArgumentError, ~r/Plot.geom_violin\/3 needs :y/, fn ->
+        @violin_values
+        |> Plot.new(%{x: :g})
+        |> Plot.geom_violin()
+      end
+
+      plot = Plot.new(@violin_values, %{x: :g, y: :y})
+
+      for aesthetic <- [:weight, :width] do
+        error =
+          assert_raise ArgumentError, fn ->
+            Plot.stat_ydensity(plot, %{aesthetic => :s})
+          end
+
+        assert error.message =~ "Plot.stat_ydensity/3"
+        assert error.message =~ inspect(aesthetic)
+      end
+    end
+  end
+
   describe "geom_density/3 and stat_density/3" do
     @values %{
       "x" => [1.0, 2.0, 4.0, 4.0],
@@ -5466,6 +5641,8 @@ defmodule Giggly.PlotTest do
         {:geom_raster, placed, %{}, [], :with_width, :identity},
         {:stat_summary, placed, %{}, [geom: :bar], :oriented_with_width, :identity},
         {:geom_boxplot, grouped, %{}, [], :boxplot, :dodge2},
+        {:geom_violin, grouped, %{}, [], :oriented_with_width, :dodge},
+        {:stat_ydensity, grouped, %{}, [], :oriented_with_width, :dodge},
         {:geom_rect, bare, %{xmin: :lo, xmax: :hi, ymin: :lo, ymax: :hi}, [], :rect, :identity},
         {:geom_hline, bare, %{yintercept: :y}, [], :hline, :identity},
         {:geom_hline, bare, %{}, [yintercept: 2], :hline, :identity},

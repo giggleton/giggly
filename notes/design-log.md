@@ -79,6 +79,17 @@ stops the question being reopened from scratch. A new entry is about 150 words: 
 sentence or two of why, and one line per rejected alternative. What a later decision replaces is
 deleted from the entry it was in, never marked superseded; git history keeps every version.
 
+- **A violin's width is R's, in R's order (2026-11-02, violins step 2, within the scope Steve
+  agreed; checked against ggplot2 4.0.3).** `width:` is the stat's and a set aesthetic, as R hands
+  it to both, so the assembly's set-size stage fills it where the stat wrote none and writes it
+  into the table last. The geom keeps the width its rows hold, else 0.9 of the spacing counting
+  from zero. So a violin spanning several x is drawn at 0.9 of their range while `layer_data()`
+  shows the set width, and a short group kept beside `width:` has no room, as R draws them. A
+  mapped width rides along to each group of one x, and one varying within such a group drops
+  every width, as R drops the column. *Rejected: a `width` field on the geom*, R's `params$width`:
+  the set-size stage already gives it. *Rejected: drawing every violin at the set width*: the
+  table would match its drawing, but neither would match R's.
+
 - **A transformation of your own labels its breaks turned back rounded to 14 significant digits
   unless it says (2026-11-02, Steve: "A", increment 4's step 8; checked against ggplot2 4.0.3).**
   `Transform.new/2` without `labels:` records `&Labels.plain_round_tripped/1`, as logit's and

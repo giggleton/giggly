@@ -3493,11 +3493,81 @@ defmodule Giggly.StatTest do
                {:category, levels: ["w", "v", "u"], ordered: false}
     end
 
+    # Golden: x a and b at y 1, 2, 4, 1, 3 and 4 mapping a width constant in each group, and one
+    # varying in a; x 1, 2, 3, 5, 5 and 5 at y 1, 2, 3, 1, 2 and 4 in groups 1 and 2, mapping a
+    # width constant in each, one varying in group 1 and one varying in group 2.
+    test "a mapped width is carried to a group of one x, and a varying one drops every width" do
+      discrete = fn widths ->
+        DataFrame.new(
+          x: [1, 1, 1, 2, 2, 2],
+          y: [1.0, 2.0, 4.0, 1.0, 3.0, 4.0],
+          width: widths,
+          panel: List.duplicate(1, 6),
+          group: [1, 1, 1, 2, 2, 2]
+        )
+      end
+
+      constant = violins(discrete.([0.5, 0.5, 0.5, 0.7, 0.7, 0.7]))
+      assert at_rows(constant, :width, [1, 515, 516, 1030]) == [0.5, 0.5, 0.7, 0.7]
+
+      varying = violins(discrete.([0.5, 0.6, 0.5, 0.7, 0.7, 0.7]))
+      refute :width in DataFrame.names(varying)
+
+      continuous = fn widths ->
+        frame = continuous_frame()
+        DataFrame.put(frame, :width, widths)
+      end
+
+      beside = violins(continuous.([0.3, 0.3, 0.3, 0.4, 0.4, 0.4]), [], false)
+      assert_near_values(:width, at_rows(beside, :width, [1, 516]), [1.8, 0.4])
+
+      read = violins(continuous.([0.3, 0.2, 0.3, 0.4, 0.4, 0.4]), [], false)
+      assert_near_values(:width, at_rows(read, :width, [1, 516]), [1.8, 0.4])
+
+      dropped = violins(continuous.([0.3, 0.3, 0.3, 0.4, 0.5, 0.4]), [], false)
+      refute :width in DataFrame.names(dropped)
+    end
+
+    # Golden: x a and b at y 1, 2, 4, 1, 3 and 4 mapping widths 0.5 and 0.7 with `width = 0.2`;
+    # and x a, b, b and b at y 1, 1, 2 and 3 mapping widths 0.5 and 0.7 with `width = 0.2, drop =
+    # FALSE`.
+    test "the stat's width replaces a mapped one, but for a short group kept" do
+      frame =
+        DataFrame.new(
+          x: [1, 1, 1, 2, 2, 2],
+          y: [1.0, 2.0, 4.0, 1.0, 3.0, 4.0],
+          width: [0.5, 0.5, 0.5, 0.7, 0.7, 0.7],
+          panel: List.duplicate(1, 6),
+          group: [1, 1, 1, 2, 2, 2]
+        )
+
+      given = violins(frame, width: 0.2)
+      assert at_rows(given, :width, [1, 516]) == [0.2, 0.2]
+
+      short =
+        DataFrame.new(
+          x: [1, 2, 2, 2],
+          y: [1.0, 1.0, 2.0, 3.0],
+          width: [0.5, 0.7, 0.7, 0.7],
+          panel: [1, 1, 1, 1],
+          group: [1, 2, 2, 2]
+        )
+
+      kept = violins(short, width: 0.2, drop: false)
+      assert at_rows(kept, :width, [1, 2]) == [0.5, 0.2]
+    end
+
+    test "a mapped width that is not a number is refused" do
+      frame = single_frame([1.0, 2.0, 3.0], width: ["a", "b", "c"])
+
+      assert_raise ArgumentError, ~r/a width must be a number/, fn -> violins(frame) end
+    end
+
     test "names what an after_stat can read, the aesthetics it takes, needs and consumes" do
       assert Stat.Ydensity.computed_variables() ==
                [:count, :density, :n, :quantile, :scaled, :violinwidth, :width]
 
-      assert Stat.Ydensity.accepted_aesthetics() == [:group, :weight, :x, :y]
+      assert Stat.Ydensity.accepted_aesthetics() == [:group, :weight, :width, :x, :y]
       assert Stat.Ydensity.required_aesthetics() == [:x, :y]
       assert Stat.Ydensity.dropped_aesthetics() == [:weight]
     end

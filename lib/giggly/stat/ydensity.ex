@@ -79,7 +79,7 @@ defmodule Giggly.Stat.Ydensity do
   # The aesthetics a violin's layer can use for its densities, from its own mapping or the plot's.
   @doc false
   @spec accepted_aesthetics() :: [atom()]
-  def accepted_aesthetics, do: [:group, :weight, :x, :y]
+  def accepted_aesthetics, do: [:group, :weight, :width, :x, :y]
 
   # The aesthetics a violin's densities cannot be computed without, ggplot2's `required_aes =
   # c("x", "y")`.
@@ -124,12 +124,26 @@ defmodule Giggly.Stat.Ydensity do
     @impl Giggly.Stat
     def compute_layer(stat, frame, axes) do
       KernelDensity.check_weight(frame)
+      check_width(frame)
       flipped = flipped?(stat.orientation, frame, axes)
 
       frame
       |> flip(flipped)
       |> violins(stat, flipped)
       |> flip(flipped)
+    end
+
+    # A mapped width is how wide a violin is drawn, so it must hold numbers, as a weight must.
+    defp check_width(frame) do
+      case DataFrame.dtypes(frame) do
+        %{width: dtype} when dtype not in [:integer, :float, :null] ->
+          raise ArgumentError,
+                "a violin is drawn as wide as its group's width, so a width must be a number, " <>
+                  "but the layer's width is a #{inspect(dtype)} column"
+
+        _numbers_or_no_width ->
+          :ok
+      end
     end
 
     # Whether the violins run along x, drawn across y, as ggplot2's `has_flipped_aes()` decides a
@@ -176,16 +190,24 @@ defmodule Giggly.Stat.Ydensity do
 
     defp violins(frame, stat, flipped) do
       names = DataFrame.names(frame)
-      carried = Enum.reject(names, fn name -> name in [:x, :y] end)
+      carried = Enum.reject(names, fn name -> name in [:x, :y, :width] end)
       rows = DataFrame.filter(frame, finite(names))
+      given = if :width in names, do: [given_width: {:first, [:width]}], else: []
 
       figures =
-        DataFrame.summarise(rows, [:panel, :group],
-          rows: {:count, [:y]},
-          x_low: {:min, [:x]},
-          x_high: {:max, [:x]},
-          x_count: {:n_distinct, [:x]},
-          y_low: {:min, [:y]}
+        DataFrame.summarise(
+          rows,
+          [:panel, :group],
+          Enum.concat(
+            [
+              rows: {:count, [:y]},
+              x_low: {:min, [:x]},
+              x_high: {:max, [:x]},
+              x_count: {:n_distinct, [:x]},
+              y_low: {:min, [:y]}
+            ],
+            given
+          )
         )
 
       quantiles = quantiles(stat.quantiles, rows, DataFrame.row_count(figures))
@@ -215,9 +237,64 @@ defmodule Giggly.Stat.Ydensity do
       carried_values = DataFrame.summarise(kept_rows, [:panel, :group], firsts)
 
       groups
+      |> with_given_widths(given != [], figures, kept_rows, stat)
       |> widened(stat.scale)
       |> output(carried_values, constant, stat.quantiles, flipped)
     end
+
+    # Each group's rows with the layer's mapped width, where it maps one, as ggplot2 carries it to
+    # the groups whose own rows gave no width: those of one x where the stat is given none, and a
+    # short group kept. Where it varies within any such group given rows, every row loses its
+    # width, a group's of several x too, as ggplot2 drops a column that varies from the whole
+    # table.
+    defp with_given_widths(groups, false, _figures, _kept_rows, _stat), do: groups
+
+    defp with_given_widths(groups, true, figures, kept_rows, stat) do
+      reading =
+        figures
+        |> KernelDensity.rows_by_group([:rows, :x_count, :given_width])
+        |> Map.new(fn {key, group} -> {key, reads_given_width?(group, stat)} end)
+
+      readers =
+        figures
+        |> DataFrame.select(panel: :panel, group: :group)
+        |> DataFrame.put(
+          :reads,
+          Enum.map(groups, fn {key, _rows} -> Map.fetch!(reading, key) end)
+        )
+
+      read_rows =
+        kept_rows
+        |> DataFrame.join(readers, [:panel, :group])
+        |> DataFrame.filter(:reads)
+
+      given_widths =
+        figures
+        |> KernelDensity.rows_by_group([:given_width])
+        |> Map.new(fn {key, group} -> {key, group.given_width} end)
+
+      constant = Carry.constant_columns(read_rows, [:width]) == [:width]
+
+      Enum.map(groups, fn {key, group_rows} ->
+        {key, given_width(group_rows, constant, Map.fetch!(reading, key), given_widths[key])}
+      end)
+    end
+
+    # A group's rows given the mapped width where it reads it, every row's width dropped where the
+    # mapped width varies within a group reading it.
+    defp given_width(group_rows, false, _reads, _width),
+      do: Enum.map(group_rows, fn row -> %{row | width: :dropped} end)
+
+    defp given_width(group_rows, true, true, width),
+      do: Enum.map(group_rows, fn row -> %{row | width: width} end)
+
+    defp given_width(group_rows, true, false, _width), do: group_rows
+
+    # Whether a group's rows take the mapped width: a short one's, or one of one x where the stat
+    # is given no width.
+    defp reads_given_width?(%{rows: rows}, _stat) when rows < 2, do: true
+    defp reads_given_width?(%{x_count: 1}, %{width: :none}), do: true
+    defp reads_given_width?(_group, _stat), do: false
 
     # Whether a row's x, y and weight, where the layer maps one, are all finite.
     defp finite(names) do
@@ -430,7 +507,11 @@ defmodule Giggly.Stat.Ydensity do
           Enum.map(group_rows, fn row -> Map.put(row, :key, key) end)
         end)
 
-      widths = if Enum.any?(rows, fn row -> row.width != nil end), do: [:width], else: []
+      widths =
+        if Enum.any?(rows, fn row -> row.width not in [nil, :dropped] end),
+          do: [:width],
+          else: []
+
       quantile = if quantiles == :none, do: [], else: [:quantile]
 
       computed =

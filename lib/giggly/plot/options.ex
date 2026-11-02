@@ -1628,6 +1628,110 @@ defmodule Giggly.Plot.Options do
                             @stat_density_line_style_options ++ @nudge_options
                         )
 
+  # How every violin of a layer looks, set by its options.
+  @violin_look_options [
+    alpha: [
+      type: {:custom, __MODULE__, :validate_alpha, []},
+      doc:
+        "How opaque every violin's fill is, from 0, invisible, to 1, opaque; its border keeps " <>
+          "its colour's own alpha."
+    ],
+    color: [
+      type: @color_type,
+      doc:
+        "The colour of every violin's border, written `colour:` or `color:`: " <>
+          @color_forms <>
+          "; when not given, the theme's ink mixed 20% toward its paper, `#333333`, or " <>
+          "`#000000CC` under `theme_void/2`."
+    ],
+    fill: [
+      type: @color_type,
+      doc:
+        "The colour every violin is filled with: " <>
+          @color_forms <>
+          "; the theme's paper when not given, white, or clear under `theme_void/2`."
+    ],
+    linewidth: [
+      type: {:custom, __MODULE__, :validate_linewidth, []},
+      doc:
+        "How wide every violin's border is, in millimetres; the theme's `base_line_size` when " <>
+          "not given, 0.5 at its default sizes."
+    ],
+    linetype: [
+      type: @linetype_type,
+      doc:
+        "The line type of every violin's border: " <>
+          @linetype_forms <> "; `:solid` when not given."
+    ]
+  ]
+
+  # `geom_violin/3`'s and `stat_ydensity/3`'s options, validated at the call: how each group's
+  # densities are estimated and scaled, where its violin stands, and how it looks.
+  @violin_options NimbleOptions.new!(
+                    [
+                      data: @data_option,
+                      position:
+                        Keyword.put(@oriented_position_with_width_option, :default, :dodge)
+                    ] ++
+                      Keyword.take(@density_estimate_options, [:bw, :adjust, :kernel]) ++
+                      [
+                        trim: [
+                          type: :boolean,
+                          default: true,
+                          doc:
+                            "Whether each violin spans only its own group's extent; `false` " <>
+                              "reaches three of the rule's bandwidths, before `adjust:`, past " <>
+                              "it either end, so its tails show."
+                        ],
+                        bounds: Keyword.fetch!(@density_estimate_options, :bounds),
+                        scale: [
+                          type: {:in, [:area, :count, :width]},
+                          default: :area,
+                          doc:
+                            "How the violins are sized beside one another: each the same area " <>
+                              "(`:area`), as wide as its density makes it beside the panel's " <>
+                              "greatest; that times its rows over the panel's most, so a violin " <>
+                              "of more rows is bigger (`:count`); or each as wide at its widest " <>
+                              "(`:width`)."
+                        ],
+                        quantiles: [
+                          type: {:custom, __MODULE__, :validate_quantiles, []},
+                          default: [0.25, 0.5, 0.75],
+                          doc:
+                            "The quantiles of each group's `y` the densities mark, each a row " <>
+                              "of its own whose `quantile` is its probability, a list of numbers " <>
+                              "from 0 to 1, or `:none` for no `quantile` column at all."
+                        ],
+                        drop: [
+                          type: :boolean,
+                          default: true,
+                          doc:
+                            "Whether to leave out a group of fewer than two rows, or, `false`, " <>
+                              "keep it as one row of missing densities, so a position makes room " <>
+                              "for it."
+                        ],
+                        width: [
+                          type: {:custom, __MODULE__, :validate_width, []},
+                          doc:
+                            "How wide a violin's room is, in the units of the axis it stands " <>
+                              "on, any number; it replaces a mapped `:width`, and gives way to " <>
+                              "0.9 of the range of a group spanning several positions. 0.9 times " <>
+                              "the closest spacing of the positions, counting from zero, when " <>
+                              "not given."
+                        ],
+                        orientation: [
+                          type: {:in, [:x, :y]},
+                          doc:
+                            "The axis the violins stand along, `:x` or `:y`, estimating the " <>
+                              "other; when not given they stand along the discrete one, or else " <>
+                              "along the axis on which every group holds one value, or else " <>
+                              "along x."
+                        ]
+                      ] ++
+                      @violin_look_options ++
+                      @stat_density_line_style_options ++ @nudge_options
+                  )
+
   # `geom_smooth/3`'s and `stat_smooth/3`'s options, validated at the call: how each curve is
   # fitted, and how its line and band look.
   @smooth_options NimbleOptions.new!(
@@ -4275,6 +4379,10 @@ defmodule Giggly.Plot.Options do
   def stat_density, do: @stat_density_options
 
   @doc false
+  @spec violin() :: NimbleOptions.t()
+  def violin, do: @violin_options
+
+  @doc false
   @spec line() :: NimbleOptions.t()
   def line, do: @line_options
 
@@ -4645,6 +4753,27 @@ defmodule Giggly.Plot.Options do
   def validate_adjust(adjust),
     do:
       {:error, "expected a multiple of the bandwidth, a number above 0, got: #{inspect(adjust)}"}
+
+  # NimbleOptions' check of a violin's `quantiles:`: `:none`, or a list of probabilities from 0 to
+  # 1, each kept as a float, as R refuses one outside them.
+  @doc false
+  @spec validate_quantiles(term()) :: {:ok, :none | [float()]} | {:error, String.t()}
+  def validate_quantiles(:none), do: {:ok, :none}
+
+  def validate_quantiles(quantiles) when is_list(quantiles) do
+    if Enum.all?(quantiles, fn quantile ->
+         is_number(quantile) and quantile >= 0 and quantile <= 1
+       end),
+       do: {:ok, Enum.map(quantiles, fn quantile -> quantile / 1 end)},
+       else: quantiles_error(quantiles)
+  end
+
+  def validate_quantiles(quantiles), do: quantiles_error(quantiles)
+
+  defp quantiles_error(quantiles),
+    do:
+      {:error,
+       "expected quantiles, a list of numbers from 0 to 1, or :none, got: #{inspect(quantiles)}"}
 
   # NimbleOptions' check of a density's `bounds:`: `{low, high}`, the low a number or
   # `:neg_infinity`, the high a number or `:infinity`, not below the low, each number kept as a

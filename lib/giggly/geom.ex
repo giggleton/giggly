@@ -22,7 +22,8 @@ defprotocol Giggly.Geom do
   # (`Giggly.Geom.Path`) and lines (`Giggly.Geom.Line`), which draw as paths once their rows are in
   # order, as ggplot2's `GeomLine` is a `GeomPath`, text (`Giggly.Geom.Text`), labels
   # (`Giggly.Geom.Label`), text on a box with rounded corners, box plots
-  # (`Giggly.Geom.Boxplot`), which draw their outliers as points, ribbons (`Giggly.Geom.Ribbon`)
+  # (`Giggly.Geom.Boxplot`), which draw their outliers as points, violins (`Giggly.Geom.Violin`), a
+  # polygon round each group's densities, ribbons (`Giggly.Geom.Ribbon`)
   # and areas (`Giggly.Geom.Area`), which draw as ribbons from 0 to their y, as ggplot2's
   # `GeomArea` is a `GeomRibbon`, densities (`Giggly.Geom.Density`), which draw as areas with a
   # look of their own, as ggplot2's `GeomDensity` is a `GeomArea`, segments
@@ -81,6 +82,7 @@ defprotocol Giggly.Geom do
       Raster,
       Text,
       Tile,
+      Violin,
       Vline
     ]
 
