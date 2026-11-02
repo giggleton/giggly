@@ -423,8 +423,7 @@ defmodule Scales.Transform do
   # A domain `new/2` takes: two numbers or infinities, the first below the second.
   @doc false
   @spec validate_domain(term()) :: {:ok, {term(), term()}} | {:error, String.t()}
-  def validate_domain({low, high} = domain)
-      when is_bound(low) and is_bound(high) and low != :infinity and high != :neg_infinity do
+  def validate_domain({low, high} = domain) when is_bound(low) and is_bound(high) do
     if Double.less?(low, high),
       do: {:ok, domain},
       else: {:error, "expected a domain's low end below its high end, got: #{inspect(domain)}"}

@@ -3878,13 +3878,19 @@ defmodule Scales.TransformTest do
 
     # R's `transform_compose("reciprocal", "reverse")$domain` is `c(-Inf, -Inf)` and its
     # `trim_to_domain()` of `c(-5, 0, 10, 1000)` is `c(0, 0)`: R's `min()` and `max()` of the
-    # reciprocal's equal zeros both give -0. Here -0 is below +0, so the domain is the
-    # reciprocal's own (design-log §4, the entry beginning "A composition's domain").
-    test "orders a negative zero below a positive one where R's domain is an accident" do
+    # reciprocal's equal zeros both give -0. Here the pair is ordered together, so the domain is
+    # the reciprocal's own (design-log §4, the entry beginning "A composition's domain"); every
+    # other tie is R's, as `sqrt, reverse, sqrt`'s domain 0 to 0 and `exp, reverse, sqrt`'s -Inf
+    # to -Inf (`inc4/step6/sweep/table.R`)
+    test "orders the range's two ends as a pair where R's domain is an accident, ties as R's" do
       name = {:compose, [:reciprocal, :reverse]}
 
       assert {Transform.domain(name), Transform.trim_to_domain(name, [-5, 0, 10, 1000])} ===
                {{:neg_infinity, :infinity}, {-0.001, 0.2}}
+
+      assert {Transform.domain({:compose, [:sqrt, :reverse, :sqrt]}),
+              Transform.domain({:compose, [:exp, :reverse, :sqrt]})} ===
+               {{0.0, 0.0}, {:neg_infinity, :neg_infinity}}
     end
 
     # Golden: ggplot2 4.0.3's axes of `scale_y_continuous(transform = transform_compose(...))`
@@ -4053,25 +4059,43 @@ defmodule Scales.TransformTest do
     end
 
     test "refuses a date, date-time or time part anywhere but first, and what it cannot do" do
-      assert_raise ArgumentError, ~r/comes first in a composition/, fn ->
-        Transform.transform({:compose, [:reverse, :date]}, [1])
-      end
+      late =
+        assert_raise ArgumentError, fn ->
+          Transform.transform({:compose, [:reverse, :date]}, [1])
+        end
 
-      assert_raise ArgumentError, ~r/not numbers/, fn ->
-        Transform.trim_to_domain({:compose, [:date, :reverse]}, [1])
-      end
+      trimmed =
+        assert_raise ArgumentError, fn ->
+          Transform.trim_to_domain({:compose, [:date, :reverse]}, [1])
+        end
 
       assert_raise FunctionClauseError, fn ->
         Transform.derivative({:compose, [:date, :reverse]}, [1])
       end
+
+      assert {String.starts_with?(late.message, "a date, date-time or time transformation comes"),
+              late.message =~ "{:compose, [:reverse, :date]}",
+              String.starts_with?(trimmed.message, "{:compose, [:date, :reverse]} takes dates")} ==
+               {true, true, true}
+    end
+
+    # The first part's own domain, every date, whose ends no date's transformation takes
+    test "takes a date, date-time or time first part's domain" do
+      assert Transform.domain({:compose, [:date, :reverse]}) === {:neg_infinity, :infinity}
     end
 
     # R aborts `transform_compose("sqrt", "reverse", "log10")`: "Sequence of transformations
     # yields invalid domain", and `transform_compose()`: "must include at least 1 transformer"
     test "refuses parts no value passes, no parts, and derivatives a part lacks" do
-      assert_raise ArgumentError, ~r/no value passes every part/, fn ->
-        Transform.transform({:compose, [:sqrt, :reverse, :log10]}, [1])
-      end
+      passes_none =
+        assert_raise ArgumentError, fn ->
+          Transform.transform({:compose, [:sqrt, :reverse, :log10]}, [1])
+        end
+
+      assert String.starts_with?(
+               passes_none.message,
+               "no value passes every part of {:compose, [:sqrt, :reverse, :log10]}"
+             )
 
       for name <- [{:compose, []}, {:compose, :log10}] do
         assert_raise FunctionClauseError, fn -> Transform.transform(name, [1]) end
@@ -4080,6 +4104,48 @@ defmodule Scales.TransformTest do
       assert_raise FunctionClauseError, fn ->
         Transform.derivative({:compose, [:timespan, :reverse]}, [1])
       end
+    end
+
+    # R aborts, "Sequence of transformations yields invalid domain", where the domain's ends turn
+    # back to NA or NaN or the domain transforms to either: a part of one's own can make any of
+    # them happen, at either end
+    test "refuses parts whose domain turns back to nothing or transforms to NaN, at either end" do
+      for lost <- [nil, :nan],
+          ending <- [:infinity, :neg_infinity],
+          direction <- [:back, :forward] do
+        losing = fn
+          ^ending -> lost
+          value -> value
+        end
+
+        keeping = fn value -> value end
+
+        {transform, inverse} =
+          if direction == :forward, do: {losing, keeping}, else: {keeping, losing}
+
+        part = Transform.new("losing", transform: transform, inverse: inverse)
+
+        assert_raise ArgumentError, ~r/no value passes every part/, fn ->
+          Transform.transform({:compose, [part, :identity]}, [1])
+        end
+      end
+    end
+
+    # Golden: R's `d_transform` of `transform_compose("sqrt", transform_yj(-1))` at -Inf and -2
+    # is NA, yj's NA times sqrt's NaN (`inc4/step6/sweep/table.R`); of a part whose derivative is
+    # always NA then sqrt, NaN at -2 and NA at 4, sqrt's NaN times NA (`inc4/step6/nan_na.R`):
+    # R's `*` keeps its first operand's, the part's derivative times the product so far
+    test "chains derivatives as R multiplies NA and NaN, the part's first" do
+      missing_slope =
+        Transform.new("missing_slope",
+          transform: fn value -> value end,
+          inverse: fn position -> position end,
+          derivative: fn _value -> nil end
+        )
+
+      assert {Transform.derivative({:compose, [:sqrt, {:yj, -1}]}, [:neg_infinity, -2.0]),
+              Transform.derivative({:compose, [missing_slope, :sqrt]}, [-2.0, 4.0])} ===
+               {[nil, nil], [:nan, nil]}
     end
   end
 
@@ -4183,8 +4249,10 @@ defmodule Scales.TransformTest do
 
     test "makes an integer answered a float and refuses any answer but a double" do
       rounded = Transform.new("rounded", transform: &round/1, inverse: &round/1)
+      unplaced = Transform.new("unplaced", transform: fn _value -> :nan end, inverse: &round/1)
 
-      assert Transform.transform(rounded, [2.4]) === [2.0]
+      assert {Transform.transform(rounded, [2.4]), Transform.transform(unplaced, [2.4])} ===
+               {[2.0], [:nan]}
 
       error =
         assert_raise ArgumentError, fn ->
@@ -4202,16 +4270,31 @@ defmodule Scales.TransformTest do
     test "refuses a missing function, an unknown option, another arity and a domain not low to high" do
       for options <- [
             [transform: &round/1],
+            [inverse: &round/1],
             [transform: &round/1, inverse: &round/1, base: 10],
             [transform: &round/1, inverse: &Kernel.+/2],
             [transform: &round/1, inverse: &round/1, domain: {1, 0}],
             [transform: &round/1, inverse: &round/1, domain: {0, 0}],
             [transform: &round/1, inverse: &round/1, domain: {:infinity, :infinity}],
             [transform: &round/1, inverse: &round/1, domain: [0, 1]],
+            [transform: &round/1, inverse: &round/1, domain: {"0", 1}],
+            [transform: &round/1, inverse: &round/1, domain: {0, "1"}],
             [transform: &round/1, inverse: &round/1, breaks: fn -> [] end]
           ] do
         assert_raise NimbleOptions.ValidationError, fn -> Transform.new("odd", options) end
       end
+
+      reversed =
+        assert_raise NimbleOptions.ValidationError, fn ->
+          Transform.new("odd", transform: &round/1, inverse: &round/1, domain: {1, 0})
+        end
+
+      worded =
+        assert_raise NimbleOptions.ValidationError, fn ->
+          Transform.new("odd", transform: &round/1, inverse: &round/1, domain: {"0", 1})
+        end
+
+      assert {reversed.message =~ "{1, 0}", worded.message =~ ~s({"0", 1})} == {true, true}
 
       for name <- [:cube, nil] do
         assert_raise FunctionClauseError, fn ->
@@ -4322,9 +4405,40 @@ defmodule Scales.TransformTest do
 
       counting_none = cube(breaks: fn _limits -> [1.0] end)
 
-      assert_raise ArgumentError, ~r/takes one argument, so it counts no breaks/, fn ->
-        Transform.breaks(counting_none, {0.0, 1.0}, n: 3)
+      refused =
+        assert_raise ArgumentError, fn ->
+          Transform.breaks(counting_none, {0.0, 1.0}, n: 3)
+        end
+
+      assert_raise ArgumentError, fn ->
+        Transform.format(counting_none, [1.0], {0.0, 1.0}, n: 3)
       end
+
+      assert {String.starts_with?(
+                refused.message,
+                ~s(the "cube" transformation's breaks function)
+              ), refused.message =~ "[:n]"} == {true, true}
+    end
+
+    # ggplot2 draws no breaks on an axis wholly past a bound its transformation never reaches: both
+    # ends squish onto it and turn back to infinities, and both are set aside
+    test "finds no breaks where both ends turn back to anything but a number" do
+      bounded =
+        Transform.new("bounded",
+          transform: fn
+            :infinity -> 1.0
+            value -> 1 - 1 / value
+          end,
+          inverse: fn
+            position when position == 1 -> :infinity
+            :neg_infinity -> 0.0
+            position -> 1 / (1 - position)
+          end,
+          domain: {1.0e-100, :infinity}
+        )
+
+      squished = Transform.squish(bounded, {1.05, 1.2})
+      assert {squished, Transform.breaks(bounded, squished)} === {{1.0, 1.0}, []}
     end
 
     test "takes its minor breaks function, and has no derivative it was not given" do

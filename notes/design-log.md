@@ -114,16 +114,19 @@ deleted from the entry it was in, never marked superseded; git history keeps eve
   do, is left until a composition needs it. *Rejected: plain labels from the round trip*:
   `0.002000000000001` under Box-Cox, and a date first unlabelled.
 
-- **A composition's domain is R's, but a negative zero is below a positive one (2026-11-01,
+- **A composition's domain is R's, but the range's two ends are ordered as a pair (2026-11-01,
   Steve: "A", increment 4's step 6's C4; checked against scales 1.4.0).** As R's: the first
   part's domain transformed, cut to each later part's domain and transformed again, turned back
   through every inverse and sorted, `ArgumentError` when nothing is left (sqrt, reverse, log10),
-  as R aborts; so sqrt then log10 takes 1e-200 up and exp then log -230.26 up. R's `min()` and
-  `max()` of an equal pair keep the first, so the reciprocal's -0 and +0 both come out -0 and
-  the reciprocal then reverse has the domain `-Inf, -Inf`, its `trim_to_domain()` of -5 to 1000
-  `0, 0`; no drawing shows it, ggplot2 squishing nothing into a domain of no width. Here the
-  domain is the reciprocal's own line and the trim `-0.001, 0.2`. *Rejected: R's exactly*: a
-  package function's wrong answer copied for no drawing.
+  as R aborts; so sqrt then log10 takes 1e-200 up and exp then log -230.26 up. R takes `min()`
+  and `max()` of the range alone, each keeping the first of an equal pair, so the reciprocal's -0
+  and +0 both come out -0 and the reciprocal then reverse has the domain `-Inf, -Inf`, its
+  `trim_to_domain()` of -5 to 1000 `0, 0`; no drawing shows it, ggplot2 squishing nothing into a
+  domain of no width. Here the pair's first is low and second high, so the domain is the
+  reciprocal's own line and the trim `-0.001, 0.2`; every other tie is R's, matched over 2,740
+  rows of composed pairs and triples. *Rejected: R's exactly*: a package function's wrong
+  answer copied for no drawing. *Rejected: -0 below +0 everywhere*, as first built: R's
+  `0 <= -0` holds, so sqrt, reverse, sqrt, R's domain 0 to 0, came out empty.
 
 - **A date, date-time or time transformation comes first in a composition, or nowhere
   (2026-11-01, Steve: "A", increment 4's step 6's C7; checked against ggplot2 4.0.3).**
@@ -4078,6 +4081,10 @@ tells the story (`git show <hash>`). Until 2026-10-15 each milestone also had a 
 `git log -S "<title>" -- notes/design-log.md` finds it in this file's history. The phases are
 §1's roadmap.
 
+- 2026-11-01 — Compose transformations and take a user's own (transforms, step 6) (`3409ceb`);
+  §4: "A composition is", "A composition's breaks", "A composition's labels", "A composition's
+  domain", "A date, date-time or time transformation comes first", "`Transform.new/2` takes", "A
+  transformation of your own"
 - 2026-11-01 — Carry Box-Cox, modulus, Yeo-Johnson and a span of time (transforms, step 5)
   (`dd131e6`); §4: "Box-Cox, modulus, Yeo-Johnson and a span of time", "The Box-Cox, modulus and
   Yeo-Johnson transformations", "Box-Cox's domain", "An axis past a bound", "Box-Cox, modulus and

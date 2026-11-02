@@ -18,8 +18,9 @@ defmodule Scales.Transform.Composition do
   #
   # Its domain is R's: the first part's domain transformed, cut to each later part's domain in
   # turn and transformed again, turned back through every inverse into data units, and sorted,
-  # but with a negative zero below a positive one, so the reciprocal then the reversal keeps the
-  # whole line where R's equal zeros leave `-Inf, -Inf` (the entry beginning "A composition's
+  # each tie kept as R's `max()` and `min()` keep it, but the range's two ends ordered as a pair,
+  # where R takes each alone: so the reciprocal then the reversal keeps the whole line where R's
+  # two zeros both come out -0 and leave `-Inf, -Inf` (the entry beginning "A composition's
   # domain"); none left raises `ArgumentError`, as R aborts. A date, date-time or time part comes
   # first or raises: its values are not numbers, so its domain is its own, every value, the later
   # parts cutting the line of its positions only to check one is left; it is never squished, and
@@ -40,7 +41,7 @@ defmodule Scales.Transform.Composition do
               "its values are not numbers: #{inspect(composition)}"
     end
 
-    transformed_domain!(composition)
+    domain(composition)
     __MODULE__
   end
 
@@ -146,25 +147,19 @@ defmodule Scales.Transform.Composition do
   defp cut(part, [first, second]) do
     {domain_low, domain_high} = Transform.domain(part)
     {range_low, range_high} = ordered(first, second)
-    {_smaller_low, lower} = ordered(domain_low, range_low)
+    {_smaller_low, lower} = ordered(range_low, domain_low)
     {upper, _larger_high} = ordered(domain_high, range_high)
 
-    if below?(upper, lower),
+    if Double.less?(upper, lower),
       do: {:halt, :empty},
       else: {:cont, Transform.transform(part, [lower, upper])}
   end
 
-  # Two values low to high, a negative zero below a positive one, the first kept when neither is
-  # below the other.
+  # Two values low to high, the first kept where neither is below the other, as R's `max()` and
+  # `min()` keep it: so the domain's end on a tie with the range's, and of a pair of zeros taken
+  # together, the reciprocal's -0 and +0, the first low and the second high.
   defp ordered(first, second),
-    do: if(below?(second, first), do: {second, first}, else: {first, second})
-
-  defp below?(left, right) when left == 0 and right == 0,
-    do: negative_zero?(left) and not negative_zero?(right)
-
-  defp below?(left, right), do: Double.less?(left, right)
-
-  defp negative_zero?(value), do: value === -0.0
+    do: if(Double.less?(second, first), do: {second, first}, else: {first, second})
 
   # Positions turned back through `parts`, in the order given, a `nil` passed on without a call.
   defp back(parts, positions) do

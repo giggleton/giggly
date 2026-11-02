@@ -246,7 +246,7 @@ R's regular ones: the entry beginning "The panel's grid lines are placed by the 
   inverse, a `nil` passed back uncalled, since built-in inverses take positions; derivatives R's
   running chain-rule product, only where every part has one; breaks and labels the first part's,
   on the extent turned back into its space, `n:` handed on; minor breaks R's regular ones
-  unreversed; its domain R's rule but -0 below +0, none left `ArgumentError`; a date, date-time
+  unreversed; its domain R's rule but the range's ends ordered as a pair, none left `ArgumentError`; a date, date-time
   or time part first only, the composition then never squished, its steps laid through
   `width/3`. Its tests pin R's doubles at the nine doubles and the edges, the domains and trims,
   ggplot2's axes, and its reversed date, date-time and time axes.
