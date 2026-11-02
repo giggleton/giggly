@@ -161,7 +161,7 @@ ggplot(diamonds, aes(carat, price)) +
   coord_transform(x = scales::transform_exp(10), y = scales::transform_exp(10))
 ```
 
-Not in Giggly yet: `coord_transform()` with transformations from the `scales` package.
+Not in Giggly yet: `coord_transform()`.
 
 ## No transformation
 
