@@ -4131,6 +4131,27 @@ defmodule Scales.TransformTest do
       end
     end
 
+    # R aborts `transform_compose("asn", "reverse", shift, transform_boxcox(0.5, offset = 3))`,
+    # shift `x - 1` (`inc4/step6/disjoint.R`): its range, -1 - pi to -1, lies below Box-Cox's
+    # domain from 0, though Box-Cox places -1 and asn's inverse turns anything back to a number
+    test "refuses a range wholly outside a later part's domain, though it turns back to numbers" do
+      shift =
+        Transform.new("shift",
+          transform: fn
+            value when value in [:infinity, :neg_infinity] -> value
+            value -> value - 1
+          end,
+          inverse: fn
+            position when position in [:infinity, :neg_infinity] -> position
+            position -> position + 1
+          end
+        )
+
+      assert_raise ArgumentError, ~r/no value passes every part/, fn ->
+        Transform.transform({:compose, [:asn, :reverse, shift, {:boxcox, 0.5, offset: 3}]}, [1])
+      end
+    end
+
     # Golden: R's `d_transform` of `transform_compose("sqrt", transform_yj(-1))` at -Inf and -2
     # is NA, yj's NA times sqrt's NaN (`inc4/step6/sweep/table.R`); of a part whose derivative is
     # always NA then sqrt, NaN at -2 and NA at 4, sqrt's NaN times NA (`inc4/step6/nan_na.R`):
