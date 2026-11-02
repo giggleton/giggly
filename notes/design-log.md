@@ -4283,6 +4283,8 @@ tells the story (`git show <hash>`). Until 2026-10-15 each milestone also had a 
 `git log -S "<title>" -- notes/design-log.md` finds it in this file's history. The phases are
 §1's roadmap.
 
+- 2026-11-02 — Add Scales.Bounds.expand_range/2, R's expand_range(), and widen Giggly's extents
+  through it (transforms, step 10) (`24db15d`); §4: "A range is widened"
 - 2026-11-02 — Take transform: on Giggly's continuous non-position scales, any transformation on x
   and y (transforms, step 8) (`1b40993`); §4: "`transform:` takes every", "A column of an
   aesthetic other than position", "gradient2's midpoint", "A given limit outside", "A

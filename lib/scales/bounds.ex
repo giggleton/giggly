@@ -252,7 +252,8 @@ defmodule Scales.Bounds do
       {:neg_infinity, :infinity}
   """
   @spec expand_range(range(), keyword()) :: {Scales.double(), Scales.double()}
-  def expand_range({low, high} = range, options \\ []) when is_bound(low) and is_bound(high) do
+  # An end that is not a number or an infinity is refused by `zero_range?/1`, which reads both.
+  def expand_range({low, high} = range, options \\ []) do
     options = NimbleOptions.validate!(options, @expand_range_schema)
     {mult_low, mult_high} = each_end(options[:mult])
     {add_low, add_high} = each_end(options[:add])
