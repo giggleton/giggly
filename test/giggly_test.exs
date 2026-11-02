@@ -4692,6 +4692,18 @@ defmodule GigglyTest do
                {[22.170000000000002, 25.297500000000003, 27.873750000000001, 28.357500000000002],
                 [25.005000000000003, 27.727500000000003, 28.076250000000002, 33.217500000000001]}
     end
+
+    # Golden: ggplot2 4.0.3's `layer_data()` in R 4.6.1 for `ggplot(data, aes(g, y, size = w)) +
+    # geom_boxplot(linewidth = 0.5)`: size 1 and 6, the size scale's range, and linewidth 0.5.
+    # Without `linewidth = 0.5` R's deprecated shim copies size into linewidth, 1 and 6, which
+    # Giggly does not (design-log §4, the entry beginning "A box plot's `size`"); only that
+    # decision or the size scale's default range moves it.
+    test "a mapped size is the outliers' alone, leaving the box's line width its default" do
+      frame = box_layer(%{x: :g, y: :y, size: :w})
+
+      assert {DataFrame.pull(frame, :size), DataFrame.pull(frame, :linewidth)} ===
+               {[1.0, 6.0], [0.5, 0.5]}
+    end
   end
 
   describe "layer_data/2, for geom_segment" do

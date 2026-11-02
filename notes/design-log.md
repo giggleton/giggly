@@ -2230,6 +2230,18 @@ deleted from the entry it was in, never marked superseded; git history keeps eve
   The cost, accepted: a plot weighting a bar layer through its own mapping holds no boxes until
   the weight moves to that layer, where R would have weighed the boxes too.
 
+- **A box plot's `size` is its outliers' alone, never its lines' width (2026-11-01, Steve).**
+  ggplot2 4.0.3 reads it twice: as the outliers' size, which `?geom_boxplot` documents, and,
+  where `linewidth` is neither mapped nor set, as every line's width too, the shim 3.4.0 added
+  when `linewidth` split off ("Using `size` aesthetic for lines was deprecated"), so
+  `aes(size = 3)` draws 3 mm lines (6.40 pt, the median 12.80) where Giggly draws 0.5 mm, and a
+  size legend's keys widen with them. With `linewidth` given R draws what Giggly does, element by
+  element, legend included. Giggly takes no deprecated thing (the entry beginning "Giggly exposes
+  no function"), and its line geoms already refuse `size:` and leave a plot's mapped `size`
+  riding along unused, where R's shim widens their lines. *Rejected: copying R's shim* — a
+  deprecated way of setting the lines, which would then ask every line geom to take `size` too.
+  The cost, accepted: ggplot2 code written before 3.4 draws thinner lines than R does.
+
 - **A box layer dodges by clusters unless told otherwise, and `varwidth:` switches its dodging to
   `preserve: :single` silently (2026-10-22, Steve, scoping distributions' step 6).**
   `geom_boxplot/3` takes `position:` `:dodge2`, its default, `:dodge`, or `position_dodge2/1`'s

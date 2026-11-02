@@ -13,9 +13,10 @@ defmodule Giggly.Geom.Boxplot do
   # `Giggly.Plot.geom_boxplot/3`, whose defaults are R's. Use it through `Giggly.Geom`.
   #
   # Boxes use `:x`, `:y`, `:group`, `:alpha`, `:color`, `:fill`, `:linetype` and `:linewidth`, and
-  # `:shape` and `:size`, which only the outliers read, as ggplot2's do. What they are drawn from is
-  # what the summary writes, which no mapping gives, so a layer is checked against the summary's
-  # facts and the geom declares no required aesthetics.
+  # `:shape` and `:size`, which only the outliers read, never ggplot2's deprecated reading of
+  # `size` as the lines' width (design-log §4, the entry beginning "A box plot's `size`"). What
+  # they are drawn from is what the summary writes, which no mapping gives, so a layer is checked
+  # against the summary's facts and the geom declares no required aesthetics.
   #
   # While the plot is assembled (`setup_data/3`), each box is set up as ggplot2's
   # `GeomBoxplot$setup_data()` sets it, along the axis its stat wrote in `flipped_aes`, a horizontal
