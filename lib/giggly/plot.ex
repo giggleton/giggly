@@ -1763,7 +1763,7 @@ defmodule Giggly.Plot do
     layer = %Layer{
       geom: kind,
       stat: summary_stat(validated),
-      position: position(Keyword.get(validated, :position, :identity)),
+      position: position(Keyword.fetch!(validated, :position)),
       data: data,
       mapping: resolve(mapping, plot, data, "Plot.stat_summary/3"),
       fixed: fixed(validated),
@@ -6708,7 +6708,6 @@ defmodule Giggly.Plot do
     given =
       plot
       |> computed_mapping(layer)
-      |> Map.merge(layer.fixed)
       |> Map.keys()
 
     along = range_along(orientation, given)

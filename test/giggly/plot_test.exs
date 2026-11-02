@@ -2292,6 +2292,42 @@ defmodule Giggly.PlotTest do
   end
 
   describe "geom_linerange/3 and geom_pointrange/3" do
+    test "a range layer given only a plot is the one given an empty mapping and no options" do
+      plot = Plot.new(%{"a" => [1]}, %{x: "a", y: "a", ymin: "a", ymax: "a"})
+
+      for {function, three} <- [
+            {&Plot.geom_pointrange/1, &Plot.geom_pointrange/3},
+            {&Plot.geom_errorbar/1, &Plot.geom_errorbar/3}
+          ] do
+        assert function.(plot) == three.(plot, %{}, [])
+      end
+    end
+
+    # ggplot2 4.0.3's `has_flipped_aes(range_is_orthogonal = TRUE)` reads a range given either
+    # `ymin` or `ymax` as vertical, so `y`, `xmin`, `xmax` and `ymax` needs `x` and `ymin`; and a
+    # point range or a crossbar given `x`, `y`, `ymin` and `xmax` needs `ymax`.
+    test "a range given one vertical end runs up the panel, needing the rest of its positions" do
+      plot = Plot.new(%{"x" => [1, 2], "y" => [1, 2]})
+
+      error =
+        assert_raise ArgumentError, fn ->
+          Plot.geom_linerange(plot, %{y: "y", xmin: "x", xmax: "x", ymax: "y"})
+        end
+
+      assert error.message =~
+               "Plot.geom_linerange/3 runs along x, so it needs :x, :ymin and :ymax"
+
+      assert error.message =~ "gives :x and :ymin."
+
+      error =
+        assert_raise ArgumentError, fn ->
+          Plot.geom_pointrange(plot, %{x: "x", y: "y", ymin: "y", xmax: "x"})
+        end
+
+      assert String.starts_with?(error.message, "Plot.geom_pointrange/3 runs along x")
+      assert error.message =~ "gives :ymax."
+    end
+
     @ranges %{
       "trt" => [1, 2],
       "resp" => [1.0, 3.0],
@@ -2680,6 +2716,16 @@ defmodule Giggly.PlotTest do
   end
 
   describe "stat_summary/3" do
+    test "fun_min: or fun_max: alone leaves the whole summary to the functions given" do
+      plot = Plot.new(%{"a" => [1]}, %{x: "a", y: "a"})
+      lowest = fn values -> Enum.min(values) end
+
+      for option <- [:fun, :fun_min, :fun_max] do
+        [layer] = Plot.stat_summary(plot, [{option, lowest}]).reversed_layers
+        assert {option, layer.stat.fun_data} == {option, :none}
+      end
+    end
+
     @summarised %{"cyl" => [4, 4, 6], "mpg" => [22.0, 26.0, 18.0], "vs" => ["a", "b", "a"]}
 
     test "a summary records mean_se, point ranges with no orientation, and the identity position" do
@@ -4845,6 +4891,20 @@ defmodule Giggly.PlotTest do
   end
 
   describe "annotate/3" do
+    test "a point range or crossbar annotation given one vertical end needs the other" do
+      plot = Plot.new(%{"a" => [1]})
+
+      for geom <- [:pointrange, :crossbar] do
+        error =
+          assert_raise ArgumentError, fn ->
+            Plot.annotate(plot, geom, x: 1, y: 1, ymin: 0, xmax: 2)
+          end
+
+        assert String.starts_with?(error.message, "Plot.annotate/3 runs along x")
+        assert error.message =~ "gives :ymax."
+      end
+    end
+
     test "a bar annotation's width is checked as each bar's, and its just: as geom_col/3's" do
       plot = Plot.new(@rows, %{x: :wt, y: :mpg})
 
@@ -5325,6 +5385,24 @@ defmodule Giggly.PlotTest do
   end
 
   describe "a layer's position: what each layer function takes" do
+    test "a column a layer's mapping names that its table lacks is refused naming the function" do
+      plot = Plot.new(%{"a" => [1]})
+
+      for {function, name} <- [
+            {&Plot.geom_linerange/2, "Plot.geom_linerange/3"},
+            {&Plot.geom_pointrange/2, "Plot.geom_pointrange/3"},
+            {&Plot.geom_errorbar/2, "Plot.geom_errorbar/3"},
+            {&Plot.geom_crossbar/2, "Plot.geom_crossbar/3"},
+            {&Plot.stat_summary/2, "Plot.stat_summary/3"},
+            {&Plot.geom_label/2, "Plot.geom_label/3"},
+            {&Plot.geom_tile/2, "Plot.geom_tile/3"},
+            {&Plot.geom_raster/2, "Plot.geom_raster/3"}
+          ] do
+        error = assert_raise ArgumentError, fn -> function.(plot, %{x: "missing"}) end
+        assert String.starts_with?(error.message, "#{name} maps :x to \"missing\"")
+      end
+    end
+
     @placed %{
       "x" => [1.0, 2.0],
       "y" => [3.0, 4.0],
