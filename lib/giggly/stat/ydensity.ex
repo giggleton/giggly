@@ -251,8 +251,9 @@ defmodule Giggly.Stat.Ydensity do
     # the groups whose own rows gave no width: those of one x where the stat is given none, and a
     # short group kept. Where it varies within any such group given rows, every row loses its
     # width, a group's of several x too, as ggplot2 drops a column that varies from the whole
-    # table. Beside them, whether a group given rows carries the mapped width, so the table holds
-    # a `width` though every one carried is missing, as ggplot2 binds the column it carries.
+    # table. Beside them, whether the mapped width is carried, so the table holds a `width` though
+    # every one carried is missing, as ggplot2 binds the column it carries; where no group reads
+    # it, every group has a width of its own.
     defp with_given_widths(groups, false, _figures, _kept_rows, _stat), do: {groups, false}
 
     defp with_given_widths(groups, true, figures, kept_rows, stat) do
@@ -286,7 +287,7 @@ defmodule Giggly.Stat.Ydensity do
           {key, given_width(group_rows, constant, Map.fetch!(reading, key), given_widths[key])}
         end)
 
-      {given_groups, constant and DataFrame.row_count(read_rows) > 0}
+      {given_groups, constant}
     end
 
     # A group's rows given the mapped width where it reads it, every row's width dropped where the
