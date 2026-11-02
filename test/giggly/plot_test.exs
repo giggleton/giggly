@@ -3649,7 +3649,11 @@ defmodule Giggly.PlotTest do
 
       assert plot.reversed_layers == [
                %Plot.Layer{
-                 geom: %Geom.Violin{line_end: :butt, line_join: :mitre},
+                 geom: %Geom.Violin{
+                   line_end: :butt,
+                   line_join: :mitre,
+                   quantile: %{linetype: :none}
+                 },
                  stat: %Stat.Ydensity{
                    bandwidth: :nrd0,
                    adjust: 1.0,
@@ -3806,6 +3810,28 @@ defmodule Giggly.PlotTest do
       end
     end
 
+    test "a violin's quantile lines take the look given, `quantile_colour:` spelled either way" do
+      plot = Plot.new(@violin_values, %{x: :g, y: :y})
+
+      [layer] =
+        plot
+        |> Plot.stat_ydensity(
+          quantile_colour: "red",
+          quantile_linetype: :dashed,
+          quantile_linewidth: 1
+        )
+        |> Map.fetch!(:reversed_layers)
+
+      assert layer.geom.quantile == %{color: "#FF0000", linetype: {4, 4}, linewidth: 1.0}
+
+      [solid] =
+        plot
+        |> Plot.geom_violin(quantile_color: "blue", quantile_linetype: 1)
+        |> Map.fetch!(:reversed_layers)
+
+      assert solid.geom.quantile == %{color: "#0000FF", linetype: {}}
+    end
+
     test "a violin's key takes each of grid's ends and corners" do
       plot = Plot.new(@violin_values, %{x: :g, y: :y})
 
@@ -3815,7 +3841,7 @@ defmodule Giggly.PlotTest do
           |> Plot.geom_violin(lineend: line_end, linejoin: line_join)
           |> Map.fetch!(:reversed_layers)
 
-        assert layer.geom == %Geom.Violin{line_end: line_end, line_join: line_join}
+        assert {layer.geom.line_end, layer.geom.line_join} == {line_end, line_join}
       end
     end
 

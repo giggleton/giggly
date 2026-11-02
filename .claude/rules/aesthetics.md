@@ -16,8 +16,8 @@ atoms with ggplot2's names".
   enter, and nothing after that point matches on an alias. A new alias is an entry in the alias
   table — never a substring rule, which in Elixir would mean creating atoms from caller input —
   as each box plot part's `_colour` option is (`outlier_colour:` and the rest), a crossbar's
-  (`middle_colour:`, its `box_colour:` the box plot's), and a label's (`border_colour:`,
-  `text_colour:`).
+  (`middle_colour:`, its `box_colour:` the box plot's), a label's (`border_colour:`,
+  `text_colour:`), and a violin's quantile lines' (`quantile_colour:`).
 - **Two keys naming one aesthetic raise.** Either value winning silently is a plot the caller did
   not write.
 - **A message names an aesthetic in words through `in_words/1`** (`"line type"`, `"line

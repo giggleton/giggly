@@ -435,5 +435,13 @@ beginning "Each layer's defaults are filled in from the theme".
   while its key takes them, as `draw_key_polygon()` reads the layer's, mitred and butt unless
   given (design-log §4, the entry beginning "A violin's border is always"). Its defaults are
   ggplot2's under the theme: a weight of 1, ink mixed 20% toward paper (`#333333`), a fill of
-  paper, the borders' width and line type; its key is `Rect.polygon_key/3`'s. Every drawing is
+  paper, the borders' width and line type; its key is `Rect.polygon_key/3`'s, no quantile line in
+  it. **Its quantile lines follow it, unless their line type is blank, the default**, as
+  `draw_group()` draws them: its outline's rows marking a quantile, in the outline's order, both
+  sides and its first point again where a quantile begins it, each quantile a line, the lines in
+  the order their quantiles first appear, drawn through `Geom.Path` with butt ends and round
+  corners, as `GeomPath$draw_panel()` draws them handed no line style, each in its row's colour,
+  alpha and width, which the struct's `quantile` look replaces where the layer gives one, and in
+  its line type; so the violin's alpha fades its lines and never its border (design-log §4, the
+  entry beginning "A violin's quantile lines are R's"). Every drawing is
   checked against vdiffr's (`test/golden/violin*.svg`), radial coordinates included.

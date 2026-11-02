@@ -2336,6 +2336,13 @@ defmodule Giggly.Plot do
   bordered in the theme's ink mixed 20% toward its paper and filled with its paper unless a look
   is mapped or set.
 
+  Given a `quantile_linetype:`, each violin is drawn with a line across it at each of the
+  quantiles of its group's `y` its densities mark (`quantiles:`, its quartiles unless given), side
+  to side at the violin's width there, from its lowest to its highest; each line in its quantile's
+  row's colour, at its alpha, and width unless `quantile_color:` and `quantile_linewidth:` give
+  them. Every border and line is drawn with butt ends and round corners; `lineend:` and
+  `linejoin:` draw the legend's keys.
+
   Each group's densities compute each place's `density`; `scaled`, the density over the group's
   greatest; `count`, the density times its rows; `violinwidth`, how wide the violin is there;
   `n`, its rows; `width`, its room's width where the stat gives one; and `quantile`, which the
@@ -5980,7 +5987,8 @@ defmodule Giggly.Plot do
     layer = %Layer{
       geom: %Geom.Violin{
         line_end: Keyword.fetch!(validated, :lineend),
-        line_join: Keyword.fetch!(validated, :linejoin)
+        line_join: Keyword.fetch!(validated, :linejoin),
+        quantile: quantile_look(validated)
       },
       stat: %Stat.Ydensity{
         bandwidth: Keyword.fetch!(validated, :bw),
@@ -6012,6 +6020,15 @@ defmodule Giggly.Plot do
     )
     |> check_numbers(layer, function, :weight, "a violin spreads each row's weight")
     |> check_numbers(layer, function, :width, "a violin is drawn as wide as its width")
+  end
+
+  # A violin's quantile lines' look from `geom_violin/3`'s validated options, holding only those
+  # given, the line type always.
+  defp quantile_look(validated) do
+    for {option, look} <- Options.violin_quantile_looks(),
+        Keyword.has_key?(validated, option),
+        into: %{},
+        do: {look, Keyword.fetch!(validated, option)}
   end
 
   # The layer `geom_count/3` and `stat_sum/3` add, points counting the rows at each place, its

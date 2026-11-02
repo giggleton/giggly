@@ -9,7 +9,8 @@ defmodule Giggly.Aesthetics do
   # Aesthetics are atoms named as in ggplot2, with American spelling canonical. `:color` is the name
   # every stage after the public API sees; `:colour` is accepted there and rewritten by
   # `canonicalize/1`, and so are the colours a box plot sets for its parts, `:outlier_colour` and
-  # the rest, ggplot2's `outlier.colour`, and a label's, `:border_colour` and `:text_colour`.
+  # the rest, ggplot2's `outlier.colour`, a label's, `:border_colour` and `:text_colour`, and a
+  # violin's quantile lines', `:quantile_colour`.
   # The vocabulary is open: a name with no alias is returned as given, and which aesthetics a layer
   # accepts is declared by its geom, stat and position. So this module decides spelling, not
   # membership.
@@ -59,7 +60,8 @@ defmodule Giggly.Aesthetics do
     box_colour: :box_color,
     middle_colour: :middle_color,
     border_colour: :border_color,
-    text_colour: :text_color
+    text_colour: :text_color,
+    quantile_colour: :quantile_color
   }
 
   @typedoc "An aesthetic name, such as `:x`, `:color` or `:linewidth`."

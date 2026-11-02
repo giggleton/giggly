@@ -121,7 +121,10 @@ stat and position" and "Each facet, coordinate system, geom, stat and position i
   `validate_quantiles/1`), `drop:`, `width:` and `orientation:` the stat's, `width:` also set, so
   the assembly fills it where the stat wrote none and puts it into the table last, as R's
   `aes_params` do; `lineend:` (`:butt`) and `linejoin:` (`:mitre`) the geom's, which only its
-  keys read, and no `linemitre:`, which ggplot2 reads nowhere for a violin.
+  keys read, and no `linemitre:`, which ggplot2 reads nowhere for a violin; and the quantile lines'
+  look a map in the geom, `quantile_linetype:` (`:blank`, so `:none`, drawing none) always in it,
+  `quantile_color:` (`quantile_colour:`) and `quantile_linewidth:` only where given, R's
+  `quantile.` options underscored, `stat_ydensity/3` taking them too, where R's ignores them.
   **`stat_summary/3` records `%Stat.Summary{}` with the geom `geom:` names and the position that
   geom's function takes, `:identity` unless given** (design-log §4, the entry beginning
   "`stat_summary/3` draws with eight geoms"): `fun_data:`, `fun:`, `fun_min:`, `fun_max:` and

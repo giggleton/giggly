@@ -9244,6 +9244,59 @@ defmodule GigglyTest do
       assert svg == File.read!("test/golden/violin_radial.svg")
     end
 
+    # Golden: test/golden/violin_quantiles.svg, checked against ggplot2's drawing of the same plot,
+    # made by test/golden/violin_quantiles.R: every element matches it, the x axis drawn before the y
+    # as in test/golden/point.svg, and every clip path. The reference page's `draw_quantiles`
+    # example, drawn with its replacement: each violin's quartiles a line from side to side in its
+    # border's colour and width. It moves with what moves test/golden/violin.svg, and with paths.
+    test "violins with a quantile line type draw a line across at each quartile" do
+      svg =
+        Giggly.Datasets.mtcars()
+        |> Plot.new(%{x: {:factor, [:cyl]}, y: :mpg})
+        |> Plot.geom_violin(quantile_linetype: 1)
+        |> to_svg()
+
+      assert svg == File.read!("test/golden/violin_quantiles.svg")
+    end
+
+    # Golden: test/golden/violin_quantiles_styled.svg, checked against ggplot2's drawing of the same
+    # plot, made by test/golden/violin_quantiles_styled.R: every element matches it, the x axis
+    # drawn before the y as in test/golden/point.svg, and every clip path. Quantile lines of their
+    # own colour, dashes and width, at the violins' alpha, which leaves the borders alone, the
+    # lowest's line running left, right and left again as it begins the outline. It moves with
+    # what moves test/golden/violin_quantiles.svg.
+    test "quantile lines take their own look and the violins' alpha" do
+      svg =
+        Giggly.Datasets.mtcars()
+        |> Plot.new(%{x: {:factor, [:cyl]}, y: :mpg})
+        |> Plot.geom_violin(
+          alpha: 0.5,
+          quantiles: [0, 0.5, 1],
+          quantile_colour: "red",
+          quantile_linetype: :dashed,
+          quantile_linewidth: 1
+        )
+        |> to_svg()
+
+      assert svg == File.read!("test/golden/violin_quantiles_styled.svg")
+    end
+
+    # Golden: test/golden/violin_quantiles_radial.svg, checked against ggplot2's drawing of the same
+    # plot, made by test/golden/violin_quantiles_radial.R: every element matches it, in R's order,
+    # and every clip path but svglite's round the whole drawing. Quantile lines munched to follow the
+    # panel's curves. It moves with what moves test/golden/violin_radial.svg and
+    # test/golden/violin_quantiles.svg.
+    test "quantile lines in radial coordinates follow the panel's curves" do
+      svg =
+        Giggly.Datasets.mtcars()
+        |> Plot.new(%{x: {:factor, [:cyl]}, y: :mpg})
+        |> Plot.geom_violin(quantile_linetype: 1)
+        |> Plot.coord_radial()
+        |> to_svg()
+
+      assert svg == File.read!("test/golden/violin_quantiles_radial.svg")
+    end
+
     # Golden: ggplot2 4.0.3's `layer_data()` of `geom_violin(width = 0.5, position = "identity")`
     # over groups at x 1, 2 and 3 and at 5, and of the same beside a short group kept: the set width
     # fills the table last, but a violin of several x is set up at 0.9 of their range, and a short

@@ -101,6 +101,17 @@ deleted from the entry it was in, never marked superseded; git history keeps eve
   *Rejected: honouring them on the violins*, what the options promise: a drawing no ggplot2 user
   gets. *Rejected: taking `linemitre:` and ignoring it*: an option that silently does nothing.
 
+- **A violin's quantile lines are R's, and `stat_ydensity/3` draws them too (2026-11-02, violins
+  step 3, Steve's brief: "quantile lines on geom_violin/3 and stat_ydensity/3"; checked against
+  ggplot2 4.0.3).** `quantile_color:`, `quantile_linetype:` (`:blank`) and `quantile_linewidth:`
+  are a look map in the geom, as a box plot's parts are, and the lines are drawn as
+  `GeomViolin$draw_group()` draws them, through `GeomPath`: each in its quantile row's colour,
+  alpha and width unless given, so the violin's alpha fades its lines though never its border. R's
+  `stat_ydensity()` warns and ignores the `quantile.` options, which only `geom_violin()` turns into
+  `quantile_gp`; Giggly's two functions add one layer from one schema, so both take them.
+  *Rejected: refusing them on `stat_ydensity/3`*, as Giggly refuses what R ignores: the two
+  functions would differ only there, where R's split is how `geom_violin()` builds a parameter.
+
 - **A transformation of your own labels its breaks turned back rounded to 14 significant digits
   unless it says (2026-11-02, Steve: "A", increment 4's step 8; checked against ggplot2 4.0.3).**
   `Transform.new/2` without `labels:` records `&Labels.plain_round_tripped/1`, as logit's and

@@ -908,7 +908,7 @@ defmodule Giggly.GeomTest do
   # Golden: ggplot2 4.0.3's keys through vdiffr 1.0.9 (R 4.6.1), a 17.28-point key: a point at its
   # middle, and a bar's fill 15.86 points square, its border's 0.5 mm short of the key.
   describe "setup_data/3, draw_panel/5 and draw_key/3 for violins" do
-    @violin %Geom.Violin{line_end: :butt, line_join: :mitre}
+    @violin %Geom.Violin{line_end: :butt, line_join: :mitre, quantile: %{linetype: :none}}
 
     # A violin's rows as its densities and setup leave them, at x 1 in a room from 0.5 to 1.5, in
     # one panel, group 1 unless given, with `columns` in place of its own or beside them.
@@ -1077,6 +1077,107 @@ defmodule Giggly.GeomTest do
       unwidened = violin_rows(y: [1.0, 2.0], violinwidth: [1.0, 1.0], linewidth: [nil, nil])
       [%Polygons{stroke_width: width}] = draw_panel(@violin, unwidened, @cartesian, @params)
       assert width === 0.0
+    end
+
+    # Points of the lines a primitive draws, to 12 places.
+    defp rounded_lines(%Polylines{lines: lines}) do
+      Enum.map(lines, fn line ->
+        Enum.map(line, fn {x, y} -> {Float.round(x, 12), Float.round(y, 12)} end)
+      end)
+    end
+
+    # vdiffr: `geom_violin(quantile.linetype = 1)` draws each violin's polygon and then its
+    # quartiles' lines, lowest first, whatever order `quantiles` gives them in.
+    test "quantile lines follow their violin, side to side, in the order their quantiles appear" do
+      frame =
+        violin_rows(
+          y: [2.0, 3.0, 1.0, 2.0, 1.0, 3.0, 1.5],
+          violinwidth: [0.5, 1.0, 1.0, 0.5, 1.0, 1.0, 0.8],
+          quantile: [0.5, nil, nil, 0.75, nil, nil, 0.25],
+          group: [2, 2, 2, 1, 1, 1, 1]
+        )
+
+      geom = %{@violin | quantile: %{linetype: {}}}
+
+      assert [%Polygons{}, first_lines, %Polygons{}, second_lines] =
+               draw_panel(geom, frame, @cartesian, @params)
+
+      assert rounded_lines(first_lines) == [
+               [{0.3, 0.375}, {0.7, 0.375}],
+               [{0.375, 0.5}, {0.625, 0.5}]
+             ]
+
+      assert rounded_lines(second_lines) == [[{0.375, 0.5}, {0.625, 0.5}]]
+    end
+
+    test "quantile lines of a blank line type, or with no quantile marked, are not drawn" do
+      marked = violin_rows(y: [1.0, 2.0], violinwidth: [1.0, 1.0], quantile: [nil, 0.5])
+      unmarked = violin_rows(y: [1.0, 2.0], violinwidth: [1.0, 1.0])
+      solid = %{@violin | quantile: %{linetype: {}}}
+
+      assert [%Polygons{}] = draw_panel(@violin, marked, @cartesian, @params)
+      assert [%Polygons{}] = draw_panel(solid, unmarked, @cartesian, @params)
+    end
+
+    # vdiffr: `geom_violin(quantiles = c(0, 1), quantile.linetype = 1)` draws quantile 0's line
+    # left, right and left again.
+    test "the line of a quantile beginning the outline goes back to its left side" do
+      frame = violin_rows(y: [1.0, 2.0], violinwidth: [1.0, 1.0], quantile: [0.0, nil])
+      geom = %{@violin | quantile: %{linetype: {}}}
+
+      assert [%Polygons{}, lines] = draw_panel(geom, frame, @cartesian, @params)
+      assert rounded_lines(lines) == [[{0.25, 0.25}, {0.75, 0.25}, {0.25, 0.25}]]
+    end
+
+    # vdiffr: `geom_violin(quantile.linetype = 1)` of horizontal violins draws each line up across.
+    test "a horizontal violin's quantile lines run up across it" do
+      frame =
+        DataFrame.new(
+          y: [1.0, 1.0, 1.0],
+          ymin: [0.5, 0.5, 0.5],
+          ymax: [1.5, 1.5, 1.5],
+          x: [1.0, 2.0, 1.5],
+          violinwidth: [1.0, 1.0, 0.5],
+          quantile: [nil, nil, 0.5],
+          panel: [1, 1, 1],
+          group: [1, 1, 1],
+          flipped_aes: [true, true, true]
+        )
+
+      geom = %{@violin | quantile: %{linetype: {}}}
+
+      assert [%Polygons{}, lines] = draw_panel(geom, frame, @cartesian, @params)
+      assert rounded_lines(lines) == [[{0.75, 0.1875}, {0.75, 0.3125}]]
+    end
+
+    # vdiffr: `geom_violin(aes(colour = after_stat(density)), alpha = 0.5, quantile.linetype = 1)`
+    # draws each line in its own row's colour at the violins' alpha; `quantile.colour` and
+    # `quantile.linewidth` replace the colour and the width.
+    test "each quantile line is in its row's colour, alpha and width unless the lines give theirs" do
+      frame =
+        violin_rows(
+          y: [1.0, 2.0, 3.0],
+          violinwidth: [1.0, 1.0, 1.0],
+          quantile: [nil, 0.25, 0.75],
+          color: ["#333333", "#FF0000", "#0000FF"],
+          alpha: [0.5, 0.5, 0.5],
+          linewidth: [1.0, 1.0, 1.0]
+        )
+
+      own = %{@violin | quantile: %{linetype: {}}}
+
+      assert [%Polygons{}, %Polylines{color: ["#FF0000", "#0000FF"], opacity: [0.5, 0.5]} = drawn] =
+               draw_panel(own, frame, @cartesian, @params)
+
+      assert drawn.stroke_width == Geom.Mark.stroke_width(1.0)
+
+      given = %{@violin | quantile: %{linetype: {4, 4}, color: "#00FF00", linewidth: 2.0}}
+
+      assert [%Polygons{}, %Polylines{color: ["#00FF00", "#00FF00"]} = styled] =
+               draw_panel(given, frame, @cartesian, @params)
+
+      assert {styled.stroke_width, styled.dashes} ==
+               {Geom.Mark.stroke_width(2.0), Geom.Mark.dashes({4, 4}, 2.0)}
     end
 
     # vdiffr: `geom_violin(lineend = "square", linejoin = "mitre", linemitre = 3)` draws the same

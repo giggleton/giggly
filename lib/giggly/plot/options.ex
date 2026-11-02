@@ -1633,8 +1633,8 @@ defmodule Giggly.Plot.Options do
     alpha: [
       type: {:custom, __MODULE__, :validate_alpha, []},
       doc:
-        "How opaque every violin's fill is, from 0, invisible, to 1, opaque; its border keeps " <>
-          "its colour's own alpha."
+        "How opaque every violin's fill and quantile lines are, from 0, invisible, to 1, " <>
+          "opaque; its border keeps its colour's own alpha."
     ],
     color: [
       type: @color_type,
@@ -1663,6 +1663,40 @@ defmodule Giggly.Plot.Options do
         "The line type of every violin's border: " <>
           @linetype_forms <> "; `:solid` when not given."
     ]
+  ]
+
+  # How a violin's lines across it at its quantiles look, set by its options: hidden unless a line
+  # type is given, each other look its violin's where not given.
+  @violin_quantile_options [
+    quantile_color: [
+      type: @color_type,
+      doc:
+        "The colour of the lines across each violin at the quantiles its densities mark, " <>
+          "written `quantile_colour:` or `quantile_color:`: " <>
+          @color_forms <> "; its violin's border colour when not given."
+    ],
+    quantile_linetype: [
+      type: @linetype_type,
+      default: :blank,
+      doc:
+        "The line type of the lines across each violin at the quantiles its densities mark " <>
+          "(`quantiles:`): " <>
+          @linetype_forms <> "; `:blank`, drawing none, when not given."
+    ],
+    quantile_linewidth: [
+      type: {:custom, __MODULE__, :validate_linewidth, []},
+      doc:
+        "How wide the quantile lines are, in millimetres; their violin's border width when not " <>
+          "given."
+    ]
+  ]
+
+  # Each option giving a violin's quantile lines a look, by the look it gives, which the violin
+  # geom holds.
+  @violin_quantile_looks [
+    quantile_color: :color,
+    quantile_linetype: :linetype,
+    quantile_linewidth: :linewidth
   ]
 
   # How a violin layer's legend keys are drawn: the violins themselves are always drawn with butt
@@ -1750,6 +1784,7 @@ defmodule Giggly.Plot.Options do
                         ]
                       ] ++
                       @violin_look_options ++
+                      @violin_quantile_options ++
                       @violin_line_style_options ++ @nudge_options
                   )
 
@@ -4658,6 +4693,11 @@ defmodule Giggly.Plot.Options do
   @doc false
   @spec boxplot_part_looks() :: keyword({atom(), atom()})
   def boxplot_part_looks, do: @boxplot_part_looks
+
+  # Each option giving a violin's quantile lines a look, by the look it gives.
+  @doc false
+  @spec violin_quantile_looks() :: keyword(atom())
+  def violin_quantile_looks, do: @violin_quantile_looks
 
   # Each option giving a part of a crossbar its look, by the part and the look it gives.
   @doc false
