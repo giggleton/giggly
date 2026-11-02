@@ -342,20 +342,14 @@ stat and position" and "Each facet, coordinate system, geom, stat and position i
   takes and the position's own schema (`Options.position_kind/1`), refusing an option named
   twice, and records the position as given; `Plot` builds the kind's struct from
   it, a name alone being the position with no options given, each option not given its
-  default. The options are dodging's `width:`, any number, kept as a float, `:none` when not
-  given, `preserve:` (`:total`, `:single`), `orientation:` (`:x`, `:y`) and `reverse:`, dodging by
-  clusters' `width:`, as dodging's, `preserve:`, `padding:` 0 to 1 and `reverse:`, and jittering's
-  `width:` and `height:`,
-  each 0 or more, a float, `:none` when not given, where R moves nothing for a negative one, and
-  `seed:`, any integer, 0 when not given, and stacking's and filling's `vjust:`, any number, a
-  float, 1 when not given, never a list, which R hands out down each pile by rank (design-log §4,
-  the entry beginning "Filling is stacking"), and `reverse:`, `false` when not given, `:fill`
-  recorded as stacking with `fill: true`, and jittering beside dodging's `jitter_width:`, as
-  jittering's `width:`, `jitter_height:`, 0 or more, 0.0 when not given, `dodge_width:`, any
-  number, 0.75 when not given, and `seed:`, as jittering's, its `reverse:` refused before its
-  schema, saying R's changes nothing (design-log §4, the entry beginning "Jittering beside
-  dodging takes R's options"); nudging and the identity take none. Its
-  options never become the geom's (design-log §4, the entry beginning "Dodging by clusters takes
+  default. Each kind's options, their ranges and defaults, are its schema's
+  (`Options.position_kind/1`), from which `Plot`'s "Positions" section is generated, and they
+  depart from R's in three places: a jitter's negative amount is refused, where R moves nothing;
+  stacking's `vjust:` is one number, never R's list handed out down each pile by rank
+  (design-log §4, the entry beginning "Filling is stacking"); and jittering beside dodging's
+  `reverse:` is refused before its schema, saying R's changes nothing (the entry beginning
+  "Jittering beside dodging takes R's options"). `:fill` is recorded as stacking with `fill:
+  true`; nudging and the identity take none. Its options never become the geom's (design-log §4, the entry beginning "Dodging by clusters takes
   `preserve:`"). **Every layer function takes every position that moves its marks in ggplot2,
   found by sweeping each function against each position in R, and refuses the rest, saying why**
   (design-log §4, the entry beginning "Every layer takes the positions"), by the family of

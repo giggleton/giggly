@@ -28,13 +28,9 @@ the entry beginning "Each facet, coordinate system, geom, stat and position is a
   and each axis's kind (`axis_kinds`, as a geom's `setup_data/3` is), which jittering first read,
   as R's `compute_jitter()` reads a mapped discrete position, and the positions that read an
   orientation read too: stacking splits the table by the `panel` column itself and reads no
-  scale. A position's own parameters arrive with the option that sets them, as dodging by
-  clusters' `preserve`, `padding` and `reverse` arrived with `{:dodge2, options}` and its `width`
-  with the points it first moved, dodging's `width` with `{:dodge, width: width}`, the first reader
-  a line range, which has no edges, and its `preserve`, `orientation` and `reverse` after, and
-  stacking's `vjust`, `reverse` and `fill` with `{:stack, options}` and `:fill`, and jittering
-  beside dodging's four with `{:jitterdodge, options}`, its `reverse` refused; dodging's `order`
-  aesthetic waits, and the panel's scales with the first position that reads one.
+  scale. A position's own parameters arrive with the option that sets them; dodging's `order`
+  aesthetic waits for its first reader, and the panel's scales for the first position that reads
+  one.
 - **Stacking is ggplot2's `position_stack()`, and filling its `position_fill()`, one kind with
   `fill: true`** (design-log §4, the entry beginning "Filling is stacking"): nothing moves unless
   two rows of the layer share an x, in any panel, or it fills or its `vjust` is not 1; then a layer

@@ -51,7 +51,8 @@ ggplot(nc) +
 ```
 
 The error bars take their positions from the coordinates the stat computes, through
-`after_stat()`.
+`after_stat()`. ggplot2 has deprecated `geom_errorbarh()` for `geom_errorbar()` with
+`orientation = "y"`, its `height` the bars' `width`, which `Giggly.Plot.geom_errorbar/3` takes.
 
 Not in Giggly yet: `sf` objects, `stat_sf_coordinates()` given to a geom as `stat =
-"sf_coordinates"`, horizontal error bars, `geom_errorbarh()`, and mapping `geometry`.
+"sf_coordinates"`, and mapping `geometry`.

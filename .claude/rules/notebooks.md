@@ -19,7 +19,13 @@ the entry beginning "Every page of ggplot2's function reference has a notebook".
   keeps its ggplot2 code and names what it waits for, so the notebook is also the page's list of
   what remains. Drawn means the same plot built with Giggly's own counterparts of the example's
   functions, checked against R; a plot Giggly could only imitate (`qplot()`, a computed column
-  standing in for `cut_width(carat, 0.25)`) waits. An example that sets ggplot2's active theme
+  standing in for `cut_width(carat, 0.25)`) waits. An example calling a function ggplot2 has
+  superseded, or deprecated naming a direct replacement, is drawn with the replacement ggplot2
+  names where R draws the two alike (`coord_flip()` by swapping the mapping or `orientation: :y`,
+  `label_dollar()` as `currency/2`, `xlab()` as `labs/2`'s `x:`), its verdict naming the
+  replacement's pieces Giggly lacks; one whose replacement R draws differently
+  (`annotation_logticks()`) is not drawn and names no verdict, the prose saying why (design-log §4,
+  the entry beginning "An example calling a function ggplot2 has superseded"). An example that sets ggplot2's active theme
   (`set_theme()`, `update_theme()`) is drawn with the plot's own theme, which Giggly offers in its
   place (design-log §4, the entry beginning "An example that sets ggplot2's active theme"); one
   handing a scale a palette function (`scales::pal_brewer(palette = "Dark2")`) is drawn with the

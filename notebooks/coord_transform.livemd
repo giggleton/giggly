@@ -29,7 +29,8 @@ waiting for, so the page is also a list of what remains.
 `coord_transform()` transforms the coordinate system, such as putting an axis on a log scale. Unlike
 transforming a scale, it happens after the statistics are computed, and it changes the shapes geoms
 are drawn in, so a straight line need not stay straight. It transforms continuous positions only.
-`coord_trans()` is its old name, now deprecated. Giggly has neither yet, but transforms a scale, as
+`coord_trans()` is its old name, now deprecated. Giggly has no `coord_transform()` yet, and no
+`coord_trans()`, since ggplot2 has deprecated it, but transforms a scale, as
 `Giggly.Plot.scale_x_log10/2` does, and the data, with an expression in the mapping. A plot is
 described with `Giggly.Plot` and drawn with `Giggly.to_svg/2`, which returns an SVG document. The
 setup cell aliases `Giggly.Plot`, so the cells write `Plot.new/2`, and defines `render`, which draws

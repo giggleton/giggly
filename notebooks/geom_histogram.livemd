@@ -224,7 +224,10 @@ m +
 Mapping `weight` makes each bar the sum of its rows' votes rather than their number, as it does
 for `Giggly.Plot.geom_histogram/3` and `Giggly.Plot.geom_bar/3`.
 
-Not in Giggly yet: `ylab()` and the `movies` dataset.
+`ylab("votes")` is `Giggly.Plot.labs/2`'s `y: "votes"`, since ggplot2 has superseded `ylab()`
+with `labs()`.
+
+Not in Giggly yet: the `movies` dataset.
 
 ## Bins on a transformed scale
 

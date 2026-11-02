@@ -79,6 +79,21 @@ stops the question being reopened from scratch. A new entry is about 150 words: 
 sentence or two of why, and one line per rejected alternative. What a later decision replaces is
 deleted from the entry it was in, never marked superseded; git history keeps every version.
 
+- **An example calling a function ggplot2 has superseded is drawn with the replacement ggplot2
+  names, where R draws the two alike (2026-11-01, Steve: "A", "I", "a", "1", positions step 7).**
+  Giggly exposes no such function (the entry beginning "Giggly exposes no function"), so a verdict
+  naming one waits for ever. `coord_flip()` is drawn by swapping the mapping or `orientation: :y`,
+  R drawing each flipped example's SVG line for line as its swapped twin; `label_dollar()` as
+  `currency/2`; `xlab()` as `labs/2`'s `x:`. A deprecated function counts where its deprecation
+  names a direct replacement (`coord_trans()`, `geom_errorbarh()`, `borders()`); `qplot()`, whose
+  page names none, still waits as an imitation. Where R draws the replacement differently
+  (`annotation_logticks()`'s ticks inside the panel, `guide_axis_logticks()`'s on the axis), the
+  example is not drawn and names no verdict, the prose saying why; one R cannot compare yet
+  (`coord_map()` against `coord_sf()`, no `sf` installed) names the replacement until it lands.
+  *Rejected: drawing none, as base R's `plot()`*, though step 3 drew one. *Rejected: the verdicts
+  as written*, a "yet" never met. *Rejected: superseded functions alone.* *Rejected: naming a
+  replacement that draws differently*, which "drawn" cannot mean.
+
 - **Jittering beside dodging takes R's options but `reverse`, which it refuses (2026-11-01,
   Steve: "1", scoping the positions' step 6).** `{:jitterdodge, options}` takes `jitter_width:`,
   `jitter_height:` (0), `dodge_width:` (0.75) and `seed:` (0, as jittering's), and is taken
@@ -151,7 +166,10 @@ deleted from the entry it was in, never marked superseded; git history keeps eve
   and still moves (a range stacked off zero, each replaced by its stretch of the pile; dodging
   overlapping x intervals), Giggly moves as R does. *Rejected: each function's list widened to
   the positions judged sensible* — a guess; R's sweep is not. *Rejected: accepting what R ignores
-  and moving nothing* — a call that silently draws the plot without the position asked for.
+  and moving nothing* — a call that silently draws the plot without the position asked for. The
+  sweep's scripts stay outside the repo (Steve, 2026-11-01): this entry and the refusals' tests
+  hold what it found. *Rejected: committing them*, generator scripts having no home beside the
+  goldens' R.
 
 - **A position is an option value, `position: :name | {:name, options}`, and no function builds
   one (2026-11-01, Steve: "Sounds good").** R's `position = "fill"` is `:fill`, and
@@ -2232,9 +2250,8 @@ deleted from the entry it was in, never marked superseded; git history keeps eve
 - **A guide is chosen by a scale's `guide:` and by `guides/2`, which wins, as in R (2026-10-19,
   Steve, agreeing the proposal; checked against ggplot2 4.0.3 in R).** Every colour, fill and
   alpha scale function takes `guide:`, a name (`:none`, `:legend`, `:colorbar`) or the struct
-  `guide_legend/1` builds (`reverse:`), as a position's parameters will come by constructor (the
-  entry beginning "A layer chooses its position"). `guides/2` takes `color:`, `fill:` and
-  `alpha:` the same way; it beats the scale's whatever the pipe order, and a later call replaces
+  `guide_legend/1` builds (`reverse:`). `guides/2` takes `color:`, `fill:` and `alpha:` the same
+  way; it beats the scale's whatever the pipe order, and a later call replaces
   only what it names, R's `guides() > scale > default`. A colour bar for alpha or a discrete
   scale is refused, at the call where the call can tell and otherwise when run, where R warns and
   draws none. `reverse` flips every key, the missing-value key included, before legends merge,
@@ -3949,20 +3966,26 @@ tells the story (`git show <hash>`). Until 2026-10-15 each milestone also had a 
 `git log -S "<title>" -- notes/design-log.md` finds it in this file's history. The phases are
 §1's roadmap.
 
+- 2026-11-01 — Draw coord_flip()'s examples with the swap ggplot2 prefers, and every example of a
+  superseded function with its replacement (positions, step 7); §4: "An example calling a function
+  ggplot2 has superseded"
+- 2026-11-01 — Give the layers jittering beside dodging, {:jitterdodge, options}, as R's
+  position_jitterdodge() but its reverse, and refuse a jittered range missing its cross position
+  (positions, step 6) (`aff93fa`); §4: "Jittering beside dodging takes R's options"
 - 2026-11-01 — Give dodging R's preserve:, orientation: and reverse:, and dodging by clusters its
-  width:, each position reading the orientation as R does (positions, step 5); §4: "Dodging takes
-  R's options", "Dodging by clusters takes `preserve:`", "Dodging by clusters' `:single`", "A
-  notebook leaves out an argument"
+  width:, each position reading the orientation as R does (positions, step 5) (`5392a92`); §4:
+  "Dodging takes R's options", "Dodging by clusters takes `preserve:`", "Dodging by clusters'
+  `:single`", "A notebook leaves out an argument"
 - 2026-11-01 — Make nudge_x and nudge_y aesthetics, set or mapped on every layer that nudges
-  (positions, step 4); §4: "A nudge is an aesthetic only", "A position declares the aesthetics it
-  reads"
-- 2026-11-01 — Give stacking its vjust: and reverse:, and fill each pile to 1 with :fill
-  (positions, step 3); §4: "Filling is stacking with `fill: true`"
-- 2026-11-01 — Give every layer function the positions that move its marks in ggplot2, refusing
-  the rest with R's reason (positions, step 2); §4: "Every layer takes the positions", "A box
-  layer dodges by clusters"
-- 2026-11-01 — Give a layer's position as an option value, :name or {:name, options}, and remove
-  the position functions (positions, step 1); §4: "A position is an option value"
+  (positions, step 4) (`6b8cab7`); §4: "A nudge is an aesthetic only", "A position declares the
+  aesthetics it reads"
+- 2026-11-01 — Give stacking its vjust: and reverse:, and fill each pile to 1 with :fill (positions,
+  step 3) (`86f1b9a`); §4: "Filling is stacking with `fill: true`"
+- 2026-11-01 — Give every layer function the positions that move its marks in ggplot2, refusing the
+  rest with R's reason (positions, step 2) (`7e22345`); §4: "Every layer takes the positions", "A
+  box layer dodges by clusters"
+- 2026-11-01 — Give a layer's position as an option value, :name or {:name, options}, and remove the
+  position functions (positions, step 1) (`5b726a4`); §4: "A position is an option value"
 - 2026-11-01 — Draw the notebook examples the summaries unlock, and narrow every verdict to what
   still waits (summaries, step 6, the notebook sweep); §4: "A bootstrap example states its
   departure once", "The summaries are not public functions"
@@ -4484,17 +4507,6 @@ tells the story (`git show <hash>`). Until 2026-10-15 each milestone also had a 
   R's stat carries each group's constant `y` beside its 512 rows, so the raster has a row of cells
   per count. `Plot.stat_density/3` refuses both: "maps :x, :y, but takes only one of them". Only a
   geom that reads that `y` (`geom_raster()`, `geom_tile()`) gives it a use, so it waits for one.
-- **How a notebook treats an example of a function Giggly will not offer (found 2026-10-17).**
-  Giggly exposes no superseded or deprecated function (§4, the entry beginning "Giggly exposes no
-  function"), yet 33 waiting examples call one, most of them `coord_map()`,
-  `annotation_logticks()`, `expand_limits()`, `qplot()` and `coord_flip()`, and their verdicts
-  say "Not in Giggly yet", which will never become true. Options: draw them with the replacement,
-  as `labs(x:)` for `xlab()`, which `notebooks.md` allows as a counterpart, though `ggplot()` for
-  `qplot()` is the imitation it forbids; or say in the verdict that Giggly will not offer it.
-  Settled when the first such example could otherwise be drawn. The active theme's functions,
-  which Giggly rejects as global state, are answered (§4, the entry beginning "An example that
-  sets ggplot2's active theme"), and so are palette functions handed to a scale (the entry
-  beginning "An example handing a scale a palette function").
 - **Livebooks that match ggplot2's online reference (Steve's aim, 2026-10-12).** A set of
   Livebooks reproducing the examples in ggplot2's documentation, which ExDoc points at rather than
   building graphics, as ggity's docs did. `geom_point` and `facet_wrap` are built, and how notebooks are

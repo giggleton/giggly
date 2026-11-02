@@ -31,9 +31,11 @@ what remains.
 `orientation`, draws the same plots, and `coord_flip()` remains for the geoms and stats that cannot
 be turned that way. Under it, the x scale and the `xlim` option act on the vertical axis, while the
 theme's settings for the x axis still act on the horizontal one, and facets keep their order. Giggly
-has no `coord_flip()` yet; its `Giggly.Plot.geom_bar/3`, `Giggly.Plot.geom_histogram/3` and
+has no `coord_flip()`, since ggplot2 has superseded it, and draws each of its examples with the swap
+the page prefers: `Giggly.Plot.geom_bar/3`, `Giggly.Plot.geom_histogram/3` and
 `Giggly.Plot.geom_boxplot/3` turn on their side when `y` is mapped rather than `x`, and
-`Giggly.Plot.geom_area/3` with `orientation: :y`, the swaps the page prefers. A plot is described
+`Giggly.Plot.geom_area/3` with `orientation: :y`. ggplot2 draws each `coord_flip()` example here
+exactly as it draws the swapped one before it. A plot is described
 with `Giggly.Plot` and drawn with `Giggly.to_svg/2`, which returns an SVG document. The setup cell
 aliases `Giggly.Plot`, so the cells write `Plot.new/2`, and defines `render`, which draws a plot and
 shows it below the cell with `Kino.Image`. It binds ggplot2's `diamonds`,
@@ -66,7 +68,15 @@ ggplot(diamonds, aes(cut, price)) +
   coord_flip()
 ```
 
-Not in Giggly yet: `coord_flip()`.
+Giggly turns the boxes by swapping the mapping, the price along x and the cut along y, which draws
+this plot as `coord_flip()` does: the plot above.
+
+```elixir
+diamonds
+|> Plot.new(%{x: :price, y: :cut})
+|> Plot.geom_boxplot()
+|> render.()
+```
 
 ## Reversing a horizontal histogram
 
@@ -97,7 +107,15 @@ ggplot(diamonds, aes(carat)) +
   scale_x_reverse()
 ```
 
-Not in Giggly yet: `coord_flip()`.
+Giggly turns the bins by mapping `carat` to `y`, so the scale that runs up the left axis is the y
+scale, and `Giggly.Plot.scale_y_reverse/2` takes the place of `scale_x_reverse()`: the plot above.
+
+```elixir
+Plot.new(diamonds, %{y: :carat})
+|> Plot.geom_histogram()
+|> Plot.scale_y_reverse()
+|> render.()
+```
 
 ## A horizontal area
 
@@ -128,4 +146,13 @@ ggplot(df, aes(a, b)) +
   coord_flip()
 ```
 
-Not in Giggly yet: `coord_flip()`.
+Giggly turns the area by swapping the mapping, `b` along x and `a` along y, and giving
+`orientation: :y`, so the area fills towards the left axis as the flipped one does: the plot
+above.
+
+```elixir
+df
+|> Plot.new(%{x: :b, y: :a})
+|> Plot.geom_area(orientation: :y)
+|> render.()
+```

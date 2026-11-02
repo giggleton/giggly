@@ -14,8 +14,9 @@ ggplot2's reference page for
 examples, so this notebook says only what the page describes and where Giggly stands.
 
 `position_identity()` adjusts nothing: every row is drawn where its position aesthetics put it,
-whether or not its mark overlaps another. Giggly has no position by that name yet.
+whether or not its mark overlaps another. Giggly has it as `position: :identity`, which every
+layer function with a `position:` option takes, and the default of most:
 `Giggly.Plot.geom_point/3` draws each point at its row's `x` and `y`, unadjusted, as ggplot2's
-`geom_point()` does by default. `Giggly.Plot.geom_bar/3` and `Giggly.Plot.geom_col/3` take
-`position: :stack`, their default, `position: :dodge` or `position: :dodge2`, so they cannot yet
-draw bars over one another, as `position = "identity"` does.
+`geom_point()` does by default. `Giggly.Plot.geom_bar/3` and `Giggly.Plot.geom_col/3` stack by
+default, and with `position: :identity` draw bars over one another, as `position = "identity"`
+does.

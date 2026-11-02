@@ -292,7 +292,10 @@ m2
 # supplementing the raw data with summary statistics is _very_ important
 ```
 
-Not in Giggly yet: the `movies` dataset and `xlab()`.
+`xlab("rating")` is `Giggly.Plot.labs/2`'s `x: "rating"`, since ggplot2 has superseded `xlab()`
+with `labs()`.
+
+Not in Giggly yet: the `movies` dataset.
 
 ## A log scale before or after the stat
 
