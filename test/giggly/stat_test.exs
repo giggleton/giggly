@@ -2896,6 +2896,496 @@ defmodule Giggly.StatTest do
     end
   end
 
+  describe "compute_layer/3 for violins' densities" do
+    # Golden: `ggplot(mtcars, aes(factor(cyl), mpg))` with `stat_ydensity(geom = "blank", position =
+    # "identity")`, rows 1, 2, 300 and 512 of the first violin and each violin's quantiles' rows.
+    test "a violin's curve along its group's y, then its quantiles, R's stat_ydensity()" do
+      violins = violins(cylinders_frame())
+
+      assert DataFrame.names(violins) == [
+               :x,
+               :density,
+               :scaled,
+               :ndensity,
+               :count,
+               :wdensity,
+               :n,
+               :y,
+               :quantile,
+               :panel,
+               :group,
+               :violinwidth,
+               :flipped_aes
+             ]
+
+      assert DataFrame.row_count(violins) == 1545
+      rows = [1, 2, 300, 512, 513, 514, 515, 1028, 1029, 1030, 1543, 1544, 1545]
+
+      assert at_rows(violins, :x, rows) ==
+               [1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0] ++
+                 [2.0, 2.0, 2.0, 3.0, 3.0, 3.0]
+
+      assert_near_values(:y, at_rows(violins, :y, rows), [
+        21.399999999999999,
+        21.424461839530331,
+        28.714090019569468,
+        33.899999999999999,
+        22.800000000000001,
+        26.0,
+        30.399999999999999,
+        18.649999999999999,
+        19.699999999999999,
+        21.0,
+        14.400000000000002,
+        15.199999999999999,
+        16.25
+      ])
+
+      assert_near_values(:density, at_rows(violins, :density, rows), [
+        0.064312657989991875,
+        0.064605604975952663,
+        0.055618917672763717,
+        0.038027231120009393,
+        0.075258130777764956,
+        0.064177239683537363,
+        0.055893136547312025,
+        0.18289530247750399,
+        0.19230029283508535,
+        0.21715168067173327,
+        0.1773846978800592,
+        0.24000158566144547,
+        0.14965089777939256
+      ])
+
+      assert_near_values(:scaled, at_rows(violins, :scaled, rows), [
+        0.84450651161799806,
+        0.84835327592435361,
+        0.73034670952495395,
+        0.49934562344862221,
+        0.98823440797473738,
+        0.84272829804127225,
+        0.73394755005001278,
+        0.83253242727192511,
+        0.87534358395447209,
+        0.98846615165554952,
+        0.73901333715554085,
+        0.99988541775014483,
+        0.62346984096142877
+      ])
+
+      assert_near_values(:count, at_rows(violins, :count, rows), [
+        0.70743923788991059,
+        0.71066165473547926,
+        0.61180809440040085,
+        0.4182995423201033,
+        0.82783943855541453,
+        0.70594963651891085,
+        0.61482450202043226,
+        1.280267117342528,
+        1.3461020498455973,
+        1.5200617647021328,
+        2.4833857703208291,
+        3.3600221992602366,
+        2.0951125689114956
+      ])
+
+      assert at_rows(violins, :n, rows) == [11, 11, 11, 11, 11, 11, 11, 7, 7, 7, 14, 14, 14]
+
+      assert_near_values(:violinwidth, at_rows(violins, :violinwidth, rows), [
+        0.26793693351533299,
+        0.26915739803280181,
+        0.23171740544452585,
+        0.15842759442409801,
+        0.31353754319761079,
+        0.26737275895145618,
+        0.23285984562123155,
+        0.76197140705656441,
+        0.80115411781536661,
+        0.90468901838793947,
+        0.73901333715554085,
+        0.99988541775014483,
+        0.62346984096142888
+      ])
+
+      assert at_rows(violins, :quantile, rows) ==
+               [nil, nil, nil, nil, 0.25, 0.5, 0.75] ++
+                 [0.25, 0.5, 0.75, 0.25, 0.5, 0.75]
+
+      assert DataFrame.pull(violins, :ndensity) == DataFrame.pull(violins, :scaled)
+      assert DataFrame.pull(violins, :wdensity) == DataFrame.pull(violins, :count)
+      assert DataFrame.pull(violins, :flipped_aes) == List.duplicate(false, 1545)
+    end
+
+    # Golden: the same with `scale = "count"` and `scale = "width"`, rows 1 and 300 and each
+    # violin's quantiles' rows.
+    test "a violin's width is scaled by its rows over the panel's most, or to its own widest" do
+      rows = [1, 300, 513, 514, 515, 1028, 1029, 1030, 1543, 1544, 1545]
+
+      assert_near_values(
+        :violinwidth,
+        at_rows(violins(cylinders_frame(), scale: :count), :violinwidth, rows),
+        [
+          0.21052187633347591,
+          0.18206367570641316,
+          0.24635092679812276,
+          0.21007859631900128,
+          0.18296130727382479,
+          0.3809857035282822,
+          0.4005770589076833,
+          0.45234450919396973,
+          0.73901333715554085,
+          0.99988541775014483,
+          0.62346984096142888
+        ]
+      )
+
+      assert_near_values(
+        :violinwidth,
+        at_rows(violins(cylinders_frame(), scale: :width), :violinwidth, rows),
+        [
+          0.84450651161799806,
+          0.73034670952495395,
+          0.98823440797473738,
+          0.84272829804127225,
+          0.73394755005001278,
+          0.83253242727192511,
+          0.87534358395447209,
+          0.98846615165554952,
+          0.73901333715554085,
+          0.99988541775014483,
+          0.62346984096142877
+        ]
+      )
+    end
+
+    # Golden: the same with `trim = FALSE, adjust = 0.5`, rows 1, 2 and 512 and the first quantile's.
+    test "untrimmed, a curve reaches three of the rule's bandwidths, before adjust, past its rows" do
+      violins = violins(cylinders_frame(), trim: false, adjust: 0.5)
+
+      assert_near_values(:y, at_rows(violins, :y, [1, 2, 512, 513]), [
+        13.862190242778771,
+        13.916154273139716,
+        41.437809757221224,
+        22.800000000000001
+      ])
+
+      assert_near_values(:density, at_rows(violins, :density, [1, 2, 512, 513]), [
+        7.2757670158082359e-10,
+        9.3154777100461618e-10,
+        4.5153528397202146e-10,
+        0.10412334557175398
+      ])
+    end
+
+    # Golden: the same with `bw = 0.5, kernel = "rectangular", trim = FALSE`, and with `bw =
+    # "nrd"`, rows 1 and 300 and the first quantile's.
+    test "a violin's bandwidth is a number or Scott's rule, its kernel any of R's" do
+      given = violins(cylinders_frame(), bandwidth: 0.5, kernel: :rectangular, trim: false)
+
+      assert_near_values(:y, at_rows(given, :y, [1, 300, 513]), [
+        19.899999999999999,
+        28.969471624266141,
+        22.800000000000001
+      ])
+
+      assert_near_values(:density, at_rows(given, :density, [1, 300, 513]), [
+        2.5576051248376003e-19,
+        0.0,
+        0.10497277621629557
+      ])
+
+      scott = violins(cylinders_frame(), bandwidth: :nrd)
+
+      assert_near_values(:density, at_rows(scott, :density, [1, 300, 513]), [
+        0.059344036328186404,
+        0.056869759741539794,
+        0.068850921230443396
+      ])
+    end
+
+    # Golden: y 1, 2, 3, 4 and 10 with `bounds = c(0, 5), quantiles = NULL`, rows 1, 2 and 1536.
+    test "the bandwidth is worked out from every row of the group, those outside the bounds too" do
+      violins =
+        violins(single_frame([1.0, 2.0, 3.0, 4.0, 10.0]), bounds: {0.0, 5.0}, quantiles: :none)
+
+      refute :quantile in DataFrame.names(violins)
+      assert DataFrame.row_count(violins) == 1536
+      assert at_rows(violins, :y, [1, 2, 1536]) == [0.0, 0.0032573289902280132, 5.0]
+
+      assert_near_values(:density, at_rows(violins, :density, [1, 2, 1536]), [
+        0.1475651817834592,
+        0.14756518179525221,
+        0.14756292780893229
+      ])
+
+      assert at_rows(violins, :n, [1, 2, 1536]) == [4, 4, 4]
+    end
+
+    # Golden: y 2, 2 and 2.
+    test "a curve's rows at a quantile's y are left out, so a group of one y keeps its quantiles" do
+      violins = violins(single_frame([2.0, 2.0, 2.0]))
+
+      assert DataFrame.pull(violins, :y) == [2.0, 2.0, 2.0]
+      assert DataFrame.pull(violins, :quantile) == [0.25, 0.5, 0.75]
+      assert DataFrame.pull(violins, :violinwidth) == [1.0, 1.0, 1.0]
+
+      assert_near(violins, :density, [
+        0.27608016217533199,
+        0.27608016217533199,
+        0.27608016217533199
+      ])
+    end
+
+    # Golden: y 1, 2, 4 and 5 with `quantiles = c(0.75, 0, 1)` and `quantiles = numeric(0)`.
+    test "quantiles come in their order, and a group's ends drop its curve's first and last rows" do
+      violins = violins(single_frame([1.0, 2.0, 4.0, 5.0]), quantiles: [0.75, 0.0, 1.0])
+
+      assert DataFrame.row_count(violins) == 513
+      assert at_rows(violins, :quantile, [1, 510, 511, 512, 513]) == [nil, nil, 0.75, 0.0, 1.0]
+
+      assert_near_values(:y, at_rows(violins, :y, [1, 510, 511, 512, 513]), [
+        1.0078277886497065,
+        4.9921722113502938,
+        4.25,
+        1.0,
+        5.0
+      ])
+
+      assert_near_values(:density, at_rows(violins, :density, [1, 510, 511, 512]), [
+        0.14332510380048846,
+        0.14332510380048838,
+        0.16360730501559378,
+        0.14295840786459815
+      ])
+
+      empty = violins(single_frame([1.0, 2.0, 4.0, 5.0]), quantiles: [])
+      assert DataFrame.row_count(empty) == 512
+      assert DataFrame.pull(empty, :quantile) == List.duplicate(nil, 512)
+    end
+
+    # Golden: y 1, 2, 4 and 9 with `bounds = c(0, 6), quantiles = c(0.5, 1)`, rows 1535 to 1538.
+    test "a quantile past the curve's places reads every other column missing" do
+      violins =
+        violins(single_frame([1.0, 2.0, 4.0, 9.0]), bounds: {0.0, 6.0}, quantiles: [0.5, 1.0])
+
+      rows = [1535, 1536, 1537, 1538]
+
+      assert DataFrame.row_count(violins) == 1538
+      assert at_rows(violins, :quantile, rows) == [nil, nil, 0.5, 1.0]
+      assert at_rows(violins, :x, rows) == [1.0, 1.0, 1.0, nil]
+      assert at_rows(violins, :n, rows) == [3, 3, 3.0, nil]
+
+      assert_near_values(:y, at_rows(violins, :y, rows), [5.9960912052117266, 6.0, 3.0, 9.0])
+
+      assert_near_values(:density, at_rows(violins, :density, rows), [
+        0.094449392760564271,
+        0.094449071342354557,
+        0.17625730068711445,
+        nil
+      ])
+    end
+
+    # Golden: x a, b, b and b at y 1, 1, 2 and 3, with and without `drop = FALSE`.
+    test "a group of fewer than two rows is left out, or kept as a row of its x, y and rows" do
+      frame =
+        DataFrame.new(
+          x: [1, 2, 2, 2],
+          y: [1.0, 1.0, 2.0, 3.0],
+          panel: [1, 1, 1, 1],
+          group: [1, 2, 2, 2]
+        )
+
+      dropped = violins(frame)
+      assert DataFrame.row_count(dropped) == 515
+      assert at_rows(dropped, :x, [1, 515]) == [2.0, 2.0]
+
+      kept = violins(frame, drop: false)
+      assert DataFrame.row_count(kept) == 516
+      assert at_rows(kept, :x, [1, 2, 516]) == [1.0, 2.0, 2.0]
+      assert at_rows(kept, :y, [1, 2, 516]) == [1.0, 1.0, 2.5]
+      assert at_rows(kept, :n, [1, 2, 516]) == [1, 3, 3.0]
+      assert at_rows(kept, :quantile, [1, 2, 516]) == [nil, nil, 0.75]
+      assert_near_values(:density, at_rows(kept, :density, [1, 2]), [nil, 0.29104631056435171])
+
+      assert_near_values(:violinwidth, at_rows(kept, :violinwidth, [1, 2, 516]), [
+        nil,
+        0.86887412578351597,
+        0.97331309079217543
+      ])
+    end
+
+    # Golden: x a, a, b, b and b at y 1, 9, 1, 2 and 3 with `bounds = c(0, 5)`, and with
+    # `quantiles = NULL` too, rows 1, 2 and 1537.
+    test "a group of fewer than two rows inside the bounds fails its panel where quantiles read it" do
+      frame =
+        DataFrame.new(
+          x: [1, 1, 2, 2, 2],
+          y: [1.0, 9.0, 1.0, 2.0, 3.0],
+          panel: [1, 1, 1, 1, 1],
+          group: [1, 1, 2, 2, 2]
+        )
+
+      failed = violins(frame, bounds: {0.0, 5.0})
+      assert DataFrame.row_count(failed) == 0
+
+      unread = violins(frame, bounds: {0.0, 5.0}, quantiles: :none)
+      assert DataFrame.row_count(unread) == 1537
+      assert at_rows(unread, :x, [1, 2, 1537]) == [1.0, 2.0, 2.0]
+      assert at_rows(unread, :y, [1, 2, 1537]) == [nil, 0.0, 5.0]
+      assert at_rows(unread, :n, [1, 2, 1537]) == [nil, 3, 3]
+
+      assert_near_values(:density, at_rows(unread, :density, [1, 2, 1537]), [
+        nil,
+        0.088837191966386383,
+        0.00050717120915322084
+      ])
+
+      assert_near_values(:violinwidth, at_rows(unread, :violinwidth, [1, 2, 1537]), [
+        nil,
+        0.26520869437904993,
+        0.0015140754815512777
+      ])
+    end
+
+    # Golden: x 1, 2, 3, 5, 5 and 5 at y 1, 2, 3, 1, 2 and 4 in groups 1 and 2, on a continuous
+    # x, and with `width = 0.5`, rows 1, 513, 514 and 1028.
+    test "a violin of several x stands at their range's middle, as wide as 0.9 of it" do
+      violins = violins(continuous_frame(), [], false)
+
+      assert :width in DataFrame.names(violins)
+      assert at_rows(violins, :x, [1, 513, 514, 1028]) == [2.0, 2.0, 2.0, 5.0]
+      assert at_rows(violins, :y, [1, 513, 514, 1028]) == [1.0, 1.5, 2.0, 1.5]
+
+      assert_near_values(:width, at_rows(violins, :width, [1, 513, 514, 1028]), [
+        1.8,
+        1.8,
+        1.8,
+        nil
+      ])
+
+      assert_near_values(:density, at_rows(violins, :density, [1, 513, 514, 1028]), [
+        0.29104631056435171,
+        0.3260301759401556,
+        0.33496947593173843,
+        0.27301500765632652
+      ])
+
+      given = violins(continuous_frame(), [width: 0.5], false)
+      assert at_rows(given, :x, [1, 513, 1028]) == [2.0, 2.0, 5.0]
+      assert_near_values(:width, at_rows(given, :width, [1, 513, 1028]), [1.8, 1.8, 0.5])
+    end
+
+    # Golden: x 1, 2, 3, 1, 2 and 4 at y 1, 1, 1, 2, 2 and 2 grouped by y; and the continuous
+    # frame with `orientation = "y"`, rows 1 and 513.
+    test "a violin runs along x where every group holds one y, or where orientation says" do
+      frame =
+        DataFrame.new(
+          x: [1.0, 2.0, 3.0, 1.0, 2.0, 4.0],
+          y: [1, 1, 1, 2, 2, 2],
+          panel: List.duplicate(1, 6),
+          group: [1, 1, 1, 2, 2, 2]
+        )
+
+      along_x = violins(frame, [], false)
+
+      names = DataFrame.names(along_x)
+      assert Enum.take(names, 2) == [:y, :density]
+      assert at_rows(along_x, :x, [1, 513, 1030]) == [1.0, 1.5, 3.0]
+      assert at_rows(along_x, :y, [1, 513, 1030]) == [1.0, 1.0, 2.0]
+      assert DataFrame.pull(along_x, :flipped_aes) == List.duplicate(true, 1030)
+
+      assert_near_values(:density, at_rows(along_x, :density, [1, 513, 1030]), [
+        0.29104631056435171,
+        0.3260301759401556,
+        0.16085376868369547
+      ])
+
+      told = violins(continuous_frame(), [orientation: :y], false)
+      assert DataFrame.row_count(told) == 518
+      assert at_rows(told, :x, [1, 513]) == [1.0, 1.5]
+      assert at_rows(told, :y, [1, 513]) == [2.0, 2.0]
+
+      assert_near_values(:density, at_rows(told, :density, [1, 513]), [
+        0.29104631056435171,
+        0.3260301759401556
+      ])
+    end
+
+    # Golden: y 1, 2, 4 and Inf; y 1, 2, 4 and 5 weighted 1, NA, 3 and 1, rows 1, 300 and the
+    # quantiles'; and weighted 1, -1, 1 and 1.
+    test "a row at an infinite y or a missing weight is left out, and a negative weight fails" do
+      infinite = violins(single_frame([1.0, 2.0, 4.0, :infinity]))
+      assert at_rows(infinite, :n, [1, 513]) == [3, 3.0]
+
+      assert_near_values(:density, at_rows(infinite, :density, [1, 513]), [
+        0.24114038426332288,
+        0.27301500765632652
+      ])
+
+      weighted = violins(single_frame([1.0, 2.0, 4.0, 5.0], weight: [1, nil, 3, 1]))
+      rows = [1, 300, 513, 514, 515]
+      refute :weight in DataFrame.names(weighted)
+
+      assert_near_values(:y, at_rows(weighted, :y, rows), [1.0, 3.340508806262231, 2.5, 4.0, 4.5])
+
+      assert_near_values(:density, at_rows(weighted, :density, rows), [
+        0.078692457966263868,
+        0.21377483116458687,
+        0.11752179255534057,
+        0.27164930266431586,
+        0.26617661386732472
+      ])
+
+      assert_near_values(:wdensity, at_rows(weighted, :wdensity, rows), [
+        0.39346228983131937,
+        1.0688741558229344,
+        0.58760896277670283,
+        1.3582465133215791,
+        1.3308830693366236
+      ])
+
+      negative = violins(single_frame([1.0, 2.0, 4.0, 5.0], weight: [1, -1, 1, 1]))
+      assert DataFrame.row_count(negative) == 0
+    end
+
+    # Golden: x a, a, a, a, b, b and b at y 1, 2, 4, 5, 1, 3 and 9, a facet for each x, rows 1,
+    # 513, 516 and 1029.
+    test "a violin's width is a share of its own panel's greatest density" do
+      frame =
+        DataFrame.new(
+          x: [1, 1, 1, 1, 2, 2, 2],
+          y: [1.0, 2.0, 4.0, 5.0, 1.0, 3.0, 9.0],
+          panel: [1, 1, 1, 1, 2, 2, 2],
+          group: [1, 1, 1, 1, 2, 2, 2]
+        )
+
+      violins = violins(frame, [], true, [1, 2])
+      rows = [1, 513, 516, 1029]
+
+      assert at_rows(violins, :panel, rows) == [1, 1, 2, 2]
+
+      assert_near_values(:density, at_rows(violins, :density, rows), [
+        0.14295840786459815,
+        0.1636073050155939,
+        0.10182769309769255,
+        0.10305627844052924
+      ])
+
+      assert_near_values(:violinwidth, at_rows(violins, :violinwidth, rows), [
+        0.86873286234634517,
+        0.99421254412392912,
+        0.91677827371146492,
+        0.9278395117249042
+      ])
+    end
+
+    test "a weight that is not a number is refused" do
+      frame = single_frame([1.0, 2.0, 3.0], weight: ["a", "b", "c"])
+
+      assert_raise ArgumentError, ~r/a weight must be a number/, fn -> violins(frame) end
+    end
+  end
+
   describe "compute_layer/3 for hexagonal binning" do
     @hexagonal %Stat.BinHex{bins: {30, 30}, binwidth: {1.0, 1.0}}
 
@@ -3199,6 +3689,65 @@ defmodule Giggly.StatTest do
       |> Map.new()
 
     Enum.map(values, fn value -> Map.fetch!(places, value) end)
+  end
+
+  # The table a violin's densities with ggplot2's defaults but `options` compute from `frame`, x
+  # discrete unless said, in each of `panels`.
+  defp violins(frame, options \\ [], x_discrete \\ true, panels \\ [1]) do
+    stat =
+      struct!(
+        %Stat.Ydensity{
+          bandwidth: :nrd0,
+          adjust: 1.0,
+          kernel: :gaussian,
+          trim: true,
+          bounds: {:neg_infinity, :infinity},
+          scale: :area,
+          quantiles: [0.25, 0.5, 0.75],
+          drop: true,
+          width: :none,
+          orientation: :none
+        },
+        options
+      )
+
+    Stat.compute_layer(stat, frame, axes(panels, x_discrete, false))
+  end
+
+  # mtcars' mpg by its cylinders' place, a group for each.
+  defp cylinders_frame do
+    places =
+      :cyl
+      |> mtcars()
+      |> Enum.map(fn cylinders -> %{4 => 1, 6 => 2, 8 => 3}[trunc(cylinders)] end)
+
+    DataFrame.new(x: places, y: mtcars(:mpg), panel: List.duplicate(1, 32), group: places)
+  end
+
+  # The y given at x 1, in one panel and one group, with the columns given.
+  defp single_frame(values, columns \\ []) do
+    rows = length(values)
+
+    [x: List.duplicate(1, rows), y: values]
+    |> Enum.concat(columns)
+    |> Enum.concat(panel: List.duplicate(1, rows), group: List.duplicate(1, rows))
+    |> DataFrame.new()
+  end
+
+  # Two groups on a continuous x: x 1, 2 and 3 at y 1, 2 and 3, and x 5 at y 1, 2 and 4.
+  defp continuous_frame do
+    DataFrame.new(
+      x: [1.0, 2.0, 3.0, 5.0, 5.0, 5.0],
+      y: [1.0, 2.0, 3.0, 1.0, 2.0, 4.0],
+      panel: List.duplicate(1, 6),
+      group: [1, 1, 1, 2, 2, 2]
+    )
+  end
+
+  # A column's values at `rows`, counted from 1 as R counts them.
+  defp at_rows(frame, name, rows) do
+    values = DataFrame.pull(frame, name)
+    Enum.map(rows, fn row -> Enum.at(values, row - 1) end)
   end
 
   defp columns(frame, names), do: Enum.map(names, fn name -> DataFrame.pull(frame, name) end)

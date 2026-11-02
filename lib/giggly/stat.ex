@@ -25,11 +25,13 @@ defprotocol Giggly.Stat do
   # (`Giggly.Stat.Align`) each group of areas at every other group's places, as `geom_area()`
   # defaults `stat = "align"`, smoothing (`Giggly.Stat.Smooth`) a curve fitted to each group,
   # as `geom_smooth()` defaults `stat = "smooth"`, its band's quantile Giggly's own
-  # (`Giggly.Stat.TDistribution`), and densities (`Giggly.Stat.Density`) each group's kernel
-  # density estimate, as `geom_density()` defaults `stat = "density"`, and summarising
-  # (`Giggly.Stat.Summary`) the y values at each x, as `stat_summary()` does. Smoothing and densities
-  # space their places and aligning and densities read a curve between its points as R does
-  # (`Giggly.Stat.Curve`).
+  # (`Giggly.Stat.TDistribution`), densities (`Giggly.Stat.Density`) each group's kernel
+  # density estimate, as `geom_density()` defaults `stat = "density"`, a violin's densities
+  # (`Giggly.Stat.Ydensity`) each group's estimate along y and its quantiles, as `geom_violin()`
+  # defaults `stat = "ydensity"`, both through one estimate (`Giggly.Stat.KernelDensity`), and
+  # summarising (`Giggly.Stat.Summary`) the y values at each x, as `stat_summary()` does.
+  # Smoothing and densities space their places and aligning and densities read a curve between its
+  # points as R does (`Giggly.Stat.Curve`).
   #
   # A stat that computes names, in `default_mapping/1`, the computed columns its aesthetics take by
   # default, as ggplot2's `default_aes` names `after_stat(count)`: the assembly puts each into an
@@ -47,7 +49,19 @@ defprotocol Giggly.Stat do
   # implementations, which no boundary exports.
   use Boundary,
     deps: [Giggly.Aesthetics, Giggly.DataFrame, Giggly.Resolution, Giggly.Tensor],
-    exports: [Align, Bin, BinHex, Boxplot, Count, Density, Identity, Smooth, Sum, Summary]
+    exports: [
+      Align,
+      Bin,
+      BinHex,
+      Boxplot,
+      Count,
+      Density,
+      Identity,
+      Smooth,
+      Sum,
+      Summary,
+      Ydensity
+    ]
 
   alias Giggly.DataFrame
 

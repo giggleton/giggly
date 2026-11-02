@@ -79,6 +79,18 @@ stops the question being reopened from scratch. A new entry is about 150 words: 
 sentence or two of why, and one line per rejected alternative. What a later decision replaces is
 deleted from the entry it was in, never marked superseded; git history keeps every version.
 
+- **A violin's densities share the density's estimate, as ggplot2's stats share
+  `compute_density()` (2026-11-01, violins step 1, agreed with Steve; checked against ggplot2
+  4.0.3).** `Giggly.Stat.KernelDensity` holds the estimate, its frame passes, grid, convolution
+  and bounds, and takes as settings what the two stats hand it differently: the span (the panel's
+  axis, or the group's extent widened by a number of the rule's bandwidths) and which rows the
+  bandwidth reads (inside the bounds for a density, every row for a violin, as `stat_ydensity()`
+  works its bandwidth out before handing it over). With `drop: false` and a short first group,
+  R's `layer_data()` lists its columns in another order; Giggly keeps its usual one, the values
+  and the drawing alike. *Rejected: a violin building a `%Stat.Density{}` and running it*: its
+  span depends on the bandwidth, worked out inside. *Rejected: a second copy of the estimate*:
+  two homes for R's `density()`.
+
 - **A non-position scale keeps the infinities its palette gives, and the geoms draw them as
   ggplot2 4.0.3 does (2026-11-01, Steve: "A", "A", "A", "A", increment 4's step 7's C3, C3a-c;
   checked against ggplot2 4.0.3).** An alpha, size or line width is R's palette's: past its range

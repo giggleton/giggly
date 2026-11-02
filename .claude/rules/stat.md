@@ -70,10 +70,12 @@ the entry beginning "Each facet, coordinate system, geom, stat and position is a
   `flipped_aes` its table also holds; the box plot's summary's whiskers, hinges, notches and
   `width`, each in either orientation, not its `outliers` or `relvarwidth`; smoothing's `y`,
   `ymin`, `ymax` and `se`, each in either orientation; a density's `density`, `count`, `scaled`,
-  `ndensity`, `wdensity` and `n`; hexagonal binning's `count`, `density`, `ncount` and
+  `ndensity`, `wdensity` and `n`; a violin's `density`, `scaled`, `count`, `violinwidth`, `n`,
+  `width` and `quantile`; hexagonal binning's `count`, `density`, `ncount` and
   `ndensity`, not the `width` and `height` its table also holds), **and the aesthetics
   it consumes** (`dropped_aesthetics/0`, ggplot2's `dropped_aes`: counting's, hexagonal
-  binning's, smoothing's and a density's `weight`, the box plot's summary's `x`, `y` and `weight`, and counting at each
+  binning's, smoothing's, a density's and a violin's `weight`, the box plot's summary's `x`, `y`
+  and `weight`, and counting at each
   place's, which `StatSum` sums without declaring), module functions beside its accepted aesthetics,
   which `Plot` reads at the call. A stat with neither, the identity, computes nothing an after_stat
   can read.
@@ -263,7 +265,25 @@ the entry beginning "Each facet, coordinate system, geom, stat and position is a
   `density()` fails the whole panel is given no rows**, as ggplot2 catches the failure per panel:
   a share missing, infinite or below 0, which weights totalling 0 make too, a bandwidth not finite
   and above 0, or a missing share total with rows outside the bounds. A weight that is not a number
-  is refused when the plot is run; a discrete axis is computed on, as R computes it.
+  is refused when the plot is run; a discrete axis is computed on, as R computes it. Its estimate
+  is `Giggly.Stat.KernelDensity`, ggplot2's `compute_density()`, which a violin's densities
+  compute with too.
+- **A violin's densities are ggplot2's `stat_ydensity()`**, through the density's estimate: per
+  panel and per group, the rows finite in x, y and weight; a group of fewer than two left out, or
+  with `drop: false` one row of its x, y and `n`; 512 places across the group's y, widened by
+  three of the rule's bandwidths, before `adjust`, without `trim`, **the bandwidth from all the
+  group's rows**, where a density's reads those inside the bounds (R draws it so); `x` the
+  group's, or its x range's middle, `width` 0.9 of that range, else the stat's; a row for each
+  of `quantiles`, in their order, at the frame's type 7 quantile of the group's y, unweighted as R
+  takes it, its other columns read along the curve by R's `approx()` formula, a curve row at its
+  y left out; `quantiles: :none` writes no `quantile` column, R's `NULL`, and `[]` one of missing
+  values, R's `numeric(0)`; `violinwidth` by `scale` over the panel's greatest density and most
+  rows. Its values are R's within 1e-12 of the largest magnitude a column holds. **A panel is
+  given no rows where its estimate fails or a group with quantiles has fewer than two rows inside
+  the bounds**, which R's `approx()` cannot read; without quantiles that group is one row of its
+  x and width. It runs along the axis `has_flipped_aes()` picks for a violin, the box plot's rule
+  without its one-axis case, since a violin needs both. With `drop: false` and the first group a
+  short one, R's `layer_data()` orders its columns otherwise; Giggly keeps its usual order.
 - **`Giggly.Tensor` is the one module that builds a tensor, and a stat reaches Nx only through it**
   (design-log §4, the entry beginning "Nx is a core dependency"): lists in and out, every tensor on
   `Nx.BinaryBackend` in 64-bit floats, so a user's default backend never reaches a drawing, the
