@@ -32,7 +32,8 @@ the entry beginning "Each facet, coordinate system, geom, stat and position is a
   clusters' `preserve`, `padding` and `reverse` arrived with `{:dodge2, options}` and its `width`
   with the points it first moved, dodging's `width` with `{:dodge, width: width}`, the first reader
   a line range, which has no edges, and its `preserve`, `orientation` and `reverse` after, and
-  stacking's `vjust`, `reverse` and `fill` with `{:stack, options}` and `:fill`; dodging's `order`
+  stacking's `vjust`, `reverse` and `fill` with `{:stack, options}` and `:fill`, and jittering
+  beside dodging's four with `{:jitterdodge, options}`, its `reverse` refused; dodging's `order`
   aesthetic waits, and the panel's scales with the first position that reads one.
 - **Stacking is ggplot2's `position_stack()`, and filling its `position_fill()`, one kind with
   `fill: true`** (design-log §4, the entry beginning "Filling is stacking"): nothing moves unless
@@ -104,13 +105,25 @@ the entry beginning "Each facet, coordinate system, geom, stat and position is a
   numbers cannot be had**: R's random numbers are never reproduced, so a golden is checked by R
   drawing Giggly's distances through `position_nudge()`; and positions whose only gap is to an
   infinity are 1 apart, where R's `resolution()` is infinite and sends them to infinity.
+- **Jittering beside dodging is ggplot2's `position_jitterdodge()`, its seed fixed** (design-log
+  §4, the entry beginning "Jittering beside dodging takes R's options"): a plain position, not a
+  dodge, as R's `PositionJitterdodge` is. It dodges as `pos_dodge()` does through `collide()` with
+  `dodge_width`: a mark with no `xmin` and `xmax` is given them, its x ∓ half the width, and each
+  panel's marks at one `xmin` share the width, each ranked by group among the groups there, so its
+  dodge is `{:dodge, width: dodge_width}`'s on every layer of the sweep; a point is given its y as
+  a `ymax`. It then jitters as `Giggly.Position.Jitter` does, through the protocol, sideways by
+  `jitter_width`, or 0.4 of the closest spacing of the layer's positions over every panel before
+  dodging, divided either way by the most groups at one x in any panel plus 2, and along the other
+  axis by `jitter_height`, as R's `setup_params()` works them out. It reads the orientation as
+  R's `has_flipped_aes(data)` does, with no fallback.
 - **A position reads a layer's orientation as ggplot2's `has_flipped_aes()` reads it for a
   position**: the first boolean in its `flipped_aes` column, written by the stat or the geom; else
   true where y is the one axis the layer has a column for whose scale is discrete, and false where
   x is; else dodging's `orientation`, false for every other position. Horizontal marks move along
-  y, flipped and flipped back. Stacking, filling and both dodges share this through
-  `Giggly.Position.Orientation`, a module of the boundary that is no kind and no export.
-- **What stacking and dodging give a mark before they move it is `Giggly.Position.Collide`**,
-  ggplot2's `collide_setup()`, `collide()` and `PositionDodge$setup_data()`: an x from a
+  y, flipped and flipped back. Stacking, filling, both dodges and jittering beside dodging share
+  this through `Giggly.Position.Orientation`, a module of the boundary that is no kind and no
+  export.
+- **What stacking, dodging and jittering beside dodging give a mark before they move it is
+  `Giggly.Position.Collide`**, ggplot2's `collide_setup()`, `collide()` and `PositionDodge$setup_data()`: an x from a
   rectangle's sides, sides from an x, a `ymax` from a y, each kept, as R's `layer_data()` keeps
   them. Like `Orientation`, it is no kind and no export.

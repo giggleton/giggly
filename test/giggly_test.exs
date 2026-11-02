@@ -9043,6 +9043,23 @@ defmodule GigglyTest do
       assert svg == File.read!("test/golden/jitter_boxplot.svg")
     end
 
+    # Golden: test/golden/jitterdodge_boxplot.svg, checked against ggplot2's drawing of the same
+    # plot, made by test/golden/jitterdodge_boxplot.R, as test/golden/jitter_boxplot.svg is: every
+    # element matches it, the x axis drawn before the y, and every clip path.
+    # position_jitterdodge()'s example on mpg: boxes by class dodged by drive train, each car's
+    # point dodged to its drive train's box and jittered across it. It moves with what moves
+    # test/golden/boxplot.svg, and with jittering and dodging.
+    test "points jittered beside dodging spread across their own group's box" do
+      svg =
+        Giggly.Datasets.mpg()
+        |> Plot.new(%{x: :class, y: :hwy, fill: :drv})
+        |> Plot.geom_boxplot(outlier_size: 0)
+        |> Plot.geom_point(shape: 21, position: :jitterdodge)
+        |> to_svg()
+
+      assert svg == File.read!("test/golden/jitterdodge_boxplot.svg")
+    end
+
     # Golden: test/golden/jitter.svg, checked against ggplot2's drawing of the same plot, made by
     # test/golden/jitter.R, as test/golden/jitter_boxplot.svg is: every element matches it, the x
     # axis drawn before the y, and every clip path. geom_jitter()'s first jittered example: mpg's

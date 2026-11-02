@@ -2239,10 +2239,15 @@ defmodule Giggly.PlotTest do
       across = Plot.new(@rows, %{x: :wt})
       both = Plot.new(@rows, %{x: :wt, y: :mpg})
 
-      for position <- [:jitter, {:jitter, seed: 3}] do
+      for {position, function} <- [
+            {:jitter, "position_jitter()"},
+            {{:jitter, seed: 3}, "position_jitter()"},
+            {:jitterdodge, "position_jitterdodge()"}
+          ] do
         error = assert_raise ArgumentError, fn -> Plot.geom_rug(across, position: position) end
         assert error.message =~ "Plot.geom_rug/3 needs :y, but neither its mapping"
         assert error.message =~ "its rugs are jittered"
+        assert error.message =~ "as ggplot2's #{function} needs both"
       end
 
       assert [%Plot.Layer{position: %Position.Jitter{width: :none, height: :none, seed: 0}}] =
@@ -2389,6 +2394,42 @@ defmodule Giggly.PlotTest do
 
       across = Plot.new(@ranges, %{y: :trt, xmin: :lower, xmax: :upper})
       assert %Plot{} = Plot.geom_linerange(across)
+    end
+
+    # ggplot2 4.0.3: `geom_linerange(aes(x = g, ymin = lo, ymax = hi), position = "jitter")` fails
+    # as the plot is built, "`position_jitter()` requires the following missing aesthetics: y", and
+    # along y without x alike, "x", and `position_jitterdodge()` the same (`jd_ranges.R`).
+    test "a jittered range needs the position across it too, which jittering moves" do
+      plot = Plot.new(@ranges)
+
+      for {mapping, along, across} <- [
+            {%{x: :trt, ymin: :lower, ymax: :upper}, "x", ":y"},
+            {%{y: :trt, xmin: :lower, xmax: :upper}, "y", ":x"}
+          ],
+          {position, function} <- [
+            {:jitter, "position_jitter()"},
+            {{:jitterdodge, seed: 2}, "position_jitterdodge()"}
+          ],
+          layer <- [:geom_linerange, :geom_errorbar] do
+        error =
+          assert_raise ArgumentError, fn ->
+            apply(Plot, layer, [plot, mapping, [position: position]])
+          end
+
+        assert error.message =~ "Plot.#{layer}/3 runs along #{along} and is jittered"
+        assert error.message =~ "so it needs #{across} too"
+        assert error.message =~ "as ggplot2's #{function} needs both"
+      end
+
+      assert [%Plot.Layer{position: %Position.Jitterdodge{}}] =
+               plot
+               |> Plot.geom_errorbar(%{x: :trt, y: :resp, ymin: :lower, ymax: :upper},
+                 position: :jitterdodge
+               )
+               |> Map.fetch!(:reversed_layers)
+
+      assert [%Plot.Layer{position: %Position.Identity{}}] =
+               Plot.geom_linerange(plot, %{x: :trt, ymin: :lower, ymax: :upper}).reversed_layers
     end
 
     test "a point range needs its point's x and y" do
@@ -5300,6 +5341,7 @@ defmodule Giggly.PlotTest do
       dodge: Position.Dodge,
       dodge2: Position.Dodge2,
       jitter: Position.Jitter,
+      jitterdodge: Position.Jitterdodge,
       nudge: Position.Nudge
     }
 
@@ -5366,18 +5408,25 @@ defmodule Giggly.PlotTest do
       do: [{:dodge, orientation: :y, preserve: :single} | taken(:oriented_with_width)]
 
     defp taken(:oriented_with_width) do
-      [:identity, :stack, :fill, :dodge, :dodge2, :jitter, :nudge] ++
-        [{:dodge, preserve: :single, reverse: true}, {:dodge2, preserve: :single}]
+      [:identity, :stack, :fill, :dodge, :dodge2, :jitter, :jitterdodge, :nudge] ++
+        [
+          {:dodge, preserve: :single, reverse: true},
+          {:dodge2, preserve: :single},
+          {:jitterdodge, jitter_width: 0.2, dodge_width: 0.9}
+        ]
     end
 
     defp taken(:without_width),
       do: [{:dodge, width: 0.9, orientation: :y} | taken(:oriented_without_width)]
 
     defp taken(:oriented_without_width) do
-      [:identity, :stack, :fill, {:dodge, width: 0.9}, {:dodge2, width: 0.5}, :jitter, :nudge] ++
+      [:identity, :stack, :fill, {:dodge, width: 0.9}, {:dodge2, width: 0.5}, :jitter] ++
         [
+          :jitterdodge,
+          :nudge,
           {:dodge, width: 0.9, preserve: :single, reverse: true},
-          {:dodge2, width: 0.5, padding: 0.5}
+          {:dodge2, width: 0.5, padding: 0.5},
+          {:jitterdodge, jitter_width: 0.2, dodge_width: 0.9}
         ]
     end
 
@@ -5419,7 +5468,10 @@ defmodule Giggly.PlotTest do
            "filling piles"},
         {:jitter,
          "got: :jitter, since a box plot's rows have no y once its stat has run, " <>
-           "which jittering moves"}
+           "which jittering moves"},
+        {:jitterdodge,
+         "got: :jitterdodge, since a box plot's rows have no y once its stat has run, " <>
+           "which jittering beside dodging moves"}
       ]
     end
 
@@ -5430,7 +5482,10 @@ defmodule Giggly.PlotTest do
          "got: :stack, since a rectangle has no x, at which stacking piles marks, so " <>
            "none would move"},
         {:fill, "got: :fill, since a rectangle has no x, at which filling piles marks"},
-        {:jitter, "got: :jitter, since a rectangle has no x or y, which jittering moves"}
+        {:jitter, "got: :jitter, since a rectangle has no x or y, which jittering moves"},
+        {:jitterdodge,
+         "got: :jitterdodge, since a rectangle has no x or y, which jittering beside dodging " <>
+           "moves"}
       ]
     end
 
@@ -5470,7 +5525,9 @@ defmodule Giggly.PlotTest do
          "got: :dodge, since #{line} has no x, along which dodging sets marks side by side"},
         {:dodge2,
          "got: :dodge2, since #{line} has no x, along which dodging sets marks side by side"},
-        {:jitter, "got: :jitter, since #{line} has no x or y, which jittering moves"}
+        {:jitter, "got: :jitter, since #{line} has no x or y, which jittering moves"},
+        {:jitterdodge,
+         "got: :jitterdodge, since #{line} has no x or y, which jittering beside dodging moves"}
       ]
     end
 
@@ -5508,19 +5565,19 @@ defmodule Giggly.PlotTest do
     test "a refusal names the positions the marks take" do
       for {function, plot, mapping, given, taken} <- [
             {:geom_point, Plot.new(@placed, %{x: :x, y: :y}), %{}, [],
-             ":identity, :stack, :fill, :dodge, :dodge2, :jitter or :nudge"},
+             ":identity, :stack, :fill, :dodge, :dodge2, :jitter, :jitterdodge or :nudge"},
             {:geom_boxplot, Plot.new(@placed, %{x: :g, y: :y}), %{}, [],
              ":identity, :dodge, :dodge2 or :nudge"},
             {:geom_hline, Plot.new(@placed), %{}, [yintercept: 1], ":identity or :nudge"}
           ] do
         error =
           assert_raise NimbleOptions.ValidationError, fn ->
-            added(function, plot, mapping, given, position: :jitterdodge)
+            added(function, plot, mapping, given, position: :beeswarm)
           end
 
         assert error.message =~
                  "expected #{taken}, alone or in a tuple with a keyword list of its options, " <>
-                   "got: :jitterdodge"
+                   "got: :beeswarm"
       end
     end
 
@@ -5782,8 +5839,9 @@ defmodule Giggly.PlotTest do
             {{:nudge, x: 0.1}, "in :nudge's options, unknown options [:x]"},
             {{:stack, fill: true}, "in :stack's options, unknown options [:fill]"},
             {{:dodge, :wide},
-             "expected :identity, :stack, :fill, :dodge, :dodge2, :jitter or :nudge, alone or in a " <>
-               "tuple with a keyword list of its options, got: {:dodge, :wide}"},
+             "expected :identity, :stack, :fill, :dodge, :dodge2, :jitter, :jitterdodge or " <>
+               ":nudge, alone or in a tuple with a keyword list of its options, got: {:dodge, " <>
+               ":wide}"},
             {{"dodge", []}, "got: {\"dodge\", []}"}
           ] do
         error =
@@ -5906,6 +5964,59 @@ defmodule Giggly.PlotTest do
 
         assert error.key == :position
         assert error.message =~ "in :jitter's options, "
+        assert error.message =~ message
+      end
+    end
+
+    test "jittering beside dodging records its widths as floats, its height 0 and seed 0 unless given" do
+      plot = Plot.new(@rows, %{x: :cyl, y: :mpg})
+
+      for {options, struct} <- [
+            {[],
+             %Position.Jitterdodge{
+               jitter_width: :none,
+               jitter_height: 0.0,
+               dodge_width: 0.75,
+               seed: 0
+             }},
+            {[jitter_width: 1, jitter_height: 2, dodge_width: -1, seed: 12],
+             %Position.Jitterdodge{
+               jitter_width: 1.0,
+               jitter_height: 2.0,
+               dodge_width: -1.0,
+               seed: 12
+             }}
+          ] do
+        assert [%Plot.Layer{position: position}] =
+                 Plot.geom_point(plot, position: {:jitterdodge, options}).reversed_layers
+
+        assert position === struct
+      end
+    end
+
+    # ggplot2 4.0.3 takes a negative jitter and moves nothing by it, and takes `reverse = TRUE`
+    # and moves nothing by that either: its dodge ranks the groups at a position by group,
+    # whatever the row order `reverse` sets (`jd_edges.R`, every cell of the positions sweep).
+    test "jittering beside dodging refuses a negative jitter, a seed not an integer, and reverse:" do
+      plot = Plot.new(@rows, %{x: :cyl, y: :mpg})
+
+      for {options, message} <- [
+            {[jitter_width: -1], "expected a distance, a number 0 or more, got: -1"},
+            {[jitter_height: -0.5], "expected a distance, a number 0 or more, got: -0.5"},
+            {[dodge_width: "wide"], "expected a width, a number, got: \"wide\""},
+            {[seed: 1.5], "invalid value for :seed option: expected integer, got: 1.5"},
+            {[reverse: true],
+             "expected :jitterdodge without its reverse:, got: {:jitterdodge, [reverse: " <>
+               "true]}, since the groups at a position are set side by side lowest first " <>
+               "whatever it says, as ggplot2's position_jitterdodge() sets them, so it would " <>
+               "change nothing"}
+          ] do
+        error =
+          assert_raise NimbleOptions.ValidationError, fn ->
+            Plot.geom_point(plot, position: {:jitterdodge, options})
+          end
+
+        assert error.key == :position
         assert error.message =~ message
       end
     end

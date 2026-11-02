@@ -21,7 +21,8 @@ defprotocol Giggly.Position do
   # each mark the distance its layer sets or maps, as `geom_text()` defaults `position = "nudge"`,
   # and jittering
   # (`Giggly.Position.Jitter`) a small random one, as `geom_jitter()` defaults `position =
-  # "jitter"`.
+  # "jitter"`; jittering beside dodging (`Giggly.Position.Jitterdodge`) sets the marks side by side
+  # and then jitters them, as points over dodged box plots are.
   #
   # A position may read aesthetics of its own, as nudging reads `nudge_x` and `nudge_y`; it declares
   # them with their defaults, as ggplot2's position declares its `default_aes`, and the assembly
@@ -35,7 +36,7 @@ defprotocol Giggly.Position do
   # their protocol implementations, which no boundary exports.
   use Boundary,
     deps: [Giggly.Aesthetics, Giggly.DataFrame, Giggly.Resolution],
-    exports: [Dodge, Dodge2, Identity, Jitter, Nudge, Stack]
+    exports: [Dodge, Dodge2, Identity, Jitter, Jitterdodge, Nudge, Stack]
 
   alias Giggly.DataFrame
 

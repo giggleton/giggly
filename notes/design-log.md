@@ -79,6 +79,19 @@ stops the question being reopened from scratch. A new entry is about 150 words: 
 sentence or two of why, and one line per rejected alternative. What a later decision replaces is
 deleted from the entry it was in, never marked superseded; git history keeps every version.
 
+- **Jittering beside dodging takes R's options but `reverse`, which it refuses (2026-11-01,
+  Steve: "1", scoping the positions' step 6).** `{:jitterdodge, options}` takes `jitter_width:`,
+  `jitter_height:` (0), `dodge_width:` (0.75) and `seed:` (0, as jittering's), and is taken
+  wherever `:jitter` is, as R fails exactly where jitter fails. As R: the dodge is
+  `position_dodge(width = dodge.width)`'s, groups ranked within each `xmin`; the sideways amount,
+  given or not, is divided by the most groups at one x in any panel plus 2; one not given is 0.4
+  of the layer's spacing over every panel, before dodging. `reverse: true` is refused, saying it
+  changes nothing: R's dodge ranks groups by group, so the row order it flips never shows, on any
+  layer of the sweep. *Rejected: taking `reverse:` and moving nothing*, as R, an option that
+  changes nothing. *Rejected: reversing the groups*, as R's docs say, a departure from what R
+  draws. Found beside it: a jittered line range or error bar missing its cross position is
+  refused at the call, as R fails, where Giggly crashed when run.
+
 - **Dodging takes R's options, and refuses an orientation where the marks say which way they run
   (2026-11-01, Steve: "a", scoping the positions' step 5).** `{:dodge, options}` takes `width:`,
   `preserve:` (`:total`, `:single`), `orientation:` (`:x`, `:y`) and `reverse:`, ranking groups as
@@ -1158,8 +1171,7 @@ deleted from the entry it was in, never marked superseded; git history keeps eve
   point-and-label case R needs a seed for. *Rejected: the layer's index as the default seed* —
   layers would differ as R's do, but adding a layer underneath would move every point. *Rejected:
   `Nx.Random`* — jitter is noise, not an analysis result, and Nx would put `Giggly.Tensor` in
-  `Position`'s deps. *Deferred:* `position_jitterdodge()`, with dodging's `width:`
-  for marks without edges (Steve).
+  `Position`'s deps.
 
 - **A jitter's distances are Erlang's random numbers, and a drawing is checked by R drawing them
   (2026-10-26, Steve, agreeing the proposal).** R's come from its own generator and seeding,

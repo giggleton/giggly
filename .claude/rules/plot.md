@@ -350,7 +350,11 @@ stat and position" and "Each facet, coordinate system, geom, stat and position i
   `seed:`, any integer, 0 when not given, and stacking's and filling's `vjust:`, any number, a
   float, 1 when not given, never a list, which R hands out down each pile by rank (design-log §4,
   the entry beginning "Filling is stacking"), and `reverse:`, `false` when not given, `:fill`
-  recorded as stacking with `fill: true`; nudging and the identity take none. Its
+  recorded as stacking with `fill: true`, and jittering beside dodging's `jitter_width:`, as
+  jittering's `width:`, `jitter_height:`, 0 or more, 0.0 when not given, `dodge_width:`, any
+  number, 0.75 when not given, and `seed:`, as jittering's, its `reverse:` refused before its
+  schema, saying R's changes nothing (design-log §4, the entry beginning "Jittering beside
+  dodging takes R's options"); nudging and the identity take none. Its
   options never become the geom's (design-log §4, the entry beginning "Dodging by clusters takes
   `preserve:`"). **Every layer function takes every position that moves its marks in ggplot2,
   found by sweeping each function against each position in R, and refuses the rest, saying why**
@@ -366,9 +370,10 @@ stat and position" and "Each facet, coordinate system, geom, stat and position i
   point ranges, ribbons, areas, densities, smooths, every summary), refuse dodging's
   `orientation:`, which R ignores (design-log §4, the entry beginning "Dodging takes R's
   options"); a box plot and a rectangle refuse stacking, filling and jittering, R failing at a
-  box's missing y and stacking no rectangle, which has no x, and failing to fill one; and filling
-  is taken and refused wherever stacking is; a horizontal or vertical line takes only
-  `:identity` and `:nudge`; a diagonal line and an annotation take no `position:`, as R's
+  box's missing y and stacking no rectangle, which has no x, and failing to fill one; filling
+  is taken and refused wherever stacking is, and jittering beside dodging wherever jittering is,
+  with no width needed, its dodge's being 0.75 unless given; a horizontal or vertical line takes
+  only `:identity` and `:nudge`; a diagonal line and an annotation take no `position:`, as R's
   `geom_abline()` and `annotate()` take none. Each function's default is ggplot2's: stacking for
   bars, bins, areas and `stat_density/3`, nudging for text and labels, dodging by clusters for box
   plots, jittering for `geom_jitter/3`, the identity elsewhere. `geom_boxplot/3` with `varwidth:
@@ -385,8 +390,10 @@ stat and position" and "Each facet, coordinate system, geom, stat and position i
   `geom_jitter/3`'s own `width:` and `height:` are recorded as jittering's and refused beside
   `position:`, as ggplot2's `geom_jitter()` refuses both, and it takes no `seed:`, as ggplot2's
   does not (design-log §4, the entry beginning "`geom_jitter` is Phase 3's fourteenth").
-  `geom_rug/3` jittered needs both `:x` and `:y`, as `position_jitter()` does, where it otherwise
-  needs one of them (design-log §4, the entry beginning "`geom_rug()` draws ggplot2's rugs").
+  `geom_rug/3` jittered, beside dodging or not, needs both `:x` and `:y`, as `position_jitter()`
+  and `position_jitterdodge()` do, where it otherwise needs one of them (design-log §4, the entry
+  beginning "`geom_rug()` draws ggplot2's rugs"), and so does a line range or error bar jittered
+  either way, the position across its range checked after its range, where R fails when it builds.
 - **An option that sets an aesthetic for every mark (`alpha:`, `colour:`, `fill:`, `linewidth:`)
   is recorded in the layer's `fixed`, by canonical name**, as ggplot2's `aes_params`; every geom
   function takes `alpha:` and `colour:`, the bar, rectangle, ribbon, area, density, smooth,

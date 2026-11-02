@@ -549,7 +549,49 @@ defmodule Giggly.Plot.Options do
             "same rows the same way, so another seed draws other distances."
       ]
     ],
+    jitterdodge: [
+      jitter_width: [
+        type: @jitter_amount_type,
+        doc:
+          "How far each mark moves at most to either side of its share, in the units of the " <>
+            "axis it is dodged along, 0 or more, before it is divided by the most groups at one " <>
+            "position in any panel plus 2; 0.4 of the closest spacing of the layer's positions " <>
+            "along that axis, over every panel, when not given, 0.4 on a discrete axis."
+      ],
+      jitter_height: [
+        type: @jitter_amount_type,
+        default: 0.0,
+        doc:
+          "How far each mark moves at most along the other axis, up or down for marks dodged " <>
+            "along x, in that axis's units, 0 or more, so marks move only to the side unless " <>
+            "given."
+      ],
+      dodge_width: [
+        type: {:custom, __MODULE__, :validate_width, []},
+        default: 0.75,
+        doc:
+          "How wide the space is that the groups at one position share, in the units of the " <>
+            "axis they are dodged along, any number."
+      ],
+      seed: [
+        type: :integer,
+        default: 0,
+        doc:
+          "The seed the random distances are drawn from, any integer: the same seed moves the " <>
+            "same rows the same way, so another seed draws other distances."
+      ]
+    ],
     nudge: []
+  }
+
+  # The options a position refuses whatever the marks, each with why it would change nothing,
+  # checked before its schema, which holds none of them.
+  @position_kind_refused_options %{
+    jitterdodge: [
+      reverse:
+        "the groups at a position are set side by side lowest first whatever it says, as " <>
+          "ggplot2's position_jitterdodge() sets them, so it would change nothing"
+    ]
   }
 
   @position_kind_schemas Map.new(@position_kind_options, fn {kind, options} ->
@@ -560,7 +602,7 @@ defmodule Giggly.Plot.Options do
   # with why R fails or moves nothing (`validate_position/2`). Marks with a width of their own,
   # tiles and rasters, take every position, but no width for dodging by clusters, which R reads
   # only for marks without edges.
-  @all_positions [:identity, :stack, :fill, :dodge, :dodge2, :jitter, :nudge]
+  @all_positions [:identity, :stack, :fill, :dodge, :dodge2, :jitter, :jitterdodge, :nudge]
 
   @width_unread "the marks have edges of their own, which it sets side by side, so a width would " <>
                   "change nothing"
@@ -598,7 +640,9 @@ defmodule Giggly.Plot.Options do
     refuses: [
       stack: "a box plot's rows have no y once its stat has run, which stacking piles",
       fill: "a box plot's rows have no y once its stat has run, which filling piles",
-      jitter: "a box plot's rows have no y once its stat has run, which jittering moves"
+      jitter: "a box plot's rows have no y once its stat has run, which jittering moves",
+      jitterdodge:
+        "a box plot's rows have no y once its stat has run, which jittering beside dodging moves"
     ],
     refuses_options: [dodge: [orientation: @orientation_unread], dodge2: [width: @width_unread]]
   ]
@@ -609,7 +653,8 @@ defmodule Giggly.Plot.Options do
     refuses: [
       stack: "a rectangle has no x, at which stacking piles marks, so none would move",
       fill: "a rectangle has no x, at which filling piles marks",
-      jitter: "a rectangle has no x or y, which jittering moves"
+      jitter: "a rectangle has no x or y, which jittering moves",
+      jitterdodge: "a rectangle has no x or y, which jittering beside dodging moves"
     ],
     refuses_options: [dodge2: [width: @width_unread]]
   ]
@@ -623,7 +668,8 @@ defmodule Giggly.Plot.Options do
       fill: "a horizontal line has no y, which filling piles",
       dodge: "a horizontal line has no x, along which dodging sets marks side by side",
       dodge2: "a horizontal line has no x, along which dodging sets marks side by side",
-      jitter: "a horizontal line has no x or y, which jittering moves"
+      jitter: "a horizontal line has no x or y, which jittering moves",
+      jitterdodge: "a horizontal line has no x or y, which jittering beside dodging moves"
     ]
   ]
 
@@ -634,7 +680,8 @@ defmodule Giggly.Plot.Options do
       fill: "a vertical line has no y, which filling piles, so none would move",
       dodge: "a vertical line has no x, along which dodging sets marks side by side",
       dodge2: "a vertical line has no x, along which dodging sets marks side by side",
-      jitter: "a vertical line has no x or y, which jittering moves"
+      jitter: "a vertical line has no x or y, which jittering moves",
+      jitterdodge: "a vertical line has no x or y, which jittering beside dodging moves"
     ]
   ]
 
@@ -647,7 +694,8 @@ defmodule Giggly.Plot.Options do
         "piled on one another (`:stack`), piled to the same height (`:fill`), set side by side " <>
         "within the width one mark takes or the width given (`:dodge`), set side by side, each " <>
         "its share of their widths, with a gap between them (`:dodge2`), each moved a small " <>
-        "random distance (`:jitter`), or nudged (`:nudge`), each alone or with its options, as " <>
+        "random distance (`:jitter`), set side by side and then each moved a small random " <>
+        "distance (`:jitterdodge`), or nudged (`:nudge`), each alone or with its options, as " <>
         "[Positions](#module-positions) says."
   ]
 
@@ -659,8 +707,9 @@ defmodule Giggly.Plot.Options do
         "piled on one another (`:stack`), piled to the same height (`:fill`), set side by side " <>
         "within the width given, `{:dodge, width: width}`, or each taken as that wide and set " <>
         "side by side with the marks it overlaps, `{:dodge2, width: width}`, having no width of " <>
-        "their own to share, each moved a small random distance (`:jitter`), or nudged " <>
-        "(`:nudge`), each alone or with its options, as [Positions](#module-positions) says."
+        "their own to share, each moved a small random distance (`:jitter`), set side by side " <>
+        "and then each moved a small random distance (`:jitterdodge`), or nudged (`:nudge`), " <>
+        "each alone or with its options, as [Positions](#module-positions) says."
   ]
 
   # The same two for marks that say which way they run.
@@ -4908,6 +4957,7 @@ defmodule Giggly.Plot.Options do
   defp checked_position(kind, options, given, positions) do
     with :ok <- taken(kind, given, positions),
          true <- once?(options) || {:error, position_options_error(given)},
+         :ok <- unrefused_kind_options(kind, options, given),
          {:ok, _validated} <- NimbleOptions.validate(options, position_kind(kind)),
          :ok <- unrefused_options(kind, options, given, positions),
          :ok <- with_width(kind, options, given, Keyword.fetch(positions, :needs_width)) do
@@ -4937,6 +4987,11 @@ defmodule Giggly.Plot.Options do
     end
   end
 
+  # Whether `options` names none of the options `kind` refuses whatever the marks: one it refuses
+  # names the reason.
+  defp unrefused_kind_options(kind, options, given),
+    do: refused_option(kind, options, given, Map.get(@position_kind_refused_options, kind, []))
+
   # Whether `options` names none of the options the marks refuse for `kind`: one they refuse
   # names the reason.
   defp unrefused_options(kind, options, given, positions) do
@@ -4945,6 +5000,11 @@ defmodule Giggly.Plot.Options do
       |> Keyword.get(:refuses_options, [])
       |> Keyword.get(kind, [])
 
+    refused_option(kind, options, given, refused)
+  end
+
+  # `:ok` where `options` names none of `refused`, else an error naming the first and its reason.
+  defp refused_option(kind, options, given, refused) do
     case Enum.find(refused, :none, fn {option, _reason} -> Keyword.has_key?(options, option) end) do
       :none ->
         :ok

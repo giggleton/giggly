@@ -930,6 +930,197 @@ defmodule Giggly.PositionTest do
     end
   end
 
+  # R's jitter is not reproduced (see jittering's tests), so these pin the dodge to ggplot2 4.0.3's
+  # `layer_data()` in R 4.6.1 with `jitter.width = 0`, and the jitter to `exsss`'s numbers from the
+  # seed at R's amounts: `width / (ndodge + 2)`, ndodge the most groups at one x in any panel, the
+  # width not given 0.4 of the layer's closest spacing over every panel (`jd_edges.R`, the
+  # positions sweep's `jd_*` cells).
+  describe "compute_layer/3 for jittering beside dodging" do
+    # R: `geom_point(aes(xd, y, colour = g), position = position_jitterdodge(jitter.width = 0))`,
+    # its rows unsorted, three groups at p, two at q and r; the same as `position_dodge(width =
+    # 0.75)`, and as R draws it with `reverse = TRUE`.
+    test "dodges the groups at each position within 0.75, lowest first, and gives a point a top" do
+      frame =
+        DataFrame.new(
+          panel: List.duplicate(1, 7),
+          group: [5, 3, 1, 4, 2, 7, 6],
+          x: [2, 1, 1, 2, 1, 3, 3],
+          y: [1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0]
+        )
+
+      dodged = Position.compute_layer(still(), frame, %{x: :discrete, y: :continuous})
+
+      assert Enum.map([:x, :xmin, :xmax, :ymax], fn name -> DataFrame.pull(dodged, name) end) ===
+               [
+                 [2.1875, 1.25, 0.75, 1.8125, 1.0, 3.1875, 2.8125],
+                 [2.0, 1.125, 0.625, 1.625, 0.875, 3.0, 2.625],
+                 [2.375, 1.375, 0.875, 2.0, 1.125, 3.375, 3.0],
+                 [1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0]
+               ]
+    end
+
+    # R: `geom_col(position = position_jitterdodge(jitter.width = 0))`, bars 0.9 wide.
+    test "a bar keeps its own width over the number of groups, centred in its share" do
+      dodged =
+        Position.compute_layer(still(), bar_rows([1.0, 1.0], [1, 2], [3.0, 4.0]), @continuous)
+
+      assert Enum.map([:x, :xmin, :xmax], fn name -> DataFrame.pull(dodged, name) end) ===
+               [[0.8125, 1.1875], [0.5875, 0.9625], [1.0375, 1.4125]]
+    end
+
+    # R: the most groups at one x set the amount in every panel, 0.4 / 5 on a discrete axis; a
+    # panel of two groups beside one of three jitters at most 0.0797 (`jd_panels.R`).
+    test "the sideways amount is 0.4 over the most groups at one x in any panel plus 2" do
+      frame =
+        DataFrame.new(
+          panel: [1, 1, 2, 2, 2],
+          group: [1, 2, 1, 2, 3],
+          x: [1, 1, 1, 1, 1],
+          y: [1.0, 2.0, 3.0, 4.0, 5.0]
+        )
+
+      jittered =
+        Position.compute_layer(
+          %Position.Jitterdodge{
+            jitter_width: :none,
+            jitter_height: 0.0,
+            dodge_width: 0.75,
+            seed: 3
+          },
+          frame,
+          %{x: :discrete, y: :continuous}
+        )
+
+      [first, _, second, _] = draws(3, 4)
+      [_, _, _, _, third, _] = draws(3, 6)
+      # 0.4 of a discrete axis's spacing, 1, over three groups plus 2.
+      amount = 0.4 / 5
+
+      assert DataFrame.pull(jittered, :x) === [
+               0.8125 + distance(first, amount),
+               1.1875 + distance(second, amount),
+               0.75 + distance(first, amount),
+               1.0 + distance(second, amount),
+               1.25 + distance(third, amount)
+             ]
+    end
+
+    # R: positions 0.5 apart in one panel and alone in the others move at most 0.4 * 0.5 / 4 in
+    # every panel, where jittering alone works out each panel's.
+    test "the amount not given is worked out over the whole layer, before dodging" do
+      frame =
+        DataFrame.new(
+          panel: [1, 1, 2, 2, 3, 3],
+          group: [1, 2, 1, 2, 1, 2],
+          x: [2.0, 2.0, 1.5, 1.5, 1.0, 1.0],
+          y: [0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+        )
+
+      jittered =
+        Position.compute_layer(
+          %Position.Jitterdodge{
+            jitter_width: :none,
+            jitter_height: 0.0,
+            dodge_width: 0.75,
+            seed: 8
+          },
+          frame,
+          @continuous
+        )
+
+      [first, _, second, _] = draws(8, 4)
+      amount = 0.4 * 0.5 / 4
+
+      assert DataFrame.pull(jittered, :x) === [
+               1.8125 + distance(first, amount),
+               2.1875 + distance(second, amount),
+               1.3125 + distance(first, amount),
+               1.6875 + distance(second, amount),
+               0.8125 + distance(first, amount),
+               1.1875 + distance(second, amount)
+             ]
+    end
+
+    # R: `jitter.width = 0.5` beside two groups moves at most 0.125, `jitter.height = 0.3` at most
+    # 0.3, its edges with its x.
+    test "a width given is divided among the groups too, and a height given is not" do
+      frame = DataFrame.new(panel: [1, 1], group: [1, 2], x: [1.0, 1.0], y: [2.0, 3.0])
+
+      jittered =
+        Position.compute_layer(
+          %Position.Jitterdodge{
+            jitter_width: 0.5,
+            jitter_height: 0.3,
+            dodge_width: 0.75,
+            seed: 4
+          },
+          frame,
+          @continuous
+        )
+
+      [first_across, first_up, second_across, second_up] = draws(4, 4)
+      across = 0.5 / 4
+
+      assert Enum.map([:x, :xmin, :y, :ymax], fn name -> DataFrame.pull(jittered, name) end) ===
+               [
+                 [
+                   0.8125 + distance(first_across, across),
+                   1.1875 + distance(second_across, across)
+                 ],
+                 [0.625 + distance(first_across, across), 1.0 + distance(second_across, across)],
+                 [2.0 + distance(first_up, 0.3), 3.0 + distance(second_up, 0.3)],
+                 [2.0 + distance(first_up, 0.3), 3.0 + distance(second_up, 0.3)]
+               ]
+    end
+
+    # R: points over a continuous x and a discrete y are dodged and jittered sideways along y.
+    test "marks whose one discrete axis is y are dodged and jittered sideways along y" do
+      frame = DataFrame.new(panel: [1, 1], group: [1, 2], x: [2.0, 3.0], y: [1, 1])
+
+      jittered =
+        Position.compute_layer(
+          %Position.Jitterdodge{
+            jitter_width: :none,
+            jitter_height: 0.3,
+            dodge_width: 0.75,
+            seed: 6
+          },
+          frame,
+          %{x: :continuous, y: :discrete}
+        )
+
+      [first_across, first_up, second_across, second_up] = draws(6, 4)
+      # 0.4 of a discrete axis's spacing, 1, over two groups plus 2.
+      sideways = 0.4 / 4
+
+      assert Enum.map([:x, :y, :ymin], fn name -> DataFrame.pull(jittered, name) end) === [
+               [2.0 + distance(first_across, 0.3), 3.0 + distance(second_across, 0.3)],
+               [0.8125 + distance(first_up, sideways), 1.1875 + distance(second_up, sideways)],
+               [0.625 + distance(first_up, sideways), 1.0 + distance(second_up, sideways)]
+             ]
+    end
+
+    # R: x 1, 1, NA, 2, 2 of groups a, b, a, a, b dodge to 0.8125, 1.1875, NA, 1.8125, 2.1875.
+    test "a row missing its x or y stays missing, and the rest dodge as R's" do
+      frame =
+        DataFrame.new(
+          panel: [1, 1, 1, 1, 1],
+          group: [1, 2, 1, 1, 2],
+          x: [1.0, 1.0, nil, 2.0, 2.0],
+          y: [1.0, 2.0, 3.0, nil, 5.0]
+        )
+
+      dodged = Position.compute_layer(still(), frame, @continuous)
+
+      assert {DataFrame.pull(dodged, :x), DataFrame.pull(dodged, :y)} ===
+               {[0.8125, 1.1875, nil, 1.8125, 2.1875], [1.0, 2.0, 3.0, nil, 5.0]}
+    end
+  end
+
+  # Jittering beside dodging within 0.75 with no jitter, so the marks are only dodged.
+  defp still,
+    do: %Position.Jitterdodge{jitter_width: 0.0, jitter_height: 0.0, dodge_width: 0.75, seed: 1}
+
   # `value` with its type hidden from the compiler, so a test can hand a function a value its
   # guards refuse.
   @spec untyped(term()) :: term()

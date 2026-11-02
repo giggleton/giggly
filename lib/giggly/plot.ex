@@ -51,8 +51,8 @@ defmodule Giggly.Plot do
   bars, tiles and error bars, take them all. Marks with none, such as points, lines, text, line
   ranges and areas, are dodged, either way, only within a width given, `{:dodge, width: 0.9}` or
   `{:dodge2, width: 0.5}`, since without one neither would move them. Box plots and rectangles are
-  neither stacked, filled nor jittered, and a horizontal or vertical line is only nudged; a
-  diagonal line takes no position.
+  neither stacked, filled nor jittered, beside dodging or not, and a horizontal or vertical line is
+  only nudged; a diagonal line takes no position.
 
   Stacking and dodging move marks along x, and horizontal marks along y: those the layer makes
   horizontal, such as bars counted along `y` or a line range from `xmin` to `xmax`, and those whose
@@ -204,6 +204,32 @@ defmodule Giggly.Plot do
       [0.0673789719000282, 1.0819934130875033]
       iex> plot |> Giggly.layer_data(1) |> Giggly.DataFrame.pull(:x)
       [0.0673789719000282, 1.0819934130875033]
+
+  ### Setting marks side by side, then moving them a random distance: `:jitterdodge`
+
+  The marks of different groups at one position are set side by side within `dodge_width:`, as
+  `{:dodge, width: dodge_width}` sets them, then each moves by a distance drawn evenly from minus
+  to plus its amount to either side, and up and down by up to `jitter_height:`, 0 unless given, so
+  points drawn over box plots dodged by the same groups spread across their own group's box. The
+  sideways amount is `jitter_width:`, else 0.4 of the closest spacing of the layer's positions,
+  over every panel, divided by the most groups at one position in any panel plus 2, so the points
+  of each group keep to their share; the distances are drawn as `:jitter` draws them, from
+  `seed:`. Marks with no width of their own are dodged within `dodge_width:` too, and so are
+  marks whose one discrete axis is `y`, along y. A layer jittered this way needs both `x` and
+  `y`, as `:jitter` does.
+
+  #{NimbleOptions.docs(Giggly.Plot.Options.position_kind(:jitterdodge))}
+
+      iex> plot =
+      ...>   %{"cut" => ["a", "a", "a", "a"], "carat" => [1.0, 2.0, 3.0, 4.0]}
+      ...>   |> Map.put("clarity", ["p", "q", "p", "q"])
+      ...>   |> Giggly.Plot.new(%{x: :cut, y: :carat, fill: :clarity})
+      ...>   |> Giggly.Plot.geom_boxplot()
+      ...>   |> Giggly.Plot.geom_point(position: :jitterdodge)
+      iex> plot |> Giggly.layer_data(0) |> Giggly.DataFrame.pull(:x)
+      [0.8125, 1.1875]
+      iex> plot |> Giggly.layer_data(1) |> Giggly.DataFrame.pull(:x)
+      [0.8086663925491824, 1.2857778162399303, 0.7413202475792124, 1.1838679705192539]
 
   ## Colours
 
@@ -5755,6 +5781,7 @@ defmodule Giggly.Plot do
   defp position_name(%Position.Dodge{}), do: :dodge
   defp position_name(%Position.Dodge2{}), do: :dodge2
   defp position_name(%Position.Jitter{}), do: :jitter
+  defp position_name(%Position.Jitterdodge{}), do: :jitterdodge
 
   # The layer `geom_smooth/3` and `stat_smooth/3` add, a curve fitted to each group, its mistakes
   # named as `function`'s: its method, `:none` when not given, and how its curves are worked out
@@ -6018,6 +6045,15 @@ defmodule Giggly.Plot do
     }
   end
 
+  defp position_struct(:jitterdodge, options) do
+    %Position.Jitterdodge{
+      jitter_width: Keyword.get(options, :jitter_width, :none),
+      jitter_height: Keyword.fetch!(options, :jitter_height),
+      dodge_width: Keyword.fetch!(options, :dodge_width),
+      seed: Keyword.fetch!(options, :seed)
+    }
+  end
+
   defp width_given(options), do: Keyword.get(options, :width, :none)
 
   # A jitter layer's position: the one given, or one moving its points as `width:` and `height:`
@@ -6264,13 +6300,14 @@ defmodule Giggly.Plot do
     }
   end
 
-  # What a rug layer needs: one of its positions, or, jittered, both, which jittering moves.
-  defp rug_requirements(%Position.Jitter{}) do
+  # What a rug layer needs: one of its positions, or, jittered, beside dodging or not, both, which
+  # jittering moves.
+  defp rug_requirements(%jittering{}) when jittering in [Position.Jitter, Position.Jitterdodge] do
     [
       required: [:x, :y],
       unmet:
         "neither its mapping nor the plot's maps it, and its rugs are jittered, which moves " <>
-          "each row across and up, as ggplot2's position_jitter() needs both"
+          "each row across and up, as ggplot2's #{jittering_function(jittering)} needs both"
     ]
   end
 
@@ -6651,7 +6688,7 @@ defmodule Giggly.Plot do
   # `has_flipped_aes(range_is_orthogonal = TRUE)` reads a range, and needs the three positions it
   # runs along there: `:x`, `:ymin` and `:ymax`, or `:y`, `:xmin` and `:xmax`. ggplot2 aborts when
   # it builds a vertical layer without them, and draws nothing for a horizontal one; Giggly refuses
-  # either at the call.
+  # either at the call. Jittered, it needs the position across them too (`check_jittered_range/5`).
   defp check_range(plot, %Layer{geom: %{orientation: orientation}} = layer, function) do
     given =
       plot
@@ -6664,7 +6701,7 @@ defmodule Giggly.Plot do
 
     case Enum.reject(needed, fn aesthetic -> aesthetic in given end) do
       [] ->
-        plot
+        check_jittered_range(plot, layer, along, given, function)
 
       missing ->
         raise ArgumentError,
@@ -6674,6 +6711,28 @@ defmodule Giggly.Plot do
                 ":xmin to :xmax at each :y; orientation: chooses where both are given."
     end
   end
+
+  # A jittered range layer, beside dodging or not, needs the position across the axis it runs
+  # along too, `:y` along x and `:x` along y, which jittering moves every row by, as ggplot2's
+  # jittering positions require both and fail without one.
+  defp check_jittered_range(plot, %Layer{position: %jittering{}}, along, given, function)
+       when jittering in [Position.Jitter, Position.Jitterdodge] do
+    across = if along == :x, do: :y, else: :x
+
+    if across in given do
+      plot
+    else
+      raise ArgumentError,
+            "#{function} runs along #{along} and is jittered, which moves each row across and " <>
+              "up, so it needs #{inspect(across)} too, but neither its mapping nor the plot's " <>
+              "gives it, as ggplot2's #{jittering_function(jittering)} needs both"
+    end
+  end
+
+  defp check_jittered_range(plot, _layer, _along, _given, _function), do: plot
+
+  defp jittering_function(Position.Jitter), do: "position_jitter()"
+  defp jittering_function(Position.Jitterdodge), do: "position_jitterdodge()"
 
   defp range_along(:none, given),
     do: if(Enum.any?([:ymin, :ymax], fn end_given -> end_given in given end), do: :x, else: :y)
