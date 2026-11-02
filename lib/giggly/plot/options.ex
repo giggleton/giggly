@@ -483,9 +483,40 @@ defmodule Giggly.Plot.Options do
           "How wide the space is that the marks at one position share, in the units of the " <>
             "axis they are dodged along, any number; the panel's first mark's width when not " <>
             "given, so marks with no width of their own, such as line ranges, are not moved."
+      ],
+      preserve: [
+        type: {:in, [:total, :single]},
+        default: :total,
+        doc:
+          "Whether the marks at a position share the whole width (`:total`), or each takes the " <>
+            "share it would among the most groups any one position holds, the first share first, " <>
+            "so a position with fewer leaves room after them (`:single`)."
+      ],
+      orientation: [
+        type: {:in, [:x, :y]},
+        default: :x,
+        doc:
+          "The axis the marks are dodged along where neither the layer nor its data says which " <>
+            "way they run: points or text over two continuous axes, say, which `:y` dodges up " <>
+            "the panel. Marks whose one discrete axis is `y` are dodged along y whatever this " <>
+            "says, and a layer whose marks always say which way they run, bars, box plots, " <>
+            "ranges, lines and areas, takes none."
+      ],
+      reverse: [
+        type: :boolean,
+        default: false,
+        doc: "Whether the marks at a position run from the highest group to the lowest."
       ]
     ],
     dodge2: [
+      width: [
+        type: {:custom, __MODULE__, :validate_width, []},
+        doc:
+          "How wide each mark with no width of its own, such as a point or a line range, is " <>
+            "taken to be, in the units of the axis it is dodged along, any number, so each is " <>
+            "set side by side with the marks it overlaps, whatever their groups; a layer whose " <>
+            "marks have widths of their own, bars, box plots and error bars, takes none."
+      ],
       preserve: [
         type: {:in, [:total, :single]},
         default: :total,
@@ -527,18 +558,37 @@ defmodule Giggly.Plot.Options do
 
   # The positions each family of layers takes, as ggplot2's take them, and those it refuses, each
   # with why R fails or moves nothing (`validate_position/2`). Marks with a width of their own,
-  # bars, bins, error bars, crossbars, tiles and frequency polygons' bins, take every position.
-  @positions_with_width [takes: [:identity, :stack, :fill, :dodge, :dodge2, :jitter, :nudge]]
+  # tiles and rasters, take every position, but no width for dodging by clusters, which R reads
+  # only for marks without edges.
+  @all_positions [:identity, :stack, :fill, :dodge, :dodge2, :jitter, :nudge]
 
-  # Marks with no width of their own, points, lines, text, line ranges, areas and the rest, are
+  @width_unread "the marks have edges of their own, which it sets side by side, so a width would " <>
+                  "change nothing"
+  @orientation_unread "the marks say which way they run, which dodging reads first, so an " <>
+                        "orientation would change nothing"
+
+  @positions_with_width [takes: @all_positions, refuses_options: [dodge2: [width: @width_unread]]]
+
+  # Marks with a width of their own that say which way they run, bars, bins, error bars, crossbars
+  # and frequency polygons' bins, whose stat or geom writes it in `flipped_aes`, so dodging reads
+  # no `orientation`, as R ignores it.
+  @oriented_positions_with_width [
+    takes: @all_positions,
+    refuses_options: [dodge: [orientation: @orientation_unread], dodge2: [width: @width_unread]]
+  ]
+
+  # Marks with no width of their own, points, text, paths, segments, rugs, counts and hexagons, are
   # dodged only within a width given, where ggplot2 warns "Width not defined" and moves none.
   @positions_without_width [
-    takes: [:identity, :stack, :fill, :dodge, :jitter, :nudge],
-    refuses: [
-      dodge2:
-        "the marks have no width of their own, by which dodging by clusters sets them side by " <>
-          "side, so none would move"
-    ],
+    takes: @all_positions,
+    needs_width: "the marks have no width of their own to share, so none would move"
+  ]
+
+  # Marks with no width of their own that say which way they run, lines, line and point ranges,
+  # ribbons, areas, densities and smooths.
+  @oriented_positions_without_width [
+    takes: @all_positions,
+    refuses_options: [dodge: [orientation: @orientation_unread]],
     needs_width: "the marks have no width of their own to share, so none would move"
   ]
 
@@ -549,7 +599,8 @@ defmodule Giggly.Plot.Options do
       stack: "a box plot's rows have no y once its stat has run, which stacking piles",
       fill: "a box plot's rows have no y once its stat has run, which filling piles",
       jitter: "a box plot's rows have no y once its stat has run, which jittering moves"
-    ]
+    ],
+    refuses_options: [dodge: [orientation: @orientation_unread], dodge2: [width: @width_unread]]
   ]
 
   # A rectangle has corners and no x or y, so ggplot2 stacks none and fails to jitter one.
@@ -559,7 +610,8 @@ defmodule Giggly.Plot.Options do
       stack: "a rectangle has no x, at which stacking piles marks, so none would move",
       fill: "a rectangle has no x, at which filling piles marks",
       jitter: "a rectangle has no x or y, which jittering moves"
-    ]
+    ],
+    refuses_options: [dodge2: [width: @width_unread]]
   ]
 
   # A reference line has only its intercept, so ggplot2 moves one only by nudging it, stacks none
@@ -605,11 +657,25 @@ defmodule Giggly.Plot.Options do
     doc:
       "Where the marks are moved once the stat has run: left at their positions (`:identity`), " <>
         "piled on one another (`:stack`), piled to the same height (`:fill`), set side by side " <>
-        "within the width given, " <>
-        "`{:dodge, width: width}`, having no width of their own to share, each moved a small " <>
-        "random distance (`:jitter`), or nudged (`:nudge`), each alone or with its options, as " <>
-        "[Positions](#module-positions) says."
+        "within the width given, `{:dodge, width: width}`, or each taken as that wide and set " <>
+        "side by side with the marks it overlaps, `{:dodge2, width: width}`, having no width of " <>
+        "their own to share, each moved a small random distance (`:jitter`), or nudged " <>
+        "(`:nudge`), each alone or with its options, as [Positions](#module-positions) says."
   ]
+
+  # The same two for marks that say which way they run.
+  @oriented_position_with_width_option Keyword.put(
+                                         @position_with_width_option,
+                                         :type,
+                                         {:custom, __MODULE__, :validate_position,
+                                          [@oriented_positions_with_width]}
+                                       )
+  @oriented_position_without_width_option Keyword.put(
+                                            @position_without_width_option,
+                                            :type,
+                                            {:custom, __MODULE__, :validate_position,
+                                             [@oriented_positions_without_width]}
+                                          )
 
   # Where a layer's marks are drawn, ggplot2's `position`, `:identity` unless given: for marks with
   # a width of their own, error bars and crossbars, tiles and frequency polygons, and for those
@@ -624,6 +690,16 @@ defmodule Giggly.Plot.Options do
                                             :default,
                                             :identity
                                           )
+  @identity_oriented_position_with_width_option Keyword.put(
+                                                  @oriented_position_with_width_option,
+                                                  :default,
+                                                  :identity
+                                                )
+  @identity_oriented_position_without_width_option Keyword.put(
+                                                     @oriented_position_without_width_option,
+                                                     :default,
+                                                     :identity
+                                                   )
 
   # Where a point layer's points are placed, ggplot2's `position`.
   @point_position_option Keyword.put(@position_without_width_option, :default, :identity)
@@ -699,7 +775,7 @@ defmodule Giggly.Plot.Options do
 
   # How bars that share an `x` are placed, an option of `geom_bar/3`, `geom_col/3` and the binning
   # functions.
-  @bar_position_option Keyword.put(@position_with_width_option, :default, :stack)
+  @bar_position_option Keyword.put(@oriented_position_with_width_option, :default, :stack)
 
   # `geom_col/3`'s options, validated at the call.
   @bar_options NimbleOptions.new!(
@@ -872,7 +948,7 @@ defmodule Giggly.Plot.Options do
   @line_options NimbleOptions.new!(
                   [
                     data: @data_option,
-                    position: @identity_position_without_width_option,
+                    position: @identity_oriented_position_without_width_option,
                     orientation: @orientation_option,
                     alpha: @alpha_option,
                     color: @line_color_option,
@@ -922,7 +998,7 @@ defmodule Giggly.Plot.Options do
   @linerange_options NimbleOptions.new!(
                        [
                          data: @data_option,
-                         position: @identity_position_without_width_option,
+                         position: @identity_oriented_position_without_width_option,
                          orientation: @range_orientation_option
                        ] ++ @range_look_options ++ @nudge_options
                      )
@@ -958,7 +1034,7 @@ defmodule Giggly.Plot.Options do
   @pointrange_options NimbleOptions.new!(
                         [
                           data: @data_option,
-                          position: @identity_position_without_width_option,
+                          position: @identity_oriented_position_without_width_option,
                           orientation: @range_orientation_option
                         ] ++
                           Keyword.merge(@range_look_options, @pointrange_point_options) ++
@@ -978,7 +1054,7 @@ defmodule Giggly.Plot.Options do
   @errorbar_options NimbleOptions.new!(
                       [
                         data: @data_option,
-                        position: @identity_position_with_width_option,
+                        position: @identity_oriented_position_with_width_option,
                         orientation: @range_orientation_option,
                         width: @range_width_option
                       ] ++ @range_look_options ++ @nudge_options
@@ -1078,7 +1154,7 @@ defmodule Giggly.Plot.Options do
   @crossbar_options NimbleOptions.new!(
                       [
                         data: @data_option,
-                        position: @identity_position_with_width_option,
+                        position: @identity_oriented_position_with_width_option,
                         orientation: @range_orientation_option,
                         width: @range_width_option
                       ] ++
@@ -1191,7 +1267,7 @@ defmodule Giggly.Plot.Options do
   @ribbon_options NimbleOptions.new!(
                     [
                       data: @data_option,
-                      position: @identity_position_without_width_option,
+                      position: @identity_oriented_position_without_width_option,
                       orientation: [
                         type: {:in, [:x, :y]},
                         doc:
@@ -1208,7 +1284,8 @@ defmodule Giggly.Plot.Options do
   @area_options NimbleOptions.new!(
                   [
                     data: @data_option,
-                    position: Keyword.put(@position_without_width_option, :default, :stack),
+                    position:
+                      Keyword.put(@oriented_position_without_width_option, :default, :stack),
                     orientation: [
                       type: {:in, [:x, :y]},
                       default: :x,
@@ -1296,14 +1373,14 @@ defmodule Giggly.Plot.Options do
     pointrange:
       NimbleOptions.new!(
         @summary_stat_options ++
-          [position: @identity_position_without_width_option] ++
+          [position: @identity_oriented_position_without_width_option] ++
           Keyword.merge(@range_look_options, @pointrange_point_options) ++
           @nudge_options
       ),
     point:
       NimbleOptions.new!(
         @summary_stat_options ++
-          [position: @identity_position_without_width_option] ++
+          [position: @identity_oriented_position_without_width_option] ++
           @point_look_options ++
           @nudge_options
       ),
@@ -1311,7 +1388,7 @@ defmodule Giggly.Plot.Options do
       NimbleOptions.new!(
         @summary_stat_options ++
           [
-            position: @identity_position_without_width_option,
+            position: @identity_oriented_position_without_width_option,
             alpha: @alpha_option,
             color: @line_color_option,
             linewidth: @linewidth_option,
@@ -1325,7 +1402,7 @@ defmodule Giggly.Plot.Options do
       NimbleOptions.new!(
         @summary_stat_options ++
           [
-            position: @identity_position_with_width_option,
+            position: @identity_oriented_position_with_width_option,
             width: @bar_width_option,
             just: @bar_just_option
           ] ++
@@ -1335,7 +1412,7 @@ defmodule Giggly.Plot.Options do
     crossbar:
       NimbleOptions.new!(
         @summary_stat_options ++
-          [position: @identity_position_with_width_option, width: @range_width_option] ++
+          [position: @identity_oriented_position_with_width_option, width: @range_width_option] ++
           @crossbar_look_options ++
           @crossbar_line_look_options ++
           @crossbar_line_style_options ++
@@ -1344,14 +1421,14 @@ defmodule Giggly.Plot.Options do
     errorbar:
       NimbleOptions.new!(
         @summary_stat_options ++
-          [position: @identity_position_with_width_option, width: @range_width_option] ++
+          [position: @identity_oriented_position_with_width_option, width: @range_width_option] ++
           @range_look_options ++
           @nudge_options
       ),
     linerange:
       NimbleOptions.new!(
         @summary_stat_options ++
-          [position: @identity_position_without_width_option] ++
+          [position: @identity_oriented_position_without_width_option] ++
           @range_look_options ++
           @nudge_options
       ),
@@ -1359,7 +1436,7 @@ defmodule Giggly.Plot.Options do
       NimbleOptions.new!(
         @summary_stat_options ++
           [
-            position: @identity_position_without_width_option,
+            position: @identity_oriented_position_without_width_option,
             outline_type: [default: :both] ++ @outline_type_option
           ] ++
           @band_look_options ++ @line_style_options ++ @nudge_options
@@ -1463,7 +1540,7 @@ defmodule Giggly.Plot.Options do
   @density_options NimbleOptions.new!(
                      [
                        data: @data_option,
-                       position: @identity_position_without_width_option,
+                       position: @identity_oriented_position_without_width_option,
                        outline_type: [default: :upper] ++ @outline_type_option
                      ] ++
                        @density_estimate_options ++
@@ -1486,7 +1563,11 @@ defmodule Giggly.Plot.Options do
                           [
                             data: @data_option,
                             position:
-                              Keyword.put(@position_without_width_option, :default, :stack),
+                              Keyword.put(
+                                @oriented_position_without_width_option,
+                                :default,
+                                :stack
+                              ),
                             outline_type: [default: :both] ++ @outline_type_option
                           ] ++
                             @density_estimate_options ++
@@ -1499,7 +1580,7 @@ defmodule Giggly.Plot.Options do
   @smooth_options NimbleOptions.new!(
                     [
                       data: @data_option,
-                      position: @identity_position_without_width_option,
+                      position: @identity_oriented_position_without_width_option,
                       method: [
                         type: {:in, [:lm, :loess, :gam]},
                         doc:
@@ -1585,7 +1666,10 @@ defmodule Giggly.Plot.Options do
 
   # `geom_freqpoly/3`'s options, validated at the call: how the axis is cut into bins, and a path's.
   @freqpoly_options NimbleOptions.new!(
-                      [data: @data_option, position: @identity_position_with_width_option] ++
+                      [
+                        data: @data_option,
+                        position: @identity_oriented_position_with_width_option
+                      ] ++
                         @freqpoly_binning_options ++
                         [
                           alpha: @alpha_option,
@@ -4803,8 +4887,10 @@ defmodule Giggly.Plot.Options do
   # a tuple with a keyword list of its options, each given once, recorded as it is given, which
   # `Plot` validates again to fill each default. `positions` is one of the
   # families below: the positions the marks take (`takes:`), those they refuse, each with the
-  # reason, R's, why it would fail or move nothing (`refuses:`), and, for marks with no width of
-  # their own, why dodging needs its `width:` (`needs_width:`).
+  # reason, R's, why it would fail or move nothing (`refuses:`), the options of a position they
+  # refuse, by the position's name, each with why it would change nothing (`refuses_options:`),
+  # and, for marks with no width of their own, why both dodges need their `width:`
+  # (`needs_width:`).
   @doc false
   @spec validate_position(term(), keyword()) ::
           {:ok, atom() | {atom(), keyword()}} | {:error, String.t()}
@@ -4823,6 +4909,7 @@ defmodule Giggly.Plot.Options do
     with :ok <- taken(kind, given, positions),
          true <- once?(options) || {:error, position_options_error(given)},
          {:ok, _validated} <- NimbleOptions.validate(options, position_kind(kind)),
+         :ok <- unrefused_options(kind, options, given, positions),
          :ok <- with_width(kind, options, given, Keyword.fetch(positions, :needs_width)) do
       {:ok, given}
     else
@@ -4850,14 +4937,33 @@ defmodule Giggly.Plot.Options do
     end
   end
 
-  # Dodging marks with no width of their own needs the width they share.
-  defp with_width(:dodge, options, given, {:ok, reason}) do
+  # Whether `options` names none of the options the marks refuse for `kind`: one they refuse
+  # names the reason.
+  defp unrefused_options(kind, options, given, positions) do
+    refused =
+      positions
+      |> Keyword.get(:refuses_options, [])
+      |> Keyword.get(kind, [])
+
+    case Enum.find(refused, :none, fn {option, _reason} -> Keyword.has_key?(options, option) end) do
+      :none ->
+        :ok
+
+      {option, reason} ->
+        {:error,
+         "expected #{inspect(kind)} without its #{option}:, got: #{inspect(given)}, since " <>
+           reason}
+    end
+  end
+
+  # Dodging marks with no width of their own, either way, needs the width they share.
+  defp with_width(kind, options, given, {:ok, reason}) when kind in [:dodge, :dodge2] do
     if Keyword.has_key?(options, :width),
       do: :ok,
       else:
         {:error,
-         "expected :dodge with its width:, {:dodge, width: width}, got: #{inspect(given)}, " <>
-           "since " <> reason}
+         "expected #{inspect(kind)} with its width:, {#{inspect(kind)}, width: width}, got: " <>
+           "#{inspect(given)}, since " <> reason}
   end
 
   defp with_width(_kind, _options, _given, _needs_width), do: :ok

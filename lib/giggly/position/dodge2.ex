@@ -3,10 +3,10 @@ defmodule Giggly.Position.Dodge2 do
 
   # Dodging by clusters, ggplot2's `position_dodge2()`: the bars at one position set side by side,
   # each its share of their widths, with a gap between them, as `geom_bar(position = "dodge2")`
-  # sets them. Its fields are R's parameters but `width`, which R reads only for a mark without
-  # edges: `preserve`, `:total` or `:single`; `padding`, from 0 to 1; and `reverse`, each given by
-  # a layer's `position: {:dodge2, options}`, whose defaults are R's. Run it through
-  # `Giggly.Position`.
+  # sets them. Its fields are R's parameters: `width`, the width a mark without edges is given,
+  # `:none` where it is not given; `preserve`, `:total` or `:single`; `padding`, from 0 to 1; and
+  # `reverse`, each given by a layer's `position: {:dodge2, options}`, whose defaults are R's. Run
+  # it through `Giggly.Position`.
   #
   # It works on the layer's rows as lists, since they are its marks, a row each (design-log §4, the
   # entry beginning "Dodging by clusters computes on lists"), in R's order and R's arithmetic
@@ -24,15 +24,22 @@ defmodule Giggly.Position.Dodge2 do
   # bar with no edges the next one's start (design-log §4, the entry beginning "Dodging by clusters
   # places each cluster"); a bar missing an edge is in no cluster, is placed nowhere, and loses its
   # x, even where no bar of its panel has edges, which R fails at. A mark with sides and no x, a
-  # rectangle, is first given their middle as its x, as R's dodging gives it. Heights are left
+  # rectangle, is first given their middle as its x, as R's dodging gives it, and a mark with no
+  # edges, a point, is given them, its x less and plus half `width`, else its x on both, as
+  # ggplot2's `collide_setup()` gives them, so each point is a bar of its own. Heights are left
   # alone.
-  # Horizontal bars, those whose `flipped_aes` column says so, are dodged along y, x and y swapped
-  # and swapped back (`Giggly.Position.Orientation`).
+  # Horizontal marks, those whose `flipped_aes` column says so, or else whose one discrete axis is
+  # y, are dodged along y, x and y swapped and swapped back (`Giggly.Position.Orientation`).
 
-  @enforce_keys [:preserve, :padding, :reverse]
+  @enforce_keys [:width, :preserve, :padding, :reverse]
   defstruct @enforce_keys
 
-  @type t :: %__MODULE__{preserve: :total | :single, padding: float(), reverse: boolean()}
+  @type t :: %__MODULE__{
+          width: :none | float(),
+          preserve: :total | :single,
+          padding: float(),
+          reverse: boolean()
+        }
 
   defimpl Giggly.Position, for: __MODULE__ do
     use Boundary, classify_to: Giggly.Position
@@ -48,12 +55,13 @@ defmodule Giggly.Position.Dodge2 do
     def default_aesthetics(_position), do: %{}
 
     @impl Giggly.Position
-    def compute_layer(position, frame, _axis_kinds) do
-      flipped = Orientation.flipped?(frame)
+    def compute_layer(position, frame, axis_kinds) do
+      flipped = Orientation.flipped?(frame, axis_kinds, false)
 
       frame
       |> Orientation.flip(flipped)
       |> Collide.with_middle()
+      |> Collide.with_sides(position.width)
       |> dodged(position)
       |> Orientation.flip(flipped)
     end
@@ -90,7 +98,9 @@ defmodule Giggly.Position.Dodge2 do
 
     # What a bar's width is divided by: the number of bars in its cluster (`:total`), or the most
     # bars at one x in any panel (`:single`), a bar missing its x counted at none, as ggplot2's
-    # `setup_params()` counts them with `table()`.
+    # `setup_params()` counts them with `table()`. A rectangle is counted at the x it was given, the
+    # middle of its sides, where R counts the panel's clusters instead (design-log §4, the entry
+    # beginning "Dodging by clusters' `:single`").
     defp share(_rows, :total), do: :cluster
 
     defp share(rows, :single) do

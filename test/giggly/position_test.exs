@@ -61,7 +61,12 @@ defmodule Giggly.PositionTest do
           ymax: [3, 4, 5, 6]
         )
 
-      dodged = Position.compute_layer(%Position.Dodge{width: 0.9}, frame, @continuous)
+      dodged =
+        Position.compute_layer(
+          %Position.Dodge{width: 0.9, preserve: :total, orientation: :x, reverse: false},
+          frame,
+          @continuous
+        )
 
       assert Enum.map([:x, :xmin, :xmax], fn name -> DataFrame.pull(dodged, name) end) === [
                [0.775, 1.225, 1.775, 2.225],
@@ -69,7 +74,12 @@ defmodule Giggly.PositionTest do
                [1.0, 1.4500000000000002, 2.0, 2.45]
              ]
 
-      unmoved = Position.compute_layer(%Position.Dodge{width: :none}, frame, @continuous)
+      unmoved =
+        Position.compute_layer(
+          %Position.Dodge{width: :none, preserve: :total, orientation: :x, reverse: false},
+          frame,
+          @continuous
+        )
 
       assert Enum.map([:x, :xmin, :xmax], fn name -> DataFrame.pull(unmoved, name) end) === [
                [1.0, 1.0, 2.0, 2.0],
@@ -92,7 +102,12 @@ defmodule Giggly.PositionTest do
           ymax: [1.1, 5.3]
         )
 
-      dodged = Position.compute_layer(%Position.Dodge{width: 0.9}, frame, @continuous)
+      dodged =
+        Position.compute_layer(
+          %Position.Dodge{width: 0.9, preserve: :total, orientation: :x, reverse: false},
+          frame,
+          @continuous
+        )
 
       assert Enum.map([:x, :xmin, :xmax], fn name -> DataFrame.pull(dodged, name) end) === [
                [0.775, 1.225],
@@ -100,7 +115,13 @@ defmodule Giggly.PositionTest do
                [0.8375, 1.2875000000000001]
              ]
 
-      own = Position.compute_layer(%Position.Dodge{width: :none}, frame, @continuous)
+      own =
+        Position.compute_layer(
+          %Position.Dodge{width: :none, preserve: :total, orientation: :x, reverse: false},
+          frame,
+          @continuous
+        )
+
       assert DataFrame.pull(own, :x) === [0.9375, 1.0625]
     end
 
@@ -116,7 +137,12 @@ defmodule Giggly.PositionTest do
           y: [2.0, 3.0, 4.0, -1.0]
         )
 
-      dodged = Position.compute_layer(%Position.Dodge{width: 0.9}, frame, @continuous)
+      dodged =
+        Position.compute_layer(
+          %Position.Dodge{width: 0.9, preserve: :total, orientation: :x, reverse: false},
+          frame,
+          @continuous
+        )
 
       assert DataFrame.names(dodged) == [:panel, :group, :x, :y, :xmin, :xmax, :ymax]
 
@@ -144,9 +170,9 @@ defmodule Giggly.PositionTest do
         )
 
       for {position, xmin, xmax} <- [
-            {%Position.Dodge{width: :none}, [0.6000000000000001, 1.0, 1.6000000000000001],
-             [1.0, 1.4, 2.4]},
-            {%Position.Dodge2{preserve: :total, padding: 0.1, reverse: false},
+            {%Position.Dodge{width: :none, preserve: :total, orientation: :x, reverse: false},
+             [0.6000000000000001, 1.0, 1.6000000000000001], [1.0, 1.4, 2.4]},
+            {%Position.Dodge2{width: :none, preserve: :total, padding: 0.1, reverse: false},
              [0.6200000000000001, 1.02, 1.6400000000000001], [0.98, 1.38, 2.36]}
           ] do
         dodged = Position.compute_layer(position, frame, @continuous)
@@ -155,6 +181,139 @@ defmodule Giggly.PositionTest do
                  [[0.8, 1.2, 2.0], xmin, xmax]
       end
     end
+  end
+
+  # Golden: ggplot2 4.0.3's `layer_data()` in R 4.6.1, printed to 17 significant digits, for
+  # `geom_col()` of bars 0.9 wide, groups 1 and 2 at x 1 and 1 alone at 2 in one panel, 2 alone at
+  # 3 in the next, `facet_wrap(~f)`, under `position_dodge()` with each option.
+  describe "compute_layer/3 for dodging with its options" do
+    setup do
+      x_positions = [1.0, 1.0, 2.0, 3.0]
+
+      frame =
+        DataFrame.new(
+          panel: [1, 1, 1, 2],
+          group: [1, 2, 1, 2],
+          x: x_positions,
+          xmin: Enum.map(x_positions, fn x -> x - 0.45 end),
+          xmax: Enum.map(x_positions, fn x -> x + 0.45 end),
+          ymax: [1.0, 2.0, 3.0, 4.0]
+        )
+
+      %{frame: frame}
+    end
+
+    test "with :single, each mark takes the share it would among the most groups at any x, in " <>
+           "any panel, lone marks the first",
+         %{frame: frame} do
+      assert placed(dodge(preserve: :single), frame) === [
+               [
+                 0.77500000000000002,
+                 1.22500000000000009,
+                 1.77499999999999991,
+                 2.77499999999999991
+               ],
+               [0.55000000000000004, 1.0, 1.54999999999999982, 2.54999999999999982],
+               [1.0, 1.4500000000000002, 2.0, 3.0]
+             ]
+    end
+
+    test "reversed, the highest group at an x comes first, a lone mark where it was",
+         %{frame: frame} do
+      assert placed(dodge(reverse: true), frame) === [
+               [1.22500000000000009, 0.77500000000000002, 2.0, 3.0],
+               [1.0, 0.55000000000000004, 1.55000000000000004, 2.54999999999999982],
+               [1.4500000000000002, 1.0, 2.4500000000000002, 3.4500000000000002]
+             ]
+    end
+
+    test "with :single, reversed, a lone mark takes the last share", %{frame: frame} do
+      assert placed(dodge(preserve: :single, reverse: true), frame) === [
+               [
+                 1.22500000000000009,
+                 0.77500000000000002,
+                 2.22500000000000009,
+                 3.22500000000000009
+               ],
+               [1.0, 0.55000000000000004, 2.0, 3.0],
+               [1.4500000000000002, 1.0, 2.4500000000000002, 3.4500000000000002]
+             ]
+    end
+
+    # Golden: ggplot2 4.0.3's `layer_data()` in R 4.6.1 for `geom_point(position =
+    # position_dodge(width = 0.9, orientation = "y"))` of points over two continuous axes, two
+    # sharing a y, printed to 17 significant digits.
+    test "an orientation along y dodges marks that do not say which way they run along y" do
+      frame =
+        DataFrame.new(
+          panel: [1, 1, 1],
+          group: [1, 2, 1],
+          x: [1.0, 3.0, 2.0],
+          y: [2.0, 2.0, 4.0]
+        )
+
+      along_y = dodge(width: 0.9, orientation: :y)
+      dodged = Position.compute_layer(along_y, frame, @continuous)
+
+      assert Enum.map([:x, :y, :ymin, :ymax], fn name -> DataFrame.pull(dodged, name) end) === [
+               [1.0, 3.0, 2.0],
+               [1.7749999999999999, 2.2250000000000001, 4.0],
+               [1.5499999999999998, 2.0, 3.5499999999999998],
+               [2.0, 2.4500000000000002, 4.4500000000000002]
+             ]
+
+      told = DataFrame.put(frame, :flipped_aes, [false, false, false])
+      along_x = Position.compute_layer(along_y, told, @continuous)
+
+      assert DataFrame.pull(along_x, :y) === [2.0, 2.0, 4.0]
+    end
+
+    # Golden: ggplot2 4.0.3's `layer_data()` in R 4.6.1 for `geom_point(position =
+    # position_dodge(width = 0.9))` of points over a continuous x and a discrete y, R grouping
+    # them by colour and y, printed to 17 significant digits. A `flipped_aes` column, as a line's
+    # geom writes, is read first, as `has_flipped_aes()` reads it.
+    test "marks whose one discrete axis is y are dodged along y, whatever the orientation" do
+      frame =
+        DataFrame.new(panel: [1, 1, 1], group: [1, 2, 3], x: [2.0, 3.0, 1.0], y: [1, 1, 2])
+
+      levels = %{x: :continuous, y: :discrete}
+
+      for orientation <- [:x, :y] do
+        position = dodge(width: 0.9, orientation: orientation)
+        dodged = Position.compute_layer(position, frame, levels)
+
+        assert Enum.map([:x, :y, :ymin, :ymax], fn name -> DataFrame.pull(dodged, name) end) === [
+                 [2.0, 3.0, 1.0],
+                 [0.77500000000000002, 1.22500000000000009, 2.0],
+                 [0.55000000000000004, 1.0, 1.55000000000000004],
+                 [1.0, 1.4500000000000002, 2.4500000000000002]
+               ]
+      end
+
+      at_levels = DataFrame.new(panel: [1, 1], group: [1, 2], x: [1, 1], y: [2.0, 2.0])
+      along_y = dodge(width: 0.9, orientation: :y)
+      along_x = Position.compute_layer(along_y, at_levels, %{x: :discrete, y: :continuous})
+
+      assert DataFrame.pull(along_x, :x) === [0.775, 1.225]
+
+      told = DataFrame.put(frame, :flipped_aes, [false, false, false])
+      within = dodge(width: 0.9)
+      written = Position.compute_layer(within, told, levels)
+
+      assert DataFrame.pull(written, :y) === [1, 1, 2]
+    end
+  end
+
+  # The position columns `position` leaves `frame`'s marks at: their x, xmin and xmax.
+  defp placed(position, frame) do
+    dodged = Position.compute_layer(position, frame, @continuous)
+    Enum.map([:x, :xmin, :xmax], fn name -> DataFrame.pull(dodged, name) end)
+  end
+
+  # Dodging with `options`, each not given its default.
+  defp dodge(options) do
+    defaults = [width: :none, preserve: :total, orientation: :x, reverse: false]
+    struct!(Position.Dodge, Keyword.merge(defaults, options))
   end
 
   # Golden: ggplot2 4.0.3's `position_dodge2()` in R 4.6.1, its `setup_params()` and then
@@ -235,6 +394,30 @@ defmodule Giggly.PositionTest do
                {[2, 1, 3], [1.0, nil, :nan]}
     end
 
+    # R's `layer_data()` for `geom_rect(position = position_dodge2(preserve = "single"))` of the
+    # same rectangles divides by the panel's one cluster: x 0.6 and 1.4, xmin 0.24 and 1.04, xmax
+    # 0.96 and 1.76, where this departs.
+    test "with :single, rectangles are counted at the middle of their sides, as every mark" do
+      frame =
+        DataFrame.new(
+          panel: [1, 1],
+          group: [1, 2],
+          xmin: [0.6, 0.6],
+          xmax: [1.4, 1.4],
+          ymin: [0.0, 0.0],
+          ymax: [2.0, 3.0]
+        )
+
+      single = %Position.Dodge2{width: :none, preserve: :single, padding: 0.1, reverse: false}
+      dodged = Position.compute_layer(single, frame, @continuous)
+
+      assert Enum.map([:x, :xmin, :xmax], fn name -> DataFrame.pull(dodged, name) end) === [
+               [0.8, 1.2],
+               [0.6200000000000001, 1.02],
+               [0.98, 1.38]
+             ]
+    end
+
     test "a table without a flipped_aes column is dodged along x, its heights left alone" do
       frame =
         DataFrame.new(
@@ -257,6 +440,40 @@ defmodule Giggly.PositionTest do
                  [0.0, 0.0],
                  [2.0, 3.0]
                ]
+    end
+  end
+
+  # Golden: ggplot2 4.0.3's `layer_data()` in R 4.6.1 for `geom_point(position =
+  # position_dodge2(width = 0.5))`, printed to 17 significant digits.
+  describe "compute_layer/3 for dodging by clusters within a width" do
+    test "each mark with no edges is given them, half the width each side, and dodged as a bar" do
+      frame =
+        DataFrame.new(
+          panel: [1, 1, 1, 1],
+          group: [1, 2, 2, 1],
+          x: [1.0, 1.0, 1.0, 2.0],
+          y: [1.0, 2.0, 3.0, 4.0]
+        )
+
+      position = %Position.Dodge2{width: 0.5, preserve: :total, padding: 0.1, reverse: false}
+      dodged = Position.compute_layer(position, frame, @continuous)
+
+      assert Enum.map([:x, :xmin, :xmax, :y], fn name -> DataFrame.pull(dodged, name) end) === [
+               [0.83333333333333326, 1.0, 1.16666666666666652, 2.0],
+               [
+                 0.75833333333333330,
+                 0.92500000000000004,
+                 1.09166666666666656,
+                 1.77499999999999991
+               ],
+               [
+                 0.90833333333333321,
+                 1.07499999999999996,
+                 1.24166666666666647,
+                 2.22500000000000009
+               ],
+               [1.0, 2.0, 3.0, 4.0]
+             ]
     end
   end
 
@@ -288,6 +505,25 @@ defmodule Giggly.PositionTest do
                  [1.0, 1.0, 2.0, 2.0],
                  [1.0, 1.0, 2.0, 2.0]
                ]
+    end
+  end
+
+  # Golden: ggplot2 4.0.3's `layer_data()` in R 4.6.1 for `geom_point(position = "stack")` over a
+  # continuous x and a discrete y.
+  describe "compute_layer/3 for stacking marks whose one discrete axis is y" do
+    test "the marks at a level pile along x" do
+      frame =
+        DataFrame.new(panel: [1, 1, 1], group: [1, 2, 3], x: [2.0, 3.0, 1.0], y: [1, 1, 2])
+
+      stacked =
+        Position.compute_layer(%Position.Stack{}, frame, %{x: :continuous, y: :discrete})
+
+      assert Enum.map([:x, :xmin, :xmax, :y], fn name -> DataFrame.pull(stacked, name) end) === [
+               [5.0, 3.0, 1.0],
+               [3.0, 0.0, 0.0],
+               [5.0, 3.0, 1.0],
+               [1, 1, 2]
+             ]
     end
   end
 
@@ -652,7 +888,7 @@ defmodule Giggly.PositionTest do
   # `frame` dodged by clusters with R's defaults: `preserve = "total"`, `padding = 0.1`.
   defp dodged_by_clusters(frame) do
     Position.compute_layer(
-      %Position.Dodge2{preserve: :total, padding: 0.1, reverse: false},
+      %Position.Dodge2{width: :none, preserve: :total, padding: 0.1, reverse: false},
       frame,
       @continuous
     )

@@ -186,7 +186,13 @@ geom_errorbar(
 )
 ```
 
-R ignores `width = 0.5` here: the error bars have widths of their own, which `position_dodge2()`
-dodges by. Giggly's `{:dodge2, options}` takes `padding:` but not `width:`.
+R ignores `width = 0.5` here: the error bars have edges of their own, which `position_dodge2()`
+dodges by, so it draws what `padding = 0.5` alone draws. Giggly's cell leaves the width out, since
+`{:dodge2, options}` takes a `width:` only for marks without edges, such as points.
 
-Not in Giggly yet: `position_dodge2()`'s `width` option.
+```elixir
+p
+|> Plot.geom_col(position: :dodge2)
+|> Plot.geom_errorbar(%{ymin: :lower, ymax: :upper}, position: {:dodge2, padding: 0.5})
+|> render.()
+```

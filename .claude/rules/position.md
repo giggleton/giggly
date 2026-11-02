@@ -26,13 +26,14 @@ the entry beginning "Each facet, coordinate system, geom, stat and position is a
   a width is a fraction of the spacing between levels.
 - **A position's arguments arrive with their first reader.** Every position is handed the table
   and each axis's kind (`axis_kinds`, as a geom's `setup_data/3` is), which jittering first read,
-  as R's `compute_jitter()` reads a mapped discrete position: stacking splits the table by the
-  `panel` column itself and reads no scale. A position's own
-  parameters arrive with the option that sets them, as dodging by clusters' `preserve`, `padding`
-  and `reverse` arrived with `{:dodge2, options}`, dodging's `width` with `{:dodge, width: width}`,
-  the first reader a line range, which has no edges, and stacking's `vjust`, `reverse` and `fill`
-  with `{:stack, options}` and `:fill`; dodging by clusters' `width` waits, and the panel's scales
-  with the first position that reads one.
+  as R's `compute_jitter()` reads a mapped discrete position, and the positions that read an
+  orientation read too: stacking splits the table by the `panel` column itself and reads no
+  scale. A position's own parameters arrive with the option that sets them, as dodging by
+  clusters' `preserve`, `padding` and `reverse` arrived with `{:dodge2, options}` and its `width`
+  with the points it first moved, dodging's `width` with `{:dodge, width: width}`, the first reader
+  a line range, which has no edges, and its `preserve`, `orientation` and `reverse` after, and
+  stacking's `vjust`, `reverse` and `fill` with `{:stack, options}` and `:fill`; dodging's `order`
+  aesthetic waits, and the panel's scales with the first position that reads one.
 - **Stacking is ggplot2's `position_stack()`, and filling its `position_fill()`, one kind with
   `fill: true`** (design-log §4, the entry beginning "Filling is stacking"): nothing moves unless
   two rows of the layer share an x, in any panel, or it fills or its `vjust` is not 1; then a layer
@@ -49,25 +50,33 @@ the entry beginning "Each facet, coordinate system, geom, stat and position is a
   its y R's `0 * Inf`, NaN, which the scale's second mapping makes missing; filled, the bars below
   an infinity reach 0 and it NaN. **It departs from R where R fails**: a filled pile whose total is
   NaN, holding both infinities, is divided by it, so its marks are missing, where R fails.
-- **Dodging is ggplot2's `position_dodge()`, `preserve = "total"`**: a mark with sides and no x, a
-  rectangle, is first given their middle as its x, which it keeps, as `setup_data()` gives it; a
-  mark with no `xmin` and `xmax`, a line range's or a point range's, is given them, its x ∓ half the
-  `width` given, else its x, as `collide_setup()` gives them, so given none it does not move (R
-  warns, and `Plot` refuses `:dodge` alone for such marks); a mark with no `ymax`, a point, is given
-  its y as one, as `collide()` gives it; each panel's marks at one `xmin` then share the `width`
-  given, else the panel's first mark's, ranked by group, lowest leftmost, each the widest mark's
-  width over the number of groups at that x; an x with one group keeps its mark. Dodged positions
-  come out doubles, as R's are, so a discrete axis's column stays one type.
+- **Dodging is ggplot2's `position_dodge()`**: a mark with sides and no x, a rectangle, is first
+  given their middle as its x, which it keeps, as `setup_data()` gives it; a mark with no `xmin` and
+  `xmax`, a line range's or a point range's, is given them, its x ∓ half the `width` given, else
+  its x, as `collide_setup()` gives them, so given none it does not move (R warns, and `Plot`
+  refuses `:dodge` without a width for such marks); a mark with no `ymax`, a point, is given its y
+  as one, as `collide()` gives it. Each mark is ranked as `setup_data()` writes its `order`: by
+  group among the groups at its x in its panel, negated with `reverse`, then ranked again among
+  those at its x (`:total`) or among every rank in the layer (`:single`), so a lone mark takes the
+  first share, or the last reversed. Each panel's marks at one `xmin` then share the `width` given,
+  else the panel's first mark's, each the widest mark's width over n, the number of groups at
+  that x (`:total`), where an x with one group keeps its mark, or the most groups at one `xmin` in
+  any panel (`:single`). Dodged positions come out doubles, as R's are, so a discrete axis's
+  column stays one type.
 - **Dodging by clusters is ggplot2's `position_dodge2()`, on lists, in R's order and R's
   arithmetic** (design-log §4, the entries beginning "Dodging by clusters"): its widths' sum and its
   edges are R's `sum()` and `cumsum()` in extended precision (`Arithmetic.sum/2`,
   `cumulative_sum/1`), so its doubles are R's; each panel's rows come out sorted by x, then group,
   as R's do; a bar with no group is dodged; padding applies to every bar of a panel where a cluster
   holds two, and nowhere else; `:single` divides by the most bars at one present x in any panel; a
-  rectangle is first given the middle of its sides as its x, as dodging gives it. **It departs from
+  rectangle is first given the middle of its sides as its x, as dodging gives it, and a mark with
+  no edges, a point, its x ∓ half the `width` given, else its x, as `collide_setup()` gives them,
+  so each row is a bar of its own, whatever its group. **It departs from
   R where R slips**: each cluster is placed from its own middle and widths, where R misplaces those
-  after a bar missing an edge, which is placed nowhere and loses its x; and a panel where no bar has
-  edges, where R fails, keeps them missing. It writes none of R's scratch columns (`xid`, `newx`,
+  after a bar missing an edge, which is placed nowhere and loses its x; `:single` counts a
+  rectangle at the middle of its sides, as every mark, where R divides by the panel's number of
+  clusters (design-log §4, the entry beginning "Dodging by clusters' `:single`"); and a panel where
+  no bar has edges, where R fails, keeps them missing. It writes none of R's scratch columns (`xid`, `newx`,
   `new_width`), nor `order`.
 - **A position declares the aesthetics it reads, each with its default
   (`default_aesthetics/1`)**, as ggplot2's position declares its `default_aes`, and reads them
@@ -95,11 +104,12 @@ the entry beginning "Each facet, coordinate system, geom, stat and position is a
   numbers cannot be had**: R's random numbers are never reproduced, so a golden is checked by R
   drawing Giggly's distances through `position_nudge()`; and positions whose only gap is to an
   infinity are 1 apart, where R's `resolution()` is infinite and sends them to infinity.
-- **A position reads a layer's orientation from its `flipped_aes` column**, written by the stat or
-  the geom, and moves horizontal bars along y, flipped and flipped back, as ggplot2's positions
-  read `flipped_aes`; without the column, bars are vertical. The positions that move bars share
-  this through `Giggly.Position.Orientation`, a module of the boundary that is no kind and no
-  export.
+- **A position reads a layer's orientation as ggplot2's `has_flipped_aes()` reads it for a
+  position**: the first boolean in its `flipped_aes` column, written by the stat or the geom; else
+  true where y is the one axis the layer has a column for whose scale is discrete, and false where
+  x is; else dodging's `orientation`, false for every other position. Horizontal marks move along
+  y, flipped and flipped back. Stacking, filling and both dodges share this through
+  `Giggly.Position.Orientation`, a module of the boundary that is no kind and no export.
 - **What stacking and dodging give a mark before they move it is `Giggly.Position.Collide`**,
   ggplot2's `collide_setup()`, `collide()` and `PositionDodge$setup_data()`: an x from a
   rectangle's sides, sides from an x, a `ymax` from a y, each kept, as R's `layer_data()` keeps

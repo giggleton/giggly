@@ -25,7 +25,8 @@ the entry beginning "Every page of ggplot2's function reference has a notebook".
   handing a scale a palette function (`scales::pal_brewer(palette = "Dark2")`) is drawn with the
   palette's name (the entry beginning "An example handing a scale a palette function"). An
   argument ggplot2 does not recognise, and so draws as its default (`hjust = 'outside'`, centred),
-  is left out of Giggly's cell, and the prose says so (the entry beginning "A notebook leaves out an
+  or reads but not for the example's geom (`position_dodge2()`'s `width` beside error bars), is
+  left out of Giggly's cell, and the prose says so (the entry beginning "A notebook leaves out an
   argument"); one ggplot2 reads and Giggly lacks waits, even where the example gives its default
   (`formula = y ~ x`; the entry beginning "A verdict names an argument Giggly lacks"). An example R
   refuses on purpose (`should_stop()`) that Giggly refuses too is shown by a cell that runs Giggly's

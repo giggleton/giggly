@@ -79,6 +79,28 @@ stops the question being reopened from scratch. A new entry is about 150 words: 
 sentence or two of why, and one line per rejected alternative. What a later decision replaces is
 deleted from the entry it was in, never marked superseded; git history keeps every version.
 
+- **Dodging takes R's options, and refuses an orientation where the marks say which way they run
+  (2026-11-01, Steve: "a", scoping the positions' step 5).** `{:dodge, options}` takes `width:`,
+  `preserve:` (`:total`, `:single`), `orientation:` (`:x`, `:y`) and `reverse:`, ranking groups as
+  R's `setup_data()` does, within each x, so under `:single` a lone bar takes the first share, or
+  the last reversed, not its legend's place. A position reads the orientation as R's
+  `has_flipped_aes()`: the `flipped_aes` column, else y the one discrete axis, else the fallback,
+  so points and text over a discrete y stack and dodge along x, as R's do, which Giggly's did not;
+  the line geom writes `flipped_aes`, as `GeomLine` does. A layer whose stat or geom always writes
+  `flipped_aes` refuses `orientation:`, which R ignores there; the rest take it, ignored when run
+  where one axis is discrete. *Rejected: taking `orientation:` wherever dodging is taken*, as R's
+  fallback, an option that changes nothing on a whole family.
+
+- **Dodging by clusters' `:single` divides a rectangle by the most at one position, where R
+  divides by the panel's number of clusters (2026-11-01, Steve: "agree", building the positions'
+  step 5).** For marks with no x, R's `setup_params()` takes the `max` of `find_x_overlaps()`,
+  each mark's cluster number, where its branch for marks with an x takes the `max` of `table()`'s
+  counts; so a rectangle's width turns on how many positions its panel has, and two rectangles at
+  one position each keep their 0.8, spreading from 0.6–1.4 to 0.24–1.76. Giggly gives a rectangle
+  the middle of its sides as its x first and counts as for every other mark, as `preserve =
+  "single"` is documented. ggplot2's tests reach `:single` only through marks with an x. *Rejected:
+  R's count* — a slip that sets the clusters dodging separates over one another.
+
 - **A nudge is an aesthetic only, set or mapped on any layer that nudges, and `:nudge` takes no
   options (2026-11-01, Steve: design 3, then "A", "A").** As ggplot2 4.0 made them: every layer
   function but a diagonal line's takes `nudge_x:` and `nudge_y:` and maps them, a reference line
@@ -109,7 +131,7 @@ deleted from the entry it was in, never marked superseded; git history keeps eve
   R's output).** An R sweep of every layer function against every position (`layer_data()` and
   `ggplotGrob()` under `tryCatch`) decides it: where R fails, Giggly refuses with R's reason;
   where R moves nothing, warning or not, it refuses too — dodging marks with no width of their
-  own without a `width:` ("Width not defined"), dodging them by clusters, stacking a rectangle,
+  own, either way, without a `width:` ("Width not defined"), stacking a rectangle,
   which has no x, or a horizontal or vertical line, and any position on a diagonal line, which
   R's `geom_abline()` does not take; beside `varwidth: true` a box plot takes only dodging by
   clusters, as R ignores a name there and dodging moves no box of its own width. Where R warns
@@ -2125,16 +2147,16 @@ deleted from the entry it was in, never marked superseded; git history keeps eve
   with an engine that runs the operators' captures (the entry beginning "A mapping names a
   function only as a shortcut").
 
-- **Dodging by clusters takes `preserve:`, `padding:` and `reverse:` (2026-10-22, Steve, scoping
-  distributions' step 5).** `{:dodge2, options}` takes them on `geom_bar/3`, `geom_col/3`,
-  `geom_histogram/3` and `stat_bin/3`, beside the name alone: `preserve:` `:total` or `:single`,
-  R's strings as atoms; `padding:` 0 to 1, as
-  `just:` is, where R takes any number and its code widens bars into their neighbours below 0 and
-  turns them inside out above 1; `reverse:` a boolean. Step 6's `varwidth` sets the same
-  `preserve`. `width:` is left out: R reads it only for a geom without edges, none of which takes a
-  position, and on bars it changes nothing, so it raises as an unknown option, as a frequency
-  polygon's `pad:` does. *Rejected: the atom alone, `preserve` set only by `varwidth`* — R's
-  `position_dodge` page draws bars with `preserve` twice. *Rejected: `preserve:` alone* —
+- **Dodging by clusters takes `preserve:`, `padding:` and `reverse:`, and `width:` where the marks
+  have no edges (2026-10-22, Steve, scoping distributions' step 5; 2026-11-01, the positions' step
+  5).** `{:dodge2, options}` takes them beside the name alone: `preserve:` `:total` or `:single`,
+  R's strings as atoms; `padding:` 0 to 1, as `just:` is, where R takes any number and its code
+  widens bars into their neighbours below 0 and turns them inside out above 1; `reverse:` a
+  boolean. Step 6's `varwidth` sets the same `preserve`. `width:` is R's width for marks with no
+  edges, points and ranges, each row then a bar of its own, and those layers take `:dodge2` only
+  with it, as `:dodge`; marks with edges refuse it, since R ignores it there, as a frequency
+  polygon's `pad:` is refused. *Rejected: the atom alone, `preserve` set only by `varwidth`* —
+  R's `position_dodge` page draws bars with `preserve` twice. *Rejected: `preserve:` alone* —
   `padding:` and `reverse:` are R's, a line each, already checked against R.
 
 - **Dodging by clusters places each cluster from its own centre and widths, where R misplaces
@@ -3204,9 +3226,13 @@ deleted from the entry it was in, never marked superseded; git history keeps eve
   (2026-10-18, Steve).** geom_segment's example labels its segments with `hjust = 'outside'`, a
   word ggplot2 does not define: `compute_just()` reads it as `NA`, and R centres the labels exactly
   as `hjust = 0.5` does. Giggly's cell leaves `hjust` out, its default centring them the same, and
-  the prose says what R does with the word. *Rejected: adding `:outside` to Giggly's
-  justifications*, a word ggplot2 lacks, given a meaning only R's fallback gives it; *naming it as
-  missing*, which would leave the example waiting on something Giggly will never build.
+  the prose says what R does with the word. So too an argument ggplot2 reads but not for the
+  example's geom (2026-11-01, Steve: "a"): `geom_linerange`'s error bars dodged by
+  `position_dodge2(width = 0.5, padding = 0.5)`, whose width R ignores beside their own edges, are
+  drawn with `{:dodge2, padding: 0.5}`, which refuses the width there. *Rejected: adding
+  `:outside` to Giggly's justifications*, a word ggplot2 lacks, given a meaning only R's fallback
+  gives it; *naming it as missing*, which would leave the example waiting on something Giggly will
+  never build.
 
 - **A verdict names a text's mapped size "mapping a text's `size`" (2026-10-20, Steve, in the
   size, shape and line type sweep).** Once a point maps `size`, "mapping `size`" names something
@@ -3911,6 +3937,10 @@ tells the story (`git show <hash>`). Until 2026-10-15 each milestone also had a 
 `git log -S "<title>" -- notes/design-log.md` finds it in this file's history. The phases are
 §1's roadmap.
 
+- 2026-11-01 — Give dodging R's preserve:, orientation: and reverse:, and dodging by clusters its
+  width:, each position reading the orientation as R does (positions, step 5); §4: "Dodging takes
+  R's options", "Dodging by clusters takes `preserve:`", "Dodging by clusters' `:single`", "A
+  notebook leaves out an argument"
 - 2026-11-01 — Make nudge_x and nudge_y aesthetics, set or mapped on every layer that nudges
   (positions, step 4); §4: "A nudge is an aesthetic only", "A position declares the aesthetics it
   reads"

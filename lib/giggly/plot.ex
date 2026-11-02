@@ -49,13 +49,18 @@ defmodule Giggly.Plot do
 
   A layer takes every position that can move its marks. Marks with a width of their own, such as
   bars, tiles and error bars, take them all. Marks with none, such as points, lines, text, line
-  ranges and areas, are dodged only within a width given, `{:dodge, width: 0.9}`, and never by
-  clusters, since neither would move them. Box plots and rectangles are neither stacked, filled
-  nor jittered, and a horizontal or vertical line is only nudged; a diagonal line takes no
-  position.
+  ranges and areas, are dodged, either way, only within a width given, `{:dodge, width: 0.9}` or
+  `{:dodge2, width: 0.5}`, since without one neither would move them. Box plots and rectangles are
+  neither stacked, filled nor jittered, and a horizontal or vertical line is only nudged; a
+  diagonal line takes no position.
+
+  Stacking and dodging move marks along x, and horizontal marks along y: those the layer makes
+  horizontal, such as bars counted along `y` or a line range from `xmin` to `xmax`, and those whose
+  one discrete axis is `y`, such as points or labels over a continuous x and a discrete y.
 
   A position a layer's marks do not take raises from the layer function given it, saying why, and
-  so do an option the position does not take and a value it cannot use, naming the position.
+  so do an option the position does not take, or one that would change nothing for those marks,
+  and a value it cannot use, naming the position.
 
   ### Leaving marks where they are: `:identity`
 
@@ -102,7 +107,12 @@ defmodule Giggly.Plot do
   bars, but marks of different widths drawn over them, such as narrower error bars, are dodged
   within their own width and miss the bars; give each layer the same `width:`, the bars' width,
   so they line up. A mark with no width of its own, a line range or a point range, is dodged only
-  within a `width:` given. A position with one group keeps its mark where it is.
+  within a `width:` given. A position with one group keeps its mark where it is, unless
+  `preserve: :single`, where each mark takes the share it would among the most groups any one
+  position holds, in any panel, the first share first, so a position with fewer leaves room after
+  them. `reverse: true` sets the highest group first. Marks that do not say which way they run,
+  such as points over two continuous axes, are dodged along y given `orientation: :y`; a layer
+  whose marks always say so, bars, box plots, ranges, lines and areas, takes no `orientation:`.
 
   #{NimbleOptions.docs(Giggly.Plot.Options.position_kind(:dodge))}
 
@@ -114,6 +124,17 @@ defmodule Giggly.Plot do
       iex> Giggly.DataFrame.pull(frame, :x)
       [0.775, 1.225]
 
+  With `preserve: :single`, a bar alone at its position is as wide as each of a pair, in the
+  first of their places:
+
+      iex> frame =
+      ...>   %{"x" => ["a", "a", "b"], "y" => [1.0, 2.0, 3.0], "g" => ["p", "q", "p"]}
+      ...>   |> Giggly.Plot.new(%{x: :x, y: :y, fill: :g})
+      ...>   |> Giggly.Plot.geom_col(position: {:dodge, preserve: :single})
+      ...>   |> Giggly.layer_data()
+      iex> Giggly.DataFrame.pull(frame, :xmax)
+      [1.0, 1.4500000000000002, 2.0]
+
   ### Setting bars side by side by their spans: `:dodge2`
 
   Bars whose spans overlap or meet are dodged together, whatever their groups and widths: each
@@ -121,7 +142,9 @@ defmodule Giggly.Plot do
   side in order of group, centred on the middle of the span they covered, each bar's `x` moving
   to its middle. In a panel where some position holds two bars or more, every bar is then
   narrowed by `padding:`, so neighbours stand apart. The layer's rows come out in that order: by
-  panel, then by `x`, then by group.
+  panel, then by `x`, then by group. A mark with no edges of its own, a point or a line range, is
+  dodged as a bar `width:` wide, each row side by side with those it overlaps, whatever their
+  groups; marks with edges, bars, box plots and error bars, take no `width:`.
 
   #{NimbleOptions.docs(Giggly.Plot.Options.position_kind(:dodge2))}
 
@@ -132,6 +155,14 @@ defmodule Giggly.Plot do
       iex> frame = Giggly.layer_data(plot)
       iex> Giggly.DataFrame.pull(frame, :xmin)
       [0.5725, 1.0225000000000002, 1.7974999999999999]
+
+      iex> frame =
+      ...>   %{"x" => [1.0, 1.0], "y" => [2.0, 3.0], "g" => ["p", "q"]}
+      ...>   |> Giggly.Plot.new(%{x: :x, y: :y, color: :g})
+      ...>   |> Giggly.Plot.geom_point(position: {:dodge2, width: 0.5})
+      ...>   |> Giggly.layer_data()
+      iex> Giggly.DataFrame.pull(frame, :x)
+      [0.875, 1.125]
 
   ### Nudging marks: `:nudge`
 
@@ -5970,8 +6001,13 @@ defmodule Giggly.Plot do
   defp position_struct(:identity, []), do: %Position.Identity{}
   defp position_struct(:stack, options), do: struct!(Position.Stack, options)
   defp position_struct(:fill, options), do: struct!(Position.Stack, [fill: true] ++ options)
-  defp position_struct(:dodge, options), do: %Position.Dodge{width: width_given(options)}
-  defp position_struct(:dodge2, options), do: struct!(Position.Dodge2, options)
+
+  defp position_struct(:dodge, options),
+    do: struct!(Position.Dodge, Keyword.put(options, :width, width_given(options)))
+
+  defp position_struct(:dodge2, options),
+    do: struct!(Position.Dodge2, Keyword.put(options, :width, width_given(options)))
+
   defp position_struct(:nudge, []), do: %Position.Nudge{}
 
   defp position_struct(:jitter, options) do

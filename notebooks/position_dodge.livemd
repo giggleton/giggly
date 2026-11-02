@@ -33,13 +33,14 @@ Dodging keeps each mark's vertical position and sets the marks that share an `x`
 each mark by its own extent and leaving a little padding between them, which suits box plots of
 different widths. `width` gives the width to dodge within, for marks narrower than the bars they sit
 beside, and `preserve` keeps either the total width at each position or the width of each mark.
-Giggly dodges any layer as `position_dodge()` does, with `position: :dodge` or `{:dodge, width:
-width}`, marks with no width of their own, such as points, text and line ranges, only within a
-width given, and marks with widths, such as bars, histograms, error bars and box plots, as
-`position_dodge2()` does, with `position: :dodge2` or `{:dodge2, options}` and its `preserve:`,
-`padding:` and `reverse:`, a position's options given in a tuple with its name where ggplot2 calls
-its function. Not in Giggly yet: `position_dodge()`'s `preserve`,
-`orientation` and `reverse` options, and `position_dodge2()`'s `width` option. The setup cell binds R's
+Giggly dodges any layer as `position_dodge()` does, with `position: :dodge` or `{:dodge, options}`
+and its `width:`, `preserve:`, `orientation:` and `reverse:`, and as `position_dodge2()` does,
+with `position: :dodge2` or `{:dodge2, options}` and its `width:`, `preserve:`, `padding:` and
+`reverse:`, a position's options given in a tuple with its name where ggplot2 calls its function.
+Marks with no width of their own, such as points, text and line ranges, are dodged either way only
+within a width given; marks with edges of their own, such as bars and error bars, take no width
+for `:dodge2`, which R ignores, and marks that say which way they run, such as bars, box plots and
+ranges, take no `orientation:`, which R ignores too. The setup cell binds R's
 `mtcars` and ggplot2's `mpg` and `diamonds`, `Giggly.Datasets.mtcars/0`, `Giggly.Datasets.mpg/0` and
 `Giggly.Datasets.diamonds/0`, to their names in R.
 

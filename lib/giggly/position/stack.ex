@@ -32,8 +32,8 @@ defmodule Giggly.Position.Stack do
   # `detect_missing()` blanks them; it stacks as nothing, its y 0, and its `ymin` and `ymax` are
   # missing, so it is not drawn.
   #
-  # Horizontal bars, those whose `flipped_aes` column says so, are stacked along x, x and y
-  # swapped and swapped back (`Giggly.Position.Orientation`).
+  # Horizontal marks, those whose `flipped_aes` column says so, or else whose one discrete axis is
+  # y, are stacked along x, x and y swapped and swapped back (`Giggly.Position.Orientation`).
 
   defstruct vjust: 1.0, reverse: false, fill: false
 
@@ -58,8 +58,8 @@ defmodule Giggly.Position.Stack do
     def default_aesthetics(_position), do: %{}
 
     @impl Giggly.Position
-    def compute_layer(position, frame, _axis_kinds) do
-      flipped = Orientation.flipped?(frame)
+    def compute_layer(position, frame, axis_kinds) do
+      flipped = Orientation.flipped?(frame, axis_kinds, false)
 
       frame
       |> Orientation.flip(flipped)

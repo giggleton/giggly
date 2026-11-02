@@ -595,7 +595,12 @@ defmodule Giggly.PlotTest do
 
       assert [
                %Plot.Layer{
-                 position: %Position.Dodge{width: :none},
+                 position: %Position.Dodge{
+                   width: :none,
+                   preserve: :total,
+                   orientation: :x,
+                   reverse: false
+                 },
                  mapping: %{x: "cyl", y: "mpg"},
                  fixed: %{alpha: 0.5}
                }
@@ -737,7 +742,18 @@ defmodule Giggly.PlotTest do
         |> Plot.new(%{x: :cyl})
         |> Plot.geom_bar(position: :dodge)
 
-      assert [%Plot.Layer{position: %Position.Dodge{width: :none}, mapping: %{}, fixed: %{}}] =
+      assert [
+               %Plot.Layer{
+                 position: %Position.Dodge{
+                   width: :none,
+                   preserve: :total,
+                   orientation: :x,
+                   reverse: false
+                 },
+                 mapping: %{},
+                 fixed: %{}
+               }
+             ] =
                plot.reversed_layers
     end
 
@@ -747,13 +763,24 @@ defmodule Giggly.PlotTest do
 
       for add <- [&Plot.geom_bar/2, &Plot.geom_histogram/2, &Plot.stat_bin/2] do
         assert [%Plot.Layer{position: by_name}] = add.(plot, position: :dodge2).reversed_layers
-        assert by_name == %Position.Dodge2{preserve: :total, padding: 0.1, reverse: false}
+
+        assert by_name == %Position.Dodge2{
+                 width: :none,
+                 preserve: :total,
+                 padding: 0.1,
+                 reverse: false
+               }
       end
 
       assert [%Plot.Layer{position: position}] =
                Plot.geom_col(plot, %{y: :mpg}, position: told).reversed_layers
 
-      assert position === %Position.Dodge2{preserve: :single, padding: 0.0, reverse: true}
+      assert position === %Position.Dodge2{
+               width: :none,
+               preserve: :single,
+               padding: 0.0,
+               reverse: true
+             }
     end
 
     test "counted bars accept a mapped alpha, which the bar geom draws though counting ignores it" do
@@ -1116,7 +1143,9 @@ defmodule Giggly.PlotTest do
                drop: :extremes
              }
 
-      assert {layer.position, layer.fixed} == {%Position.Dodge{width: :none}, %{fill: "#FFFFFF"}}
+      assert {layer.position, layer.fixed} ==
+               {%Position.Dodge{width: :none, preserve: :total, orientation: :x, reverse: false},
+                %{fill: "#FFFFFF"}}
     end
 
     test "a boundary is recorded as a float" do
@@ -1344,7 +1373,12 @@ defmodule Giggly.PlotTest do
                    varwidth: false
                  },
                  stat: %Stat.Boxplot{coef: 1.5, width: :none, orientation: :none},
-                 position: %Position.Dodge2{preserve: :total, padding: 0.1, reverse: false},
+                 position: %Position.Dodge2{
+                   width: :none,
+                   preserve: :total,
+                   padding: 0.1,
+                   reverse: false
+                 },
                  data: :none,
                  mapping: %{x: "cyl", y: "mpg"},
                  fixed: %{},
@@ -2575,13 +2609,27 @@ defmodule Giggly.PlotTest do
       plot = Plot.new(@ranges, %{x: :trt, ymin: :lower, ymax: :upper})
 
       for {position, width} <- [{{:dodge, width: 1}, 1.0}, {{:dodge, []}, :none}] do
-        assert [%Plot.Layer{position: %Position.Dodge{width: ^width}}] =
+        assert [
+                 %Plot.Layer{
+                   position: %Position.Dodge{
+                     width: ^width,
+                     preserve: :total,
+                     orientation: :x,
+                     reverse: false
+                   }
+                 }
+               ] =
                  Plot.geom_errorbar(plot, position: position).reversed_layers
       end
 
       for {position, message} <- [
             {{:dodge, width: "wide"}, ~s(in :dodge's options, invalid value for :width option)},
-            {{:dodge, preserve: :single}, "in :dodge's options, unknown options [:preserve]"}
+            {{:dodge, width: 0.9, preserve: :both},
+             "in :dodge's options, invalid value for :preserve option"},
+            {{:dodge, width: 0.9, orientation: :z},
+             "in :dodge's options, invalid value for :orientation option"},
+            {{:dodge, width: 0.9, reverse: 1},
+             "in :dodge's options, invalid value for :reverse option"}
           ] do
         assert_raise NimbleOptions.ValidationError, ~r/#{Regex.escape(message)}/, fn ->
           Plot.geom_linerange(plot, position: position)
@@ -2687,10 +2735,19 @@ defmodule Giggly.PlotTest do
       assert [%Plot.Layer{geom: %Geom.Bar{just: +0.0}, position: %Position.Stack{}}] =
                Plot.stat_summary(plot, geom: :bar, position: :stack, just: 0).reversed_layers
 
-      assert [%Plot.Layer{position: %Position.Dodge{width: 0.5}}] =
+      assert [
+               %Plot.Layer{
+                 position: %Position.Dodge{
+                   width: 0.5,
+                   preserve: :total,
+                   orientation: :x,
+                   reverse: false
+                 }
+               }
+             ] =
                Plot.stat_summary(plot, geom: :bar, position: {:dodge, width: 0.5}).reversed_layers
 
-      assert [%Plot.Layer{position: %Position.Dodge2{preserve: :total}}] =
+      assert [%Plot.Layer{position: %Position.Dodge2{width: :none, preserve: :total}}] =
                Plot.stat_summary(plot, geom: :bar, position: :dodge2).reversed_layers
 
       assert [%Plot.Layer{position: %Position.Jitter{}}] =
@@ -5259,7 +5316,7 @@ defmodule Giggly.PlotTest do
       [
         {:geom_point, placed, %{}, [], :without_width, :identity},
         {:geom_jitter, placed, %{}, [], :without_width, :jitter},
-        {:geom_line, placed, %{}, [], :without_width, :identity},
+        {:geom_line, placed, %{}, [], :oriented_without_width, :identity},
         {:geom_path, placed, %{}, [], :without_width, :identity},
         {:geom_segment, placed, %{xend: :end, yend: :y}, [], :without_width, :identity},
         {:geom_rug, placed, %{}, [], :without_width, :identity},
@@ -5267,27 +5324,27 @@ defmodule Giggly.PlotTest do
         {:geom_label, placed, %{label: :g}, [], :without_width, :nudge},
         {:geom_count, placed, %{}, [], :without_width, :identity},
         {:stat_sum, placed, %{}, [], :without_width, :identity},
-        {:geom_linerange, ranges, %{}, [], :without_width, :identity},
-        {:geom_pointrange, ranges, %{}, [], :without_width, :identity},
-        {:geom_ribbon, along_x, %{ymin: :lo, ymax: :hi}, [], :without_width, :identity},
-        {:geom_area, placed, %{}, [], :without_width, :stack},
-        {:geom_density, along_x, %{}, [], :without_width, :identity},
-        {:stat_density, along_x, %{}, [], :without_width, :stack},
-        {:geom_smooth, placed, %{}, [], :without_width, :identity},
-        {:stat_smooth, placed, %{}, [], :without_width, :identity},
+        {:geom_linerange, ranges, %{}, [], :oriented_without_width, :identity},
+        {:geom_pointrange, ranges, %{}, [], :oriented_without_width, :identity},
+        {:geom_ribbon, along_x, %{ymin: :lo, ymax: :hi}, [], :oriented_without_width, :identity},
+        {:geom_area, placed, %{}, [], :oriented_without_width, :stack},
+        {:geom_density, along_x, %{}, [], :oriented_without_width, :identity},
+        {:stat_density, along_x, %{}, [], :oriented_without_width, :stack},
+        {:geom_smooth, placed, %{}, [], :oriented_without_width, :identity},
+        {:stat_smooth, placed, %{}, [], :oriented_without_width, :identity},
         {:geom_hex, placed, %{}, [], :without_width, :identity},
         {:stat_bin_hex, placed, %{}, [], :without_width, :identity},
-        {:stat_summary, placed, %{}, [], :without_width, :identity},
-        {:geom_bar, Plot.new(@placed, %{x: :g}), %{}, [], :with_width, :stack},
-        {:geom_col, grouped, %{}, [], :with_width, :stack},
-        {:geom_histogram, along_x, %{}, [], :with_width, :stack},
-        {:stat_bin, along_x, %{}, [], :with_width, :stack},
-        {:geom_freqpoly, along_x, %{}, [], :with_width, :identity},
-        {:geom_errorbar, ranges, %{}, [], :with_width, :identity},
-        {:geom_crossbar, ranges, %{}, [], :with_width, :identity},
+        {:stat_summary, placed, %{}, [], :oriented_without_width, :identity},
+        {:geom_bar, Plot.new(@placed, %{x: :g}), %{}, [], :oriented_with_width, :stack},
+        {:geom_col, grouped, %{}, [], :oriented_with_width, :stack},
+        {:geom_histogram, along_x, %{}, [], :oriented_with_width, :stack},
+        {:stat_bin, along_x, %{}, [], :oriented_with_width, :stack},
+        {:geom_freqpoly, along_x, %{}, [], :oriented_with_width, :identity},
+        {:geom_errorbar, ranges, %{}, [], :oriented_with_width, :identity},
+        {:geom_crossbar, ranges, %{}, [], :oriented_with_width, :identity},
         {:geom_tile, placed, %{}, [], :with_width, :identity},
         {:geom_raster, placed, %{}, [], :with_width, :identity},
-        {:stat_summary, placed, %{}, [geom: :bar], :with_width, :identity},
+        {:stat_summary, placed, %{}, [geom: :bar], :oriented_with_width, :identity},
         {:geom_boxplot, grouped, %{}, [], :boxplot, :dodge2},
         {:geom_rect, bare, %{xmin: :lo, xmax: :hi, ymin: :lo, ymax: :hi}, [], :rect, :identity},
         {:geom_hline, bare, %{yintercept: :y}, [], :hline, :identity},
@@ -5304,32 +5361,56 @@ defmodule Giggly.PlotTest do
     end
 
     # The positions each family takes, as a layer gives them, the dodging of marks with no width
-    # within a width given.
-    defp taken(:with_width), do: [:identity, :stack, :fill, :dodge, :dodge2, :jitter, :nudge]
+    # within a width given, and dodging along y only where the marks do not say which way they run.
+    defp taken(:with_width),
+      do: [{:dodge, orientation: :y, preserve: :single} | taken(:oriented_with_width)]
+
+    defp taken(:oriented_with_width) do
+      [:identity, :stack, :fill, :dodge, :dodge2, :jitter, :nudge] ++
+        [{:dodge, preserve: :single, reverse: true}, {:dodge2, preserve: :single}]
+    end
 
     defp taken(:without_width),
-      do: [:identity, :stack, :fill, {:dodge, width: 0.9}, :jitter, :nudge]
+      do: [{:dodge, width: 0.9, orientation: :y} | taken(:oriented_without_width)]
 
-    defp taken(family) when family in [:boxplot, :rect], do: [:identity, :dodge, :dodge2, :nudge]
+    defp taken(:oriented_without_width) do
+      [:identity, :stack, :fill, {:dodge, width: 0.9}, {:dodge2, width: 0.5}, :jitter, :nudge] ++
+        [
+          {:dodge, width: 0.9, preserve: :single, reverse: true},
+          {:dodge2, width: 0.5, padding: 0.5}
+        ]
+    end
+
+    defp taken(:boxplot), do: [:identity, :dodge, :dodge2, :nudge, {:dodge, reverse: true}]
+    defp taken(:rect), do: [:identity, :dodge, :dodge2, :nudge, {:dodge, orientation: :y}]
     defp taken(family) when family in [:hline, :vline], do: [:identity, :nudge]
 
     # The positions each family refuses, each with the part of its refusal saying why, as R fails
     # or moves nothing.
-    defp refused(:with_width), do: []
+    defp refused(:with_width), do: [edges_refusal()]
+    defp refused(:oriented_with_width), do: [edges_refusal(), orientation_refusal([])]
 
     defp refused(:without_width) do
       [
         {:dodge,
          "expected :dodge with its width:, {:dodge, width: width}, got: :dodge, since " <>
            "the marks have no width of their own to share, so none would move"},
+        {{:dodge, preserve: :single},
+         "expected :dodge with its width:, {:dodge, width: width}, got: {:dodge, [preserve: " <>
+           ":single]}, since the marks have no width of their own to share"},
         {:dodge2,
-         "got: :dodge2, since the marks have no width of their own, by which dodging " <>
-           "by clusters sets them side by side, so none would move"}
+         "expected :dodge2 with its width:, {:dodge2, width: width}, got: :dodge2, since " <>
+           "the marks have no width of their own to share, so none would move"}
       ]
     end
 
+    defp refused(:oriented_without_width),
+      do: [orientation_refusal(width: 0.9) | refused(:without_width)]
+
     defp refused(:boxplot) do
       [
+        edges_refusal(),
+        orientation_refusal([]),
         {:stack,
          "got: :stack, since a box plot's rows have no y once its stat has run, which " <>
            "stacking piles"},
@@ -5344,6 +5425,7 @@ defmodule Giggly.PlotTest do
 
     defp refused(:rect) do
       [
+        edges_refusal(),
         {:stack,
          "got: :stack, since a rectangle has no x, at which stacking piles marks, so " <>
            "none would move"},
@@ -5363,6 +5445,23 @@ defmodule Giggly.PlotTest do
           {:fill,
            "got: :fill, since a vertical line has no y, which filling piles, so none would move"}
         ] ++ line_refusals("a vertical line")
+
+    # Dodging by clusters with a width, which marks with edges of their own do not read.
+    defp edges_refusal do
+      {{:dodge2, width: 0.5},
+       "expected :dodge2 without its width:, got: {:dodge2, [width: 0.5]}, since the marks " <>
+         "have edges of their own, which it sets side by side, so a width would change nothing"}
+    end
+
+    # Dodging along y, with `options`, where the marks say which way they run.
+    defp orientation_refusal(options) do
+      position = {:dodge, Keyword.put(options, :orientation, :y)}
+
+      {position,
+       "expected :dodge without its orientation:, got: #{inspect(position)}, since the marks " <>
+         "say which way they run, which dodging reads first, so an orientation would change " <>
+         "nothing"}
+    end
 
     defp line_refusals(line) do
       [
@@ -5409,7 +5508,7 @@ defmodule Giggly.PlotTest do
     test "a refusal names the positions the marks take" do
       for {function, plot, mapping, given, taken} <- [
             {:geom_point, Plot.new(@placed, %{x: :x, y: :y}), %{}, [],
-             ":identity, :stack, :fill, :dodge, :jitter or :nudge"},
+             ":identity, :stack, :fill, :dodge, :dodge2, :jitter or :nudge"},
             {:geom_boxplot, Plot.new(@placed, %{x: :g, y: :y}), %{}, [],
              ":identity, :dodge, :dodge2 or :nudge"},
             {:geom_hline, Plot.new(@placed), %{}, [yintercept: 1], ":identity or :nudge"}
@@ -5573,7 +5672,7 @@ defmodule Giggly.PlotTest do
 
     test "beside varwidth: a box plot dodges by clusters alone, each box at its own width" do
       plot = Plot.new(@placed, %{x: :g, y: :y})
-      single = %Position.Dodge2{preserve: :single, padding: 0.1, reverse: false}
+      single = %Position.Dodge2{width: :none, preserve: :single, padding: 0.1, reverse: false}
 
       for position <- [:dodge2, {:dodge2, []}, {:dodge2, preserve: :single}] do
         assert [%Plot.Layer{position: ^single}] =
@@ -5588,7 +5687,12 @@ defmodule Giggly.PlotTest do
       assert [%Plot.Layer{position: kept}] =
                Plot.geom_boxplot(plot, position: told, varwidth: true).reversed_layers
 
-      assert kept == %Position.Dodge2{preserve: :single, padding: 0.3, reverse: true}
+      assert kept == %Position.Dodge2{
+               width: :none,
+               preserve: :single,
+               padding: 0.3,
+               reverse: true
+             }
 
       for position <- [:identity, :dodge, {:dodge, width: 0.9}, :nudge] do
         error =
@@ -5621,8 +5725,10 @@ defmodule Giggly.PlotTest do
       for {named, struct} <- [
             {:stack, %Position.Stack{vjust: 1.0, reverse: false, fill: false}},
             {:fill, %Position.Stack{vjust: 1.0, reverse: false, fill: true}},
-            {:dodge, %Position.Dodge{width: :none}},
-            {:dodge2, %Position.Dodge2{preserve: :total, padding: 0.1, reverse: false}}
+            {:dodge,
+             %Position.Dodge{width: :none, preserve: :total, orientation: :x, reverse: false}},
+            {:dodge2,
+             %Position.Dodge2{width: :none, preserve: :total, padding: 0.1, reverse: false}}
           ],
           position <- [named, {named, []}] do
         assert [%Plot.Layer{position: ^struct}] =
@@ -5691,7 +5797,7 @@ defmodule Giggly.PlotTest do
     end
 
     test "dodging by clusters refuses a padding outside 0 to 1, a preserve it does not know " <>
-           "and a width" do
+           "and a width that is no number" do
       plot = Plot.new(@rows, %{x: :cyl, y: :mpg})
 
       for {options, message} <- [
@@ -5700,17 +5806,60 @@ defmodule Giggly.PlotTest do
             {[padding: -0.1], "expected a fraction from 0 to 1, got: -0.1"},
             {[padding: "0.1"], ~s(expected a fraction from 0 to 1, got: "0.1")},
             {[preserve: :both], "expected one of [:total, :single], got: :both"},
-            {[width: 0.5], "unknown options [:width]"}
+            {[width: "wide"], ~s(invalid value for :width option: expected a width, a number)}
           ] do
         error =
           assert_raise NimbleOptions.ValidationError, fn ->
-            Plot.geom_col(plot, position: {:dodge2, options})
+            Plot.geom_point(plot, position: {:dodge2, options})
           end
 
         assert error.key == :position
         assert error.message =~ "in :dodge2's options, "
         assert error.message =~ message
       end
+    end
+
+    test "dodging records its options, each not given its default, a width as a float" do
+      plot = Plot.new(@rows, %{x: :cyl, y: :mpg})
+
+      for {options, recorded} <- [
+            {[], %{width: :none, preserve: :total, orientation: :x, reverse: false}},
+            {[width: 1, preserve: :single, orientation: :y, reverse: true],
+             %{width: 1.0, preserve: :single, orientation: :y, reverse: true}}
+          ] do
+        [layer] = Plot.geom_tile(plot, position: {:dodge, options}).reversed_layers
+        assert layer.position === struct!(Position.Dodge, recorded)
+      end
+    end
+
+    test "dodging by clusters records a width given as a float, else :none" do
+      plot = Plot.new(@rows, %{x: :cyl, y: :mpg})
+
+      [points] = Plot.geom_point(plot, position: {:dodge2, width: 1}).reversed_layers
+      [bars] = Plot.geom_col(plot, position: :dodge2).reversed_layers
+
+      assert {points.position.width, bars.position.width} === {1.0, :none}
+    end
+
+    # Golden: ggplot2 4.0.3's `layer_data()` in R 4.6.1 for `geom_line(position =
+    # position_dodge(width = 0.9))` over a discrete y, printed to 17 significant digits: its geom
+    # writes `flipped_aes` FALSE, so it is dodged along x. The wiring of the line's column into
+    # the position: it fails if the geom's column stops reaching dodging.
+    test "a line over a discrete y is dodged along x, as its geom says it runs" do
+      data = %{"x" => [2.0, 3.0, 1.0], "y" => ["p", "p", "q"], "g" => ["a", "b", "a"]}
+
+      frame =
+        data
+        |> Plot.new(%{x: :x, y: :y, color: :g, group: :g})
+        |> Plot.geom_line(position: {:dodge, width: 0.9})
+        |> Giggly.layer_data()
+
+      assert Enum.map([:x, :xmin, :xmax, :y], fn name -> DataFrame.pull(frame, name) end) == [
+               [1.0, 2.0, 3.0],
+               [0.55000000000000004, 1.55000000000000004, 2.54999999999999982],
+               [1.45, 2.4500000000000002, 3.4500000000000002],
+               [2, 1, 1]
+             ]
     end
 
     test "dodging by clusters keeps a padding as a float, 0 and 1 included" do

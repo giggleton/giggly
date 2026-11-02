@@ -343,8 +343,9 @@ stat and position" and "Each facet, coordinate system, geom, stat and position i
   twice, and records the position as given; `Plot` builds the kind's struct from
   it, a name alone being the position with no options given, each option not given its
   default. The options are dodging's `width:`, any number, kept as a float, `:none` when not
-  given (R's `preserve`, `orientation` and `reverse` wait), dodging by clusters' `preserve:`,
-  `padding:` 0 to 1 and `reverse:`, its `width:` waiting, and jittering's `width:` and `height:`,
+  given, `preserve:` (`:total`, `:single`), `orientation:` (`:x`, `:y`) and `reverse:`, dodging by
+  clusters' `width:`, as dodging's, `preserve:`, `padding:` 0 to 1 and `reverse:`, and jittering's
+  `width:` and `height:`,
   each 0 or more, a float, `:none` when not given, where R moves nothing for a negative one, and
   `seed:`, any integer, 0 when not given, and stacking's and filling's `vjust:`, any number, a
   float, 1 when not given, never a list, which R hands out down each pile by rank (design-log §4,
@@ -358,8 +359,13 @@ stat and position" and "Each facet, coordinate system, geom, stat and position i
   their own (bars, bins, frequency polygons, error bars, crossbars, tiles, rasters, a summary's
   bars) take every one; marks with none (points, lines, paths, segments, rugs, text, labels, counts,
   line and point ranges, ribbons, areas, densities, smooths, hexagons, a summary's other geoms)
-  take `:dodge` only with its `width:` and refuse `:dodge2`, as R warns "Width not defined" and
-  moves none; a box plot and a rectangle refuse stacking, filling and jittering, R failing at a
+  take `:dodge` and `:dodge2` only with their `width:`, as R warns "Width not defined" and moves
+  none; marks with edges, those with a width, box plots and rectangles, refuse dodging by clusters'
+  `width:`, which R ignores; and marks that say which way they run, their stat or geom writing
+  `flipped_aes` (bars, bins, frequency polygons, error bars, crossbars, box plots, lines, line and
+  point ranges, ribbons, areas, densities, smooths, every summary), refuse dodging's
+  `orientation:`, which R ignores (design-log §4, the entry beginning "Dodging takes R's
+  options"); a box plot and a rectangle refuse stacking, filling and jittering, R failing at a
   box's missing y and stacking no rectangle, which has no x, and failing to fill one; and filling
   is taken and refused wherever stacking is; a horizontal or vertical line takes only
   `:identity` and `:nudge`; a diagonal line and an annotation take no `position:`, as R's
