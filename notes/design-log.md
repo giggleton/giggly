@@ -82,6 +82,17 @@ The decisions on how the scales package behaves moved to its own design log
 (`notes/design-log.md` in giggleton/scales) when it left this repository; a §6 line naming one
 finds it there.
 
+- **Giggly's package is MIT, as scales', and ships R's `mtcars` with a notice naming its
+  source (2026-11-03, Steve: "good" and "a").** The package carries `lib`, `priv` (the datasets
+  and glyph tables, read when it compiles), `mix.exs`, `.formatter.exs`, the README, LICENSE
+  ("Copyright (c) 2026 Steve Rowley") and THIRD_PARTY_NOTICES.md; its docs link the source at the
+  tag `v<version>`, so RELEASE.md pushes the tag before publishing. ggplot2's datasets and
+  vdiffr's glyph tables are MIT, each notice its licence's full text. `mtcars` comes from R's
+  datasets package, "Part of R" (GPL-2 or GPL-3), but is the 1974 Motor Trend measurements alone,
+  as Henderson and Velleman published them, with no code or text of R's, so its notice names that
+  source. *Rejected: leaving `mtcars` out of the package*: a quarter of the notebooks call
+  `Datasets.mtcars()` and would fail for anyone using Giggly from Hex.
+
 - **Giggly takes the scales package from Hex, `{:scales, "~> 0.1.0"}`, a required dependency,
   switched once 0.1.0 was published (2026-11-02, Steve: "A"; switched 2026-11-03).** The package
   left for `giggleton/scales` with its tests, its palettes, its three rules files and the

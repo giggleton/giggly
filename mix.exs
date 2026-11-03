@@ -1,10 +1,13 @@
 defmodule Giggly.MixProject do
   use Mix.Project
 
+  @version "0.1.0"
+  @source_url "https://github.com/giggleton/giggly"
+
   def project do
     [
       app: :giggly,
-      version: "0.1.0",
+      version: @version,
       elixir: "~> 1.20",
       start_permanent: Mix.env() == :prod,
       deps: deps(),
@@ -28,7 +31,28 @@ defmodule Giggly.MixProject do
       ],
       aliases: aliases(),
       elixirc_paths: elixirc_paths(Mix.env()),
-      docs: docs()
+      description:
+        "A grammar of graphics for Elixir, after R's ggplot2: map data to aesthetics, compose " <>
+          "layers, scales, facets and coordinate systems, and draw SVG.",
+      package: package(),
+      docs: docs(),
+      source_url: @source_url
+    ]
+  end
+
+  defp package do
+    [
+      licenses: ["MIT"],
+      links: %{"GitHub" => @source_url},
+      files: [
+        "lib",
+        "priv",
+        "mix.exs",
+        ".formatter.exs",
+        "README.md",
+        "LICENSE",
+        "THIRD_PARTY_NOTICES.md"
+      ]
     ]
   end
 
@@ -90,6 +114,8 @@ defmodule Giggly.MixProject do
   # modules, Tack's and its mix tasks', are left out of the documentation.
   defp docs do
     [
+      main: "Giggly",
+      source_ref: "v#{@version}",
       extras: ["guides/fonts.md"],
       groups_for_extras: [Guides: ~r"guides/"],
       filter_modules: fn module, _metadata ->

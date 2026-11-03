@@ -150,4 +150,4 @@ invariants. Add a line here when an area gets its rules file; nothing else about
 ## Publishing
 
 - **Claude never has access to the keys** — publishing to Hex (`mix hex.publish`), and anything
-  else that needs a secret, is a step the user runs.
+  else that needs a secret, is a step the user runs, in [RELEASE.md](RELEASE.md)'s order.
