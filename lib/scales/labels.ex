@@ -2016,7 +2016,8 @@ defmodule Scales.Labels do
     # R's `round(x / precision) %% 10 == 0`, where a quotient past the largest double is `NA`:
     # beside a break that is no multiple R's `all()` is false, and beside multiples alone R
     # fails, so such a quotient is left out (design-log §4, the entry beginning "A break whose
-    # quotient").
+    # quotient"). The remainder is exact where R's `%%` loses accuracy past about 4.5e15 (the
+    # entry beginning "A quotient past"), a stated departure.
     tenfold =
       values
       |> Enum.map(fn value -> Arithmetic.quotient(value, precision) end)

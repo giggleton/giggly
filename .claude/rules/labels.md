@@ -77,6 +77,11 @@ and "`wrap/2` takes"; why `dictionary/2` matches and takes what it does: "`dicti
   `Inf` inside them; it takes no step and no cents, and no part in the others' accuracy, nor
   does a break whose quotient by the accuracy tried passes it, where R fails beside multiples
   alone (design-log §4, the entry beginning "A break whose quotient").
+- **The test for multiples takes a quotient's exact remainder by 10**, where R's `%%` works in
+  the platform's long double and warns of "probable complete loss of accuracy" once the quotient
+  passes about 4.5e15 (design-log §4, the entry beginning "A quotient past"): a break 1e15 times
+  the smallest gap or more, beside small ones, may take another accuracy than R's on x86, as
+  `comma(c(10, 5.71e305, 5, 1, -1.1e307))` takes 0.1 where R takes 1 (a stated departure).
 - **`Labels.Format` is R's `format()` for numbers, `formatReal()` rule for rule** (digits 1 to
   22, `nsmall`, trim, either notation, marks, `NA` and the non-finite values, each padded to the
   numbers' marked width), its tests pinning R's output; all of 6,000 random vectors matched R. **R's `scientific = FALSE` is plain unless

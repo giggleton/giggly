@@ -79,6 +79,17 @@ stops the question being reopened from scratch. A new entry is about 150 words: 
 sentence or two of why, and one line per rejected alternative. What a later decision replaces is
 deleted from the entry it was in, never marked superseded; git history keeps every version.
 
+- **A quotient past about 4.5e15 is tested for multiples of 10 by its exact remainder, a stated
+  departure from R (2026-11-02, Steve: "A"; checked against scales 1.4.0 on R 4.6.1, x86_64).**
+  `precision()` asks whether every `round(x / precision) %% 10` is 0; past `1 / eps` R's `%%`
+  (`myfmod()`) warns "probable complete loss of accuracy in modulus" and gives its long double's
+  remainder, so `comma(c(10, 5.71e305, 5, 1, -1.1e307))` takes accuracy 1 in R and 0.1 here, and
+  5.71e305's label is written from another double (3 of 2,000 random huge-beside-small cases).
+  R's answer there is its platform's long double's, 80 bits on x86 and others elsewhere, and an
+  axis's evenly spaced breaks never reach it. *Rejected: x87's 80-bit rounding emulated in
+  integers*: new numerics for a value R calls lost, matching one of R's platforms, near a port
+  of C's steps.
+
 - **A violin's width is R's, in R's order (2026-11-02, violins step 2, within the scope Steve
   agreed; checked against ggplot2 4.0.3).** `width:` is the stat's and a set aesthetic, as R hands
   it to both, so the assembly's set-size stage fills it where the stat wrote none and writes it
