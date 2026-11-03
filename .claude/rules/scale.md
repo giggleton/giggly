@@ -11,7 +11,7 @@ paths:
 transformation, trains a scale over the values it is given, and maps values to their positions,
 or, for an aesthetic other than position, through the scale's palette to the aesthetic's values.
 It is ggplot2's half of a scale; R's scales half, the breaks, transformations, palettes, bounds and
-data ranges it works with, is the `Scales` package (`scales.md`).
+data ranges it works with, is the `Scales` package (giggleton/scales, its `scales.md`).
 Why a palette is a field of the two scale kinds: design-log §4, the entry beginning "A scale's
 palette is a field".
 Why scales are values rather than one mutated object: design-log §4, the entry beginning "Scales
@@ -23,8 +23,8 @@ identity transformation: the entry beginning "A layer records its stat and posit
 
 - **A scale is a continuous or a discrete scale, whatever the aesthetic, or for colour and fill a
   binned one (below); its palette is what makes it one aesthetic's.** Its palette is any value
-  of `Scales.Palette`'s (`scales.md`), one of the other kind converted when mapped, or one of
-  ggplot2's own a discrete scale holds (below).
+  of `Scales.Palette`'s (the package's `scales.md`), one of the other kind converted when
+  mapped, or one of ggplot2's own a discrete scale holds (below).
   `new/1` makes a position scale; `new/2` makes an aesthetic's with ggplot2's default palette for
   it (`alpha`: 0.1 to 1; `color` and `fill`: the gradient from `#132B43` to `#56B1F7`, or
   `pal_hue()`'s hues from 15 round to 375, chroma 100, luminance 65; `size`: 1 to 6 by area, or 2
@@ -86,23 +86,23 @@ identity transformation: the entry beginning "A layer records its stat and posit
   entry beginning "A discrete scale carries its missing value"); a position scale places `nil` as
   its last level and reads none.
 - **A manual palette gives a list's colours, shapes or line types to the levels in order, and a
-  map's by value** (`Scales.DataRange.key/1`), a level the map lacks taking the `na_value`; a map with no
-  given limits narrows the scale's limits to the levels it names, the missing value kept, as
-  ggplot2's manual scale limits itself to its values' names. **A list named by breaks (`{:manual,
-  values, breaks}`) gives each break's level the value at its place and leaves the limits the
-  levels**, as `manual_scale()` names values by breaks after choosing its limits. Any kind with
-  fewer values than limits raises when the plot is run, named or not, as R fails ("Insufficient
-  values in manual scale"). This matching and refusing is ggplot2's, so it is
+  map's by value** (`Scales.DataRange.key/1`), a level the map lacks taking the `na_value`; a map
+  with no given limits narrows the scale's limits to the levels it names, the missing value kept,
+  as ggplot2's manual scale limits itself to its values' names. **A list named by breaks
+  (`{:manual, values, breaks}`) gives each break's level the value at its place and leaves the
+  limits the levels**, as `manual_scale()` names values by breaks after choosing its limits. Any
+  kind with fewer values than limits raises when the plot is run, named or not, as R fails
+  ("Insufficient values in manual scale"). This matching and refusing is ggplot2's, so it is
   `Giggly.Scale.Discrete`'s, as are ggplot2's ordinal palettes: `{:sequence, {low, high}}`,
-  `scale_alpha_ordinal()`'s `seq(low, high, length.out = n)`, and `{:area_sequence, {low,
-  high}}`, `scale_size_ordinal()`'s `sqrt(seq(low^2, high^2, length.out = n))`, `low^2` as
-  `low * low`, as R's `^` squares, both on `Scales.Palette.spread/2`; every other palette is R's
-  (`scales.md`). **A shape scale's seventh level, a line type scale's fourteenth, or a level past
-  a brewer palette's largest set, raises when the plot is run**, naming the palette's count, the
+  `scale_alpha_ordinal()`'s `seq(low, high, length.out = n)`, and `{:area_sequence, {low, high}}`,
+  `scale_size_ordinal()`'s `sqrt(seq(low^2, high^2, length.out = n))`, `low^2` as `low * low`, as
+  R's `^` squares, both on `Scales.Palette.spread/2`; every other palette is R's (the package's
+  `scales.md`). **A shape scale's seventh level, a line type scale's fourteenth, or a level past a
+  brewer palette's largest set, raises when the plot is run**, naming the palette's count, the
   levels' and `Giggly.Plot.scale_shape_manual/2`, `scale_linetype_manual/2` or the colour manual
-  scales, where R's palette gives `NA` with a warning and leaves it undrawn
-  (design-log §4, the entry beginning "A discrete palette with fewer shapes"); the package's
-  palette gives `nil` there, which the scale refuses.
+  scales, where R's palette gives `NA` with a warning and leaves it undrawn (design-log §4, the
+  entry beginning "A discrete palette with fewer shapes"); the package's palette gives `nil`
+  there, which the scale refuses.
 - **A scale names its guide (`guide`), as ggplot2's scale carries `guide`**: `:axis` for a position
   (ggplot2's `guide_axis()`, drawn by the coordinate system's sides, not through the guide
   protocol), `:colorbar` for a continuous colour or fill, `:colorsteps` for a binned one, and
@@ -214,8 +214,8 @@ identity transformation: the entry beginning "A layer records its stat and posit
 - **A missing label is written where a scale's labels are made, but among powers** (`written/1`,
   over a continuous, a discrete and a binned scale's labels alike, a list's, a map's and a
   function's): `NA`, as R draws a missing label, so a guide sees `nil` only where any label is a
-  power, and writes it as R draws its guide's (design-log §4, the entries beginning "A missing
-  break's label" and "A missing label among powers").
+  power, and writes it as R draws its guide's (the scales design log's entry beginning "A missing
+  break's label"; design-log §4, the entry beginning "A missing label among powers").
 - **A scale sees plain values, never a frame or a plot.** Its boundary lists `Scales`, R's scales
   half, which gives it its breaks, transformations, palettes, bounds and data ranges, and
   `Giggly.AsCharacter`, which writes a discrete level, and nothing else; the assembly pulls a

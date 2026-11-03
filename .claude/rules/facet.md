@@ -81,7 +81,7 @@ is: the entry beginning "`facet_grid` is Phase 3's thirteenth increment".
   the labeller as `Plot` records it, plain data, and runs a function only to write labels.
 - **`:wrap` breaks a label by `Scales.Labels.wrap/2`, R's `label_wrap()`, which
   `label_wrap_gen()` calls**, handing it the width, 25 unless given, and the labels with `nil`
-  for a missing value, which it writes `NA`; how a label breaks is the package's (`labels.md`),
+  for a missing value, which it writes `NA`; how a label breaks is the package's (its `labels.md`),
   and the facet keeps no rule of its own for it. The facet's boundary lists `Scales` for it alone.
 - **Panels made from values are ordered column by column, as R's vctrs combines the tables'
   columns** (checked in R 4.6.1): a column every table holding it holds as a category by its

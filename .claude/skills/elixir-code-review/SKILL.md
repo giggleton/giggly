@@ -13,18 +13,14 @@ rule set can grow without bloating this file.
 
 | Check | Reference file | Applies to |
 |---|---|---|
-| Module boundaries | `references/module-boundaries.md` | `lib/giggly/**/*.ex`, `lib/scales/**/*.ex` |
-| OTP process hygiene | `references/otp-processes.md` | `lib/giggly/**/*.ex`, `lib/scales/**/*.ex` |
+| Module boundaries | `references/module-boundaries.md` | `lib/giggly/**/*.ex` |
+| OTP process hygiene | `references/otp-processes.md` | `lib/giggly/**/*.ex` |
 | Test quality | `references/test-quality.md` | `test/**/*_test.exs`, `test/support/**` |
 | Suppressions & waivers | `references/suppressions.md` | `lib/**/*.ex`, `.credo.exs`, `mix.exs` |
 | Stats compute through the frame | `references/stats-through-frame.md` | `lib/giggly/stat/**/*.ex` |
 
 Read only the reference files whose "Applies to" pattern matches files in scope. Reading
 rules that can't apply wastes context and tends to produce stretched findings.
-
-`lib/scales` is the scales package, carved inside this repository until it is extracted
-(`.claude/rules/scales.md`); until then it is reviewed exactly as `lib/giggly` is, its root
-`lib/scales.ex`.
 
 Mutation testing is not part of this review: the `mutation-testing` skill runs it after the
 commit, over the lines the commit changed.
@@ -61,7 +57,7 @@ not from this change" rather than mixing it into the findings.
 2. **Load the relevant rules.** Read the reference files for the checks that apply.
 
 3. **Read the code with its context.** For a module under review, also open the modules it
-   calls and the root module of its namespace (`lib/giggly/<namespace>.ex`, or `lib/scales.ex`). Most
+   calls and the root module of its namespace (`lib/giggly/<namespace>.ex`). Most
    judgments here depend on what the public API already offers: three lines of orchestration in
    a caller read very differently when the namespace exposes a single function that would do the
    whole thing. For a test file under review, also open the module under test and any

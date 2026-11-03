@@ -97,6 +97,10 @@ semver or the changelog).
   of its own and run in a fresh VM, so none reuses another's build. The skill's warm runner
   (`warm.exs`) builds its mutants and writes its report through muex's library, so a bump also
   runs it and muex's own runner over one commit and compares the reports, as the skill says.
+- **`scales` is R's scales half, a package of its own** (giggleton/scales), taken from Hex: a
+  change to it is made and released there and taken here as any dependency update, never edited
+  under `deps/`; its rules and the decisions on how it behaves are that repository's (design-log
+  §4, the entry beginning "Giggly takes the scales package from Hex").
 - **A boundary declaration is a layering decision, so widening one asks the user** — the same
   standing as a lint waiver, but enforced **harder**: `.claude/hooks/waiver-gate.sh` scores each
   declaration's grants and **always denies** an edit that raises the score. An Edit is scored

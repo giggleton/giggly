@@ -1,6 +1,6 @@
 # Module boundaries
 
-**Applies to:** `lib/giggly/**/*.ex`, and `lib/scales/**/*.ex` until the package is extracted.
+**Applies to:** `lib/giggly/**/*.ex`.
 
 ## The rule
 

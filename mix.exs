@@ -50,7 +50,7 @@ defmodule Giggly.MixProject do
       {:boundary, "~> 0.11", runtime: false},
       {:table, "~> 0.1.2"},
       {:nimble_options, "~> 1.1"},
-      {:color, "~> 0.13.0"},
+      {:scales, "~> 0.1.0"},
       {:nx, "~> 1.0"},
       {:pngex, "~> 0.1.2"},
       {:tz, "~> 0.28", only: :test}

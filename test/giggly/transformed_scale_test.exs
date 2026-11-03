@@ -151,7 +151,7 @@ defmodule Giggly.TransformedScaleTest do
   defp decor(_legend, _scale), do: %{}
 
   # Whether Giggly drew R's values: each the same, but under the pseudo-logarithm, whose
-  # `asinh()` is the platform's, within a double of R's (`scales.md`).
+  # `asinh()` is the platform's, within a double of R's (the scales package's `scales.md`).
   defp same?(drawn, expected, transform) do
     length(drawn) == length(expected) and
       drawn
