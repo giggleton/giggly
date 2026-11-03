@@ -3567,12 +3567,15 @@ tells the story (`git show <hash>`). Until 2026-10-15 each milestone also had a 
 `git log -S "<title>" -- notes/design-log.md` finds it in this file's history. The phases are
 §1's roadmap.
 
+- 2026-11-03 — Take the scales package from Hex: scales 0.1.0 for the carved lib/scales
+  (`97b7ca0`; the package's history continues in giggleton/scales from `8a84d4c`); §4: "Giggly
+  takes the scales package from Hex"
 - 2026-11-02 — Draw a violin's quantile lines, as ggplot2's GeomViolin draws them (violins, step 3)
   (`2a4cd6f`); §4: "A violin's quantile lines are R's"
 - 2026-11-02 — Draw every violin's border butt-ended and round-cornered, as ggplot2 does, its key
   alone taking lineend and linejoin (`f3968b1`); §4: "A violin's border is always"
 - 2026-11-02 — Add Scales.Bounds.expand_range/2, R's expand_range(), and widen Giggly's extents
-  through it (transforms, step 10) (`24db15d`); §4: "A range is widened"
+  through it (transforms, step 10) (`24db15d`); §4: "A range is widened" (in the scales log)
 - 2026-11-02 — Add geom_violin() and stat_ydensity(): a violin per group, drawn as ggplot2's
   GeomViolin (violins, step 2) (`a6dea4d`); §4: "A violin's width is R's"
 - 2026-11-02 — Add stat_ydensity(), a violin's densities, sharing the density's estimate (violins,
@@ -3580,7 +3583,7 @@ tells the story (`git show <hash>`). Until 2026-10-15 each milestone also had a 
 - 2026-11-02 — Take transform: on Giggly's continuous non-position scales, any transformation on x
   and y (transforms, step 8) (`1b40993`); §4: "`transform:` takes every", "A column of an
   aesthetic other than position", "gradient2's midpoint", "A given limit outside", "A
-  transformation of your own labels"
+  transformation of your own labels" (in the scales log)
 - 2026-11-01 — Take oob: on Giggly's continuous and binned scales (transforms, step 7)
   (`6b130a1`); §4: "A non-position scale keeps", "A function `oob`", "`oob:` takes a name"
 - 2026-11-01 — Draw coord_flip()'s examples with the swap ggplot2 prefers, and every example of a
@@ -3590,22 +3593,24 @@ tells the story (`git show <hash>`). Until 2026-10-15 each milestone also had a 
   position_jitterdodge() but its reverse, and refuse a jittered range missing its cross position
   (positions, step 6) (`aff93fa`); §4: "Jittering beside dodging takes R's options"
 - 2026-11-01 — Compose transformations and take a user's own (transforms, step 6) (`3409ceb`); §4:
-  "A composition is", "A composition's breaks", "A composition's labels", "A composition's domain",
-  "A date, date-time or time transformation comes first", "`Transform.new/2` takes", "A
-  transformation of your own"
+  "A composition is" (in the scales log), "A composition's breaks" (in the scales log), "A
+  composition's labels" (in the scales log), "A composition's domain" (in the scales log), "A
+  date, date-time or time transformation comes first" (in the scales log), "`Transform.new/2`
+  takes" (in the scales log), "A transformation of your own" (in the scales log)
 - 2026-11-01 — Give dodging R's preserve:, orientation: and reverse:, and dodging by clusters its
   width:, each position reading the orientation as R does (positions, step 5) (`5392a92`); §4:
   "Dodging takes R's options", "Dodging by clusters takes `preserve:`", "Dodging by clusters'
   `:single`", "A notebook leaves out an argument"
 - 2026-11-01 — Carry Box-Cox, modulus, Yeo-Johnson and a span of time (transforms, step 5)
-  (`dd131e6`); §4: "Box-Cox, modulus, Yeo-Johnson and a span of time", "The Box-Cox, modulus and
-  Yeo-Johnson transformations", "Box-Cox's domain", "An axis past a bound", "Box-Cox, modulus and
-  Yeo-Johnson labels"
+  (`dd131e6`); §4: "Box-Cox, modulus, Yeo-Johnson and a span of time" (in the scales log), "The
+  Box-Cox, modulus and Yeo-Johnson transformations" (in the scales log), "Box-Cox's domain" (in
+  the scales log), "An axis past a bound" (in the scales log), "Box-Cox, modulus and Yeo-Johnson
+  labels" (in the scales log)
 - 2026-11-01 — Make nudge_x and nudge_y aesthetics, set or mapped on every layer that nudges
   (positions, step 4) (`6b8cab7`); §4: "A nudge is an aesthetic only", "A position declares the
   aesthetics it reads"
-- 2026-11-01 — Write a plain label past what Erlang writes whole, as R writes it (`4bdb310`); §4: "A
-  plain label past"
+- 2026-11-01 — Write a plain label past what Erlang writes whole, as R writes it (`4bdb310`); §4:
+  "A plain label past" (in the scales log)
 - 2026-11-01 — Give stacking its vjust: and reverse:, and fill each pile to 1 with :fill (positions,
   step 3) (`86f1b9a`); §4: "Filling is stacking with `fill: true`"
 - 2026-11-01 — Give every layer function the positions that move its marks in ggplot2, refusing the
@@ -3620,17 +3625,19 @@ tells the story (`git show <hash>`). Until 2026-10-15 each milestone also had a 
   and a seeded mean_cl_boot (summaries, step 5); §4: "`mean_cl_boot` draws its resamples", "The
   Hmisc summaries take Hmisc's arguments"
 - 2026-11-01 — Carry asn, atanh, logit, probit and the normal and logistic probabilities
-  (transforms, step 4) (`6e2fa4f`); §4: "A distribution's spread", "A break turned back through an
-  inexact inverse", "A logarithm's or exponential's base"
+  (transforms, step 4) (`6e2fa4f`); §4: "A distribution's spread" (in the scales log), "A break
+  turned back through an inexact inverse" (in the scales log), "A logarithm's or exponential's
+  base" (in the scales log)
 - 2026-11-01 — Carry the logarithms, log1p, the exponentials, asinh and the pseudo-logarithm
-  (transforms, step 3) (`f99fb82`); §4: "A break turned back through an inexact inverse", "A
-  logarithm's or exponential's base"
+  (transforms, step 3) (`f99fb82`); §4: "A break turned back through an inexact inverse" (in the
+  scales log), "A logarithm's or exponential's base" (in the scales log)
 - 2026-11-01 — Give R's doubles from each transformation, with trim_to_domain() and the
-  derivatives (transforms, step 2) (`e1ce0bb`); §4: "A transformation gives R's doubles"
+  derivatives (transforms, step 2) (`e1ce0bb`); §4: "A transformation gives R's doubles" (in the
+  scales log)
 - 2026-11-01 — Complete R's out-of-range family, with infinities and NaN as R gives them
-  (transforms, step 1) (`189efe5`); §4: "A NaN is `:nan` throughout `Scales.Bounds`", "The
-  scales package carries every transformation", "`oob:` takes a name or a function",
-  "`transform:` reaches the continuous non-position scales"
+  (transforms, step 1) (`189efe5`); §4: "A NaN is `:nan` throughout `Scales.Bounds`" (in the
+  scales log), "The scales package carries every transformation" (in the scales log), "`oob:`
+  takes a name or a function", "`transform:` reaches the continuous non-position scales"
 - 2026-10-31 — Summarise y at each x with stat_summary(): mean_se, the frame's summaries or a
   function, drawn by eight geoms (summaries, step 4); §4: "`stat_summary/3` draws with eight
   geoms", "A summary's values are names", "A summary carries a column cell by cell", "The
@@ -3645,12 +3652,13 @@ tells the story (`git show <hash>`). Until 2026-10-15 each milestone also had a 
   plotmath draws them (labels, step 6) (`def4123`, fixes `c6726c6`, `66602bb`); §4: "Every text a
   guide draws breaks", "A guide drawing its labels together", "A missing label among powers", "A
   plotmath sign is drawn in the symbol face", "`Font.box/5` measures", "A plotmath piece is a
-  text", and "A missing break's label" amended
+  text", and "A missing break's label" (in the scales log) amended
 - 2026-10-31 — Wrap text and look labels up in a dictionary, and break a facet's wrapped strips by
-  them (labels, step 5); §4: "`dictionary/2` matches", "`wrap/2` takes", "`wrap/2` counts a
-  character", "Wrapping a strip's label"
-- 2026-10-31 — Label dates, date-times and times of day (labels, step 4); §4: "The date
-  labellers write", "`date/2`'s and `time/2`'s `format:`", "`date_short/2` takes its parts"
+  them (labels, step 5); §4: "`dictionary/2` matches" (in the scales log), "`wrap/2` takes" (in
+  the scales log), "`wrap/2` counts a character" (in the scales log), "Wrapping a strip's label"
+- 2026-10-31 — Label dates, date-times and times of day (labels, step 4); §4: "The date labellers
+  write" (in the scales log), "`date/2`'s and `time/2`'s `format:`" (in the scales log),
+  "`date_short/2` takes its parts" (in the scales log)
 - 2026-10-31 — Draw the notebook examples tiles, rasters and faithfuld unlock (tile, step 3, the
   notebook sweep); §4: none, each checked against vdiffr's drawing at the notebook's size
 - 2026-10-31 — Draw a raster as one image of its cells, as svglite writes one, and refuse
@@ -3661,15 +3669,18 @@ tells the story (`git show <hash>`). Until 2026-10-15 each milestone also had a 
 - 2026-10-31 — Draw tiles centred on their positions, and copy ggplot2's faithfuld (tile, step 1);
   §4: "`geom_tile()`, `geom_raster()` and `faithfuld` come together"
 - 2026-10-31 — Label bytes, ordinals, p-values and spans of time (labels, step 3); §4: "A break
-  whose quotient", "`timespan/2` takes", "`pvalue/2`'s accuracy", "`ordinal/2` takes", "Plain
-  bytes under binary units", "`bytes/2`'s `units:`"
+  whose quotient" (in the scales log), "`timespan/2` takes" (in the scales log), "`pvalue/2`'s
+  accuracy" (in the scales log), "`ordinal/2` takes" (in the scales log), "Plain bytes under
+  binary units" (in the scales log), "`bytes/2`'s `units:`" (in the scales log)
 - 2026-10-31 — Label numbers in scientific notation, in whichever way suits their size, and as
-  powers (labels, step 2); §4: "A break `scale:` takes past", "`scientific/2` takes",
-  "`digits:` is an integer", "A signed power", "`log/2` refuses", "`format_log/2` takes", and
-  "A missing break's label" made exact
+  powers (labels, step 2); §4: "A break `scale:` takes past" (in the scales log), "`scientific/2`
+  takes" (in the scales log), "`digits:` is an integer" (in the scales log), "A signed power" (in
+  the scales log), "`log/2` refuses" (in the scales log), "`format_log/2` takes" (in the scales
+  log), and "A missing break's label" (in the scales log) made exact
 - 2026-10-31 — Write numbers as R's format() does, label them with number/2, and give a missing
-  break no label (labels, step 1); §4: "R's `format()` for numbers", "A missing break's label",
-  and the increment's other four entries of that day, agreed with them
+  break no label (labels, step 1); §4: "R's `format()` for numbers" (in the scales log), "A
+  missing break's label" (in the scales log), and the increment's other four entries of that day,
+  agreed with them
 - 2026-10-31 — Take Pica 0.1.0 from Hex, its native library prebuilt, and write the fonts guide
   (Pica, steps 4 and 5); §4: "Fonts are explained by one guide", "The mutation pass runs muex's
   mutants in warm VMs"
@@ -3717,12 +3728,12 @@ tells the story (`git show <hash>`). Until 2026-10-15 each milestone also had a 
 - 2026-10-29 — Take breaks and minor breaks functions and n_breaks: on Giggly's scales, R's
   names as {break, label} pairs, and minor breaks on a discrete axis (breaks, step 5); §4: "A
   breaks function"
-- 2026-10-29 — Add Breaks.pretty, R's breaks_pretty(), and n: through log10, dates and
-  date-times, their labels following it (breaks, step 4); §4: "`n:` reaches", "A date-time's
-  breaks under a day"
+- 2026-10-29 — Add Breaks.pretty, R's breaks_pretty(), and n: through log10, dates and date-times,
+  their labels following it (breaks, step 4); §4: "`n:` reaches" (in the scales log), "A
+  date-time's breaks under a day" (in the scales log)
 - 2026-10-29 — Add MinorBreaks.n, MinorBreaks.width and MinorBreaks.log, R's minor_breaks_n(),
   minor_breaks_width() and minor_breaks_log() (breaks, step 3); §4: "Minor breaks a number or a
-  width"
+  width" (in the scales log)
 - 2026-10-29 — Add geom_hex() and stat_bin_hex(): hexagons counting the rows in each, each row in
   the hexagon hexbin puts it in, through the frame's :if_else (geom_hex, step 1); §4:
   "`geom_hex()` puts each row", "`geom_hex()`'s `bins:` and `binwidth:`", "The frame chooses each
@@ -3744,11 +3755,13 @@ tells the story (`git show <hash>`). Until 2026-10-15 each milestone also had a 
   hook starts in
 - 2026-10-29 — Add geom_segment(): a straight line per row, or a path under radial coordinates,
   and annotate(:segment) (geom_segment, step 1); §4: "`geom_segment()` draws a straight line"
-- 2026-10-29 — Add Breaks.log, Breaks.exp and Breaks.timespan, R's breaks_log(), breaks_exp()
-  and breaks_timespan(), and only_loose and weights on Breaks.extended (breaks, step 2); §4:
-  "Breaks for a log, exponential or timespan axis", "The standalone colour mappers"
+- 2026-10-29 — Add Breaks.log, Breaks.exp and Breaks.timespan, R's breaks_log(), breaks_exp() and
+  breaks_timespan(), and only_loose and weights on Breaks.extended (breaks, step 2); §4: "Breaks
+  for a log, exponential or timespan axis" (in the scales log), "The standalone colour mappers"
+  (in the scales log)
 - 2026-10-29 — Add Breaks.fullseq and Breaks.width, R's fullseq() and breaks_width() on numbers,
-  dates, date-times and times, with offsets (breaks, step 1); §4: "Breaks a width apart"
+  dates, date-times and times, with offsets (breaks, step 1); §4: "Breaks a width apart" (in the
+  scales log)
 - 2026-10-29 — Draw the notebook examples increment 1 unlocks, the brewer and steps scales and a
   named palette, and narrow every verdict to what still waits (palettes and colours, step 10, the
   notebook sweep); §4: "An example handing a scale a palette function"
@@ -3761,46 +3774,50 @@ tells the story (`git show <hash>`). Until 2026-10-15 each milestone also had a 
 - 2026-10-29 — Add Scale.Binned, a third kind of scale: trained as a continuous one, squished,
   cut at breaks worked out on read (palettes and colours, step 7); §4: "A binned scale's breaks
   and limits"
-- 2026-10-29 — Add Bounds.squish/2, R's oob_squish() on finite numbers, an infinite end refused
-  by it and by censor/2 (palettes and colours, step 6); §4: "A squished value is R's"
+- 2026-10-29 — Add Bounds.squish/2, R's oob_squish() on finite numbers, an infinite end refused by
+  it and by censor/2 (palettes and colours, step 6); §4: "A squished value is R's" (in the scales
+  log)
 - 2026-10-28 — Add the brewer and distiller scales, palette: a name or a list, gradientn's
   values (palettes and colours, step 5); §4: "A brewer or distiller scale takes R's options"
 - 2026-10-28 — Add R's colour helpers, one colour a call, out-of-range arguments capped as farver
-  caps them (palettes and colours, step 4); §4: "A colour helper takes one colour"
+  caps them (palettes and colours, step 4); §4: "A colour helper takes one colour" (in the scales
+  log)
 - 2026-10-28 — Give the gradient R's values and alpha, transparent R's white, nil outside it
-  (palettes and colours, step 3); §4: "A gradient's values move a place"
+  (palettes and colours, step 3); §4: "A gradient's values move a place" (in the scales log)
 - 2026-10-28 — Give palettes R's type, levels and names, each kind converted to the other
-  (palettes and colours, step 2); §4: "A palette of one kind is converted", "A palette's name is
-  one of scales' own 45"
-- 2026-10-28 — Add the brewer palette: RColorBrewer's sets, named as R spells them, dichromat
-  left out (palettes and colours, step 1); §4: "A brewer palette is RColorBrewer's sets"
+  (palettes and colours, step 2); §4: "A palette of one kind is converted" (in the scales log), "A
+  palette's name is one of scales' own 45" (in the scales log)
+- 2026-10-28 — Add the brewer palette: RColorBrewer's sets, named as R spells them, dichromat left
+  out (palettes and colours, step 1); §4: "A brewer palette is RColorBrewer's sets" (in the scales
+  log)
 - 2026-10-27 — Document the Scales root as API: its families, the conventions they share and a
   worked example, its exports narrowed to what Giggly calls (scales package, the split, step 2,
-  the root); §4: "The scales package's API is what a user holds"
+  the root); §4: "The scales package's API is what a user holds" (in the scales log)
 - 2026-10-27 — Split the transformations' tests by subject: the package's call Scales.Transform
-  alone on R's axes, a scale's options through it move to Giggly's, and a date position turns
-  back rounded down as R's (scales package, the split, step 2, transformations' tests); §4: "The
-  package gives R's values and Giggly refuses"
+  alone on R's axes, a scale's options through it move to Giggly's, and a date position turns back
+  rounded down as R's (scales package, the split, step 2, transformations' tests); §4: "The
+  package gives R's values and Giggly refuses" (in the scales log)
 - 2026-10-27 — Document Scales.Breaks, MinorBreaks, Transform and ColorOperations as API, breaks'
   nice numbers and minor breaks' reverse as options (scales package, the split, step 2, breaks,
-  transformations and colours); §4: "The scales package's API is what a user holds"
+  transformations and colours); §4: "The scales package's API is what a user holds" (in the scales
+  log)
 - 2026-10-27 — Rename Scales.Format to Scales.Labels, R's label_* family, its rules file to
   labels.md (scales package, the split, step 2, labels, part two); §4: "The scales package's API
-  is what a user holds"
+  is what a user holds" (in the scales log)
 - 2026-10-27 — Move plain number labels into Scales.Format as plain/1, documenting it for any
   charting tool (scales package, the split, step 2, labels, part one); §4: "The scales package's
-  API is what a user holds"
+  API is what a user holds" (in the scales log)
 - 2026-10-27 — Document Scales.DataRange as API, its training rules pinned by the package's own
   tests (scales package, the split, step 2, data ranges); §4: "The package gives R's values and
-  Giggly refuses"
+  Giggly refuses" (in the scales log)
 - 2026-10-27 — Document Scales.Palette as API: R's palettes on lists, nil past a discrete one's
   end, and ggplot2's ordinal palettes, manual matching and refusals moved to Giggly.Scale.Discrete
   (scales package, the split, step 2, palettes); §4: "The package gives R's values and Giggly
-  refuses"
+  refuses" (in the scales log)
 - 2026-10-27 — Document Scales.Bounds as API: rescale on lists as R's, checking both ranges, and
   R's rescale_mid and rescale_max moved in from Giggly.Scale (scales package, the split, step 2,
-  bounds); §4: "The scales package's API is what a user holds", "The package gives R's values and
-  Giggly refuses"
+  bounds); §4: "The scales package's API is what a user holds" (in the scales log), "The package
+  gives R's values and Giggly refuses" (in the scales log)
 - 2026-10-27 — Carve R's scales half out as the Scales package: breaks, transforms, palettes,
   labels, formatters and colour operations moved by name, Scales.Bounds and Scales.DataRange
   pulled from Giggly.Scale (scales package, the split, step 1); §4: "`scales`, a package of R's
@@ -3808,17 +3825,18 @@ tells the story (`git show <hash>`). Until 2026-10-15 each milestone also had a 
 - 2026-10-27 — Narrow every notebook verdict and About sentence to what date-time scales leave
   waiting (date-time scales, step 4, the notebook sweep); §4: "Date-time scales are Phase 3's
   fifteenth increment"
-- 2026-10-27 — Times of day: scale_x_time() and scale_y_time(), a Time placed at its seconds
-  since midnight, R's breaks_hms() and hms's labels (date-time scales, step 3); §4: "A time of
-  day's labels"
+- 2026-10-27 — Times of day: scale_x_time() and scale_y_time(), a Time placed at its seconds since
+  midnight, R's breaks_hms() and hms's labels (date-time scales, step 3); §4: "A time of day's
+  labels" (in the scales log)
 - 2026-10-27 — Date-time axes in a time zone: timezone: and time_zone_database:, breaks laid and
   labels written on the zone's clock, skipped and repeated local times read as R reads them
-  (date-time scales, step 2); §4: "A local time a change of offset skips or repeats", "A time
-  zone's database is passed on the scale"
+  (date-time scales, step 2); §4: "A local time a change of offset skips or repeats" (in the
+  scales log), "A time zone's database is passed on the scale"
 - 2026-10-26 — Date-time axes: scale_x_datetime() and scale_y_datetime(), DateTime and
   NaiveDateTime placed at their seconds, R's pretty() breaks under a day (date-time scales, step
-  1); §4: "Date-time scales are Phase 3's fifteenth increment", "A date-time's breaks under a
-  day", "A time zone's database is passed on the scale", "Column types belong to the frame"
+  1); §4: "Date-time scales are Phase 3's fifteenth increment", "A date-time's breaks under a day"
+  (in the scales log), "A time zone's database is passed on the scale", "Column types belong to
+  the frame"
 - 2026-10-26 — Draw the notebook examples geom_jitter unlocks, and narrow every verdict to what
   still waits (geom_jitter, step 2, the notebook sweep); §4: "`geom_jitter` is Phase 3's fourteenth
   increment", "A jitter's distances are Erlang's", "A table is the user's to shape"
@@ -3916,8 +3934,9 @@ tells the story (`git show <hash>`). Until 2026-10-15 each milestone also had a 
 - 2026-10-22 — Read a table's factor columns, and order facet panels by their levels (ordering,
   step 2); §4: "A table's column carries its levels as a `Giggly.Factor`" (amended)
 - 2026-10-22 — Give a factor its levels, and train a discrete scale as R's discrete_range()
-  (ordering, step 1); §4: "A discrete scale fed levelled and plain values", "A factor carries R's
-  `ordered` flag", "`{:factor, [value], levels: [...]}` gives a factor its levels"
+  (ordering, step 1); §4: "A discrete scale fed levelled and plain values" (in the scales log), "A
+  factor carries R's `ordered` flag", "`{:factor, [value], levels: [...]}` gives a factor its
+  levels"
 - 2026-10-22 — Sweep the notebooks for histograms, box plots and dodging (distributions, step 7);
   §4: "A value an example computes in base R"
 - 2026-10-22 — Draw box plots: Geom.Boxplot and geom_boxplot/3 (distributions, step 6); §4: "A
@@ -3967,6 +3986,7 @@ tells the story (`git show <hash>`). Until 2026-10-15 each milestone also had a 
 - 2026-10-19 — Give a plot colour, fill and alpha scales (scale functions, step 5); §4: "Colour,
   fill and alpha scales are the scale functions' step 5", "`palette:` takes a list of colours",
   "The hue scale's options are spelled out", "A gradient is one palette of any number of colours"
+  (in the scales log)
 - 2026-10-19 — Give a plot discrete and date position scales (scale functions, step 4); §4:
   "Discrete and date position scales are the scale functions' step 4", "A discrete axis names its
   values as the column holds them", "`date_breaks:` and `date_minor_breaks:` are a step"
@@ -4012,10 +4032,11 @@ tells the story (`git show <hash>`). Until 2026-10-15 each milestone also had a 
 - 2026-10-17 — Draw labels with geom_text (text and titles, step 1) (`91fe040`); §4: "Text and
   titles is Phase 3's fifth increment", "An aesthetic a layer takes from the plot"
 - 2026-10-17 — Draw colours in the notebooks (colour, step 4) (`5918137`); §4: "Colour and fill is
-  Phase 3's fourth increment", "Colours are CSS's names and hex forms"
+  Phase 3's fourth increment", "Colours are CSS's names and hex forms" (in the scales log)
 - 2026-10-17 — Map continuous columns to colours and draw the colour bar (colour, step 3b)
   (`5c1aabb`); §4: "The colour bar is drawn as ggplot2's gradient form", "R's exact colours come
-  from the `color` package's conversions", "A discrete scale carries its missing value"
+  from the `color` package's conversions" (in the scales log), "A discrete scale carries its
+  missing value"
 - 2026-10-17 — Draw guides through a protocol at Giggly.Guide (colour, step 3a) (`47df626`); §4:
   "The guide protocol sits at `Giggly.Guide`"
 - 2026-10-16 — Draw a layer only in the legend keys its data holds (colour, step 2's follow-up)
@@ -4024,8 +4045,8 @@ tells the story (`git show <hash>`). Until 2026-10-15 each milestone also had a 
   discrete scale carries its missing value", "Group ids follow ggplot2's `add_group()`", "The
   guide protocol sits at `Giggly.Guide`"
 - 2026-10-16 — Set colours and fills on a layer (colour, step 1) (`2841c12`); §4: "Colour and fill
-  is Phase 3's fourth increment", "Colours are CSS's names and hex forms", "R's exact colours come
-  from the `color` package's conversions"
+  is Phase 3's fourth increment", "Colours are CSS's names and hex forms" (in the scales log),
+  "R's exact colours come from the `color` package's conversions" (in the scales log)
 - 2026-10-16 — Draw lines and dates in the notebooks (lines, step 4) (`04e9957`); §4: "Lines and
   date axes are Phase 3's third increment"
 - 2026-10-16 — Put dates on an axis (lines, step 3) (`223c9f1`); §4: "Lines and date axes are Phase
