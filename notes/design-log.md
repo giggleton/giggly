@@ -79,6 +79,17 @@ stops the question being reopened from scratch. A new entry is about 150 words: 
 sentence or two of why, and one line per rejected alternative. What a later decision replaces is
 deleted from the entry it was in, never marked superseded; git history keeps every version.
 
+- **The platform's asinh, atanh, erf and erfc stay, and a figure resting on them is pinned as
+  R's within the rules' bounds, never as one C library's double (2026-11-02, Steve: "Just use
+  :math and accept the difference"; checked on glibc 2.39 and 2.43).** CI's move to Ubuntu 26.04
+  failed three transform tests that pinned glibc 2.39's doubles. R's own asinh and atanh move with
+  the C library (2.43 gives the correctly rounded `atanh(0.5)`, 2.39 a double below), so the
+  package's may; R's `pnorm()` is its own and does not, while the package's goes through
+  `:math.erfc`, and 2.43 moves `pnorm(0.5, 1, 2)` a double below R's, within the distribution's
+  3. *Rejected: an error function of the package's own* (Cody's 1969 rational approximations):
+  new numerics to hold a bound already met. *Rejected: CI pinned to Ubuntu 24.04*: the suite
+  would pass only on one C library, and its "departures" were that library's.
+
 - **A quotient past about 4.5e15 is tested for multiples of 10 by its exact remainder, a stated
   departure from R (2026-11-02, Steve: "A"; checked against scales 1.4.0 on R 4.6.1, x86_64).**
   `precision()` asks whether every `round(x / precision) %% 10` is 0; past `1 / eps` R's `%%`

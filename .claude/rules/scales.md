@@ -217,8 +217,9 @@ R's regular ones: the entry beginning "The panel's grid lines are placed by the 
   bases by their own functions; R's `exp(1)^x`, not `exp(x)`, is `:log`'s inverse and `:exp`.
   Every value, derivative, domain and break is R's but where the platform's asinh, atanh and sine
   are not correctly rounded (asinh and atanh within 1 ulp of R's, the pseudo-logarithm and asn's
-  inverse 2), log1p's and expm1's measured methods (within 2 and 1), and the normal's (its
-  quantile within 5, distribution 3, density 7, nearer the truth than R's where they part; a mean
+  inverse 2), log1p's and expm1's measured methods (within 2 and 1), and the normal's, through the
+  platform's erf and erfc, which R's does not use (its quantile within 5, distribution 3, density
+  7, nearer the truth than R's where they part under glibc 2.39; a mean
   or the forward derivative carries the quantile's last bit, the derivative's at the far tail
   multiplied by about its square, 5.2e-13 relatively); R's `+0` for a negative zero from log1p,
   expm1, asinh, sinh, the pseudo-logarithm, asin, sin, tanh and atanh on a vector. The
@@ -226,7 +227,10 @@ R's regular ones: the entry beginning "The panel's grid lines are placed by the 
   x / (4 * sigma * sigma)) * 2 * sigma * log(base))` alone of twelve; a probability's forward
   derivative is 1 over its inverse's at the value transformed, as R's. Their tests pin R's
   figures over the nine doubles, ggplot2's axes and `test/scales/fixtures/r_elementary_4.6.1.csv`'s
-  bounds.
+  bounds. **A figure resting on the platform's asinh, atanh, erf or erfc is pinned as R's within
+  these bounds, never as one C library's double**: glibc 2.43 rounds them otherwise than 2.39,
+  moving R's own asinh and atanh with them, and the normal's drift is accepted rather than an
+  error function of the package's own (design-log §4, the entry beginning "The platform's").
 - **The Box-Cox, modulus and Yeo-Johnson transformations are scales' documented formulas**
   (`Transform.BoxCox`, `Transform.Modulus`, `Transform.YeoJohnson`, on `Transform.Power`'s
   `(base^exponent - 1) / exponent`; design-log §4, the entry beginning "The Box-Cox, modulus and

@@ -84,6 +84,20 @@ defmodule Scales.TransformTest do
     if sign == 1, do: -magnitude, else: magnitude
   end
 
+  # Whether `actual` is `expected`, through tuples and lists, but each nonzero finite double within
+  # `bound` doubles of its own: a zero, infinity, NaN or `nil` exactly.
+  defp near_r?(actual, expected, bound)
+       when is_float(actual) and is_float(expected) and actual != 0 and expected != 0,
+       do: ulps(actual, expected) <= bound
+
+  defp near_r?(actual, expected, bound) when is_tuple(actual) and is_tuple(expected),
+    do: near_r?(Tuple.to_list(actual), Tuple.to_list(expected), bound)
+
+  defp near_r?([actual | actual_rest], [expected | expected_rest], bound),
+    do: near_r?(actual, expected, bound) and near_r?(actual_rest, expected_rest, bound)
+
+  defp near_r?(actual, expected, _bound), do: actual === expected
+
   # The time-of-day transformation's breaks inside `extent` and their labels.
   defp time_breaks(extent) do
     breaks =
@@ -644,7 +658,8 @@ defmodule Scales.TransformTest do
                 ]}
     end
 
-    # Golden: as above. The platform's atanh places R's -0.5 and 0.5 a double nearer zero.
+    # Golden: as above. The platform's atanh may place R's -0.5 and 0.5 a double nearer zero
+    # (glibc 2.39 does; 2.43 places them as R does).
     test "atanh's positions are within a double of R's" do
       # y = c(-0.9, 0, 0.9) under "atanh"
       assert near_axis?(
@@ -1283,12 +1298,25 @@ defmodule Scales.TransformTest do
 
     # Golden: R's for step 3's transformations (`inc4/step3/probe.R`), inverses but at `NA`, the
     # infinities' and zeros' in R's IEEE arithmetic, a zero of either sign `+0` from log1p,
-    # expm1, asinh, sinh and the pseudo-logarithm, as R's on a vector. Two are the package's own,
-    # agreed departures: log1p(2), by Goldberg's method, 1 ulp above R's 1.0986122886681096, and
-    # the pseudo-logarithm's of 0.5 in sigma 2, base 10, through the platform's asinh, 2 ulps
-    # below R's 0.054146423209630819.
+    # expm1, asinh, sinh and the pseudo-logarithm, as R's on a vector. One is the package's own,
+    # agreed departure: log1p(2), by Goldberg's method, 1 ulp above R's 1.0986122886681096.
     @log1p_of_two 1.0986122886681098
-    @pseudo_log_of_half 0.054146423209630812
+    # How far from R's a transformation through the platform's asinh, atanh, erf or erfc may be,
+    # in doubles, as `.claude/rules/scales.md` bounds them, since the C library's rounding moves
+    # them: glibc 2.43 gives R's asinh and atanh, 2.39 puts the pseudo-logarithm's of 0.5 in
+    # sigma 2, base 10, 2 below R's and atanh's of 0.5 1 below. R's normal uses neither erf nor
+    # erfc, so the normal's are R's only where the platform's land there; theirs is the largest of
+    # the normal's bounds, as these tables test each transformation's wiring and
+    # `Scales.DoubleTest` holds each function to its own over R's values.
+    @platform_bounds %{
+      :asinh => 1,
+      :pseudo_log => 2,
+      {:pseudo_log, sigma: 2, base: 10} => 2,
+      {:pseudo_log, sigma: 0.5, base: 2} => 2,
+      :atanh => 1,
+      :probit => 7,
+      {:probability, :normal, mean: 1, sd: 2} => 7
+    }
     @r_doubles [
       {:log,
        {[
@@ -1625,7 +1653,7 @@ defmodule Scales.TransformTest do
           -0.20898764024997873,
           0.0,
           0.0,
-          @pseudo_log_of_half,
+          0.054146423209630819,
           0.20898764024997873,
           :infinity,
           nil,
@@ -1703,9 +1731,13 @@ defmodule Scales.TransformTest do
       inputs = Enum.reject(@doubles, &is_nil/1)
 
       for {name, expected} <- @r_doubles do
-        assert {Transform.transform(name, @doubles), Transform.inverse(name, inputs),
-                Transform.derivative(name, @doubles),
-                Transform.inverse_derivative(name, @doubles)} === expected,
+        assert near_r?(
+                 {Transform.transform(name, @doubles), Transform.inverse(name, inputs),
+                  Transform.derivative(name, @doubles),
+                  Transform.inverse_derivative(name, @doubles)},
+                 expected,
+                 Map.get(@platform_bounds, name, 0)
+               ),
                inspect(name)
       end
     end
@@ -1737,15 +1769,13 @@ defmodule Scales.TransformTest do
 
     # Golden: R's for step 4's transformations (`inc4/step4/golden.R`), inverses but at `NA`, a
     # zero of either sign `+0` from asin, sin, tanh and atanh, as R's, and `-0.0`'s square root
-    # its own, so asn's derivative there minus infinity. Three are the package's own, agreed
-    # departures: atanh's of 0.5, through the platform's, a double below R's correctly rounded
-    # 0.54930614433405489; and the normal distribution's of -2, two doubles below R's
-    # 0.022750131948179212, the nearer the truth, and of 0.5 and -0.5, a double either side of
-    # R's 0.69146246127401301 and 0.30853753872598694, each the nearer the truth.
-    @atanh_of_half 0.5493061443340548
-    @normal_below_minus_two 0.022750131948179205
-    @normal_below_half 0.6914624612740131
-    @normal_below_minus_half 0.3085375387259869
+    # its own, so asn's derivative there minus infinity. atanh's and the normal's are R's within
+    # `@platform_bounds`: under glibc 2.39 the normal distribution's of -2 is two doubles below
+    # R's, and of 0.5 and -0.5 a double either side, each the nearer the truth; under 2.43 the one
+    # of 0.5 in mean 1, sd 2 is a double below R's, the further from it.
+    @normal_below_minus_two 0.022750131948179212
+    @normal_below_half 0.69146246127401301
+    @normal_below_minus_half 0.30853753872598694
     @r_proportions [
       {:asn,
        {[:nan, :nan, 0.0, 0.0, 1.5707963267948968, :nan, :nan, nil, :nan],
@@ -1771,7 +1801,7 @@ defmodule Scales.TransformTest do
           :nan
         ]}},
       {:atanh,
-       {[:nan, :nan, 0.0, 0.0, @atanh_of_half, :nan, :nan, nil, :nan],
+       {[:nan, :nan, 0.0, 0.0, 0.54930614433405489, :nan, :nan, nil, :nan],
         [-1.0, -0.9640275800758169, 0.0, 0.0, 0.46211715726000974, 0.9640275800758169, 1.0, :nan],
         [
           -0.0,
@@ -1885,9 +1915,13 @@ defmodule Scales.TransformTest do
       inputs = Enum.reject(@doubles, &is_nil/1)
 
       for {name, expected} <- @r_proportions do
-        assert {Transform.transform(name, @doubles), Transform.inverse(name, inputs),
-                Transform.derivative(name, @doubles),
-                Transform.inverse_derivative(name, @doubles)} === expected,
+        assert near_r?(
+                 {Transform.transform(name, @doubles), Transform.inverse(name, inputs),
+                  Transform.derivative(name, @doubles),
+                  Transform.inverse_derivative(name, @doubles)},
+                 expected,
+                 Map.get(@platform_bounds, name, 0)
+               ),
                inspect(name)
       end
     end
@@ -1990,31 +2024,35 @@ defmodule Scales.TransformTest do
     end
 
     # Golden: R's trim_to_domain() of c(-5, 0.3, 0.9, NA), c(0.2, 3) and c(-0.5, 0.25)
-    # (`inc4/step4/golden.R`), but atanh's of -0.5, the platform's, a double nearer zero than
-    # R's -0.54930614433405489.
+    # (`inc4/step4/golden.R`), atanh's within `@platform_bounds`.
     test "step 4's domains: asn's and the probabilities' 0 to 1, atanh's -1 to 1" do
       ranges = [[-5.0, 0.3, 0.9, nil], [0.2, 3.0], [-0.5, 0.25]]
 
-      assert Enum.map([:asn, :atanh, :logit], fn name ->
-               Enum.map(ranges, fn values -> Transform.trim_to_domain(name, values) end)
-             end) ===
+      trimmed = fn name ->
+        Enum.map(ranges, fn values -> Transform.trim_to_domain(name, values) end)
+      end
+
+      assert {trimmed.(:asn), trimmed.(:logit)} ===
+               {[
+                  {0.0, 2.4980915447965089},
+                  {0.92729521800161219, 3.1415926535897931},
+                  {0.0, 1.0471975511965979}
+                ],
+                [
+                  {:neg_infinity, 2.1972245773362196},
+                  {-1.3862943611198906, :infinity},
+                  {:neg_infinity, -1.0986122886681098}
+                ]}
+
+      assert near_r?(
+               trimmed.(:atanh),
                [
-                 [
-                   {0.0, 2.4980915447965089},
-                   {0.92729521800161219, 3.1415926535897931},
-                   {0.0, 1.0471975511965979}
-                 ],
-                 [
-                   {:neg_infinity, 1.4722194895832204},
-                   {0.20273255405408219, :infinity},
-                   {-0.5493061443340548, 0.25541281188299536}
-                 ],
-                 [
-                   {:neg_infinity, 2.1972245773362196},
-                   {-1.3862943611198906, :infinity},
-                   {:neg_infinity, -1.0986122886681098}
-                 ]
-               ]
+                 {:neg_infinity, 1.4722194895832204},
+                 {0.20273255405408219, :infinity},
+                 {-0.54930614433405489, 0.25541281188299536}
+               ],
+               @platform_bounds[:atanh]
+             )
     end
 
     test "values all below the domain are its end" do

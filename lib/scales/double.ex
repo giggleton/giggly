@@ -308,8 +308,10 @@ defmodule Scales.Double do
   # exactly (Dekker's product, and 1 / sqrt(2)'s own rounding) and `erfc` moved by its derivative,
   # `-2 / sqrt(pi) * exp(-z^2)`, across it. Beyond 40 either side it is 0 or 1, as every double
   # there is, and the arithmetic would pass the largest double far beyond; plus infinity, an
-  # atom, sorts above every number, so is among those above 40. Measured on 3,000 random values:
-  # within 3 ulps of R's, correctly rounded on 88% of them against a 60-digit truth, R's on 86%.
+  # atom, sorts above every number, so is among those above 40. Measured on 3,000 random values
+  # under glibc 2.39: within 3 ulps of R's, correctly rounded on 88% of them against a 60-digit
+  # truth, R's on 86%. `erfc` is the platform's, where R's computes its own, so another C library
+  # moves these within that bound (2.43 puts R's 0.40129367431707630 at -0.25 a double below).
   @doc false
   @spec normal_distribution(operand()) :: operand()
   def normal_distribution(:nan), do: :nan
@@ -324,13 +326,13 @@ defmodule Scales.Double do
   # `erf(q / sqrt(2)) / 2` against `probability - 0.5`, exact there, with the rounding of
   # `q / sqrt(2)` corrected as the distribution's is, since many quantiles near 0 share one
   # distribution value near 0.5 (correctly rounded on 218 of 300 from 0.25 to 0.45, where the
-  # distribution's bisection is on 122); above 0.5 by symmetry, `1 - probability` exact there.
-  # 0's and 1's are the infinities, NaN outside them. Measured on 3,000 random values: within 5
-  # ulps of R's, correctly rounded on 86% of them against a 60-digit truth, R's on 31%. Below the
-  # smallest normal double, where one distribution double stands for a stretch of quantiles, it
-  # is one of them: at 5e-324, -38.475 where R gives -38.467; from about 1e-310 up, the stretch is
-  # under a double wide. An infinity or NaN, an atom, sorts above every number, so it is between
-  # none of them.
+  # distribution's bisection is on 122); above 0.5 by symmetry, `1 - probability` exact there. 0's
+  # and 1's are the infinities, NaN outside them. Measured under glibc 2.39, on 3,000 random values:
+  # within 5 ulps of R's, correctly rounded on 86% of them against a 60-digit truth, R's on 31%.
+  # Below the smallest normal double, where one distribution double stands for a stretch of
+  # quantiles, it is one of them: at 5e-324, -38.475 where R gives -38.467; from about 1e-310 up,
+  # the stretch is under a double wide. An infinity or NaN, an atom, sorts above every number, so it
+  # is between none of them.
   @doc false
   @spec normal_quantile(operand()) :: operand()
   def normal_quantile(probability) when probability == 0, do: :neg_infinity
@@ -347,10 +349,10 @@ defmodule Scales.Double do
 
   # The standard normal density, as R's `dnorm()`: `exp(-value^2 / 2) / sqrt(2 * pi)`, the square
   # split exactly into two doubles (Dekker's product) so its rounding is not raised to the power,
-  # `exp(-high / 2) * exp(-low / 2)`. 0 at the infinities and beyond 40 either side, as every
-  # double there is. Measured on 3,493 random values: within 7 ulps of R's, as often correctly
-  # rounded against a 60-digit truth, and nearer it between 4 and 5 either side, where R's is up
-  # to 6 off it and this one 2. The square would pass the largest double far beyond 40; an
+  # `exp(-high / 2) * exp(-low / 2)`. 0 at the infinities and beyond 40 either side, as every double
+  # there is. Measured under glibc 2.39, on 3,493 random values: within 7 ulps of R's, as often
+  # correctly rounded against a 60-digit truth, and nearer it between 4 and 5 either side, where R's
+  # is up to 6 off it and this one 2. The square would pass the largest double far beyond 40; an
   # infinity, an atom, sorts above every number, so is among those beyond it.
   @doc false
   @spec normal_density(operand()) :: operand()
